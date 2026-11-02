@@ -1,7 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import {
-  Bars3Icon,
   DocumentIcon,
   EllipsisHorizontalIcon,
   GlobeAltIcon,
@@ -97,7 +96,30 @@ export function FavoriteCard({
 }: FavoriteCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string>();
   const [dropActive, setDropActive] = useState(false);
+  const cardRef = useRef<HTMLElement>(null);
+  const previousPosition = useRef<{ left: number; top: number }>();
   const isLocalFile = parseSafeUrl(item.url)?.protocol === 'file:';
+
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+
+    const position = { left: card.offsetLeft, top: card.offsetTop };
+    const previous = previousPosition.current;
+    previousPosition.current = position;
+    if (!previous || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
+    const x = previous.left - position.left;
+    const y = previous.top - position.top;
+    if (x === 0 && y === 0) return;
+
+    card.animate([{ translate: `${x}px ${y}px` }, { translate: '0px 0px' }], {
+      duration: 220,
+      easing: 'cubic-bezier(0.2, 0, 0, 1)',
+    });
+  });
 
   useEffect(() => {
     let currentUrl: string | undefined;
@@ -140,6 +162,7 @@ export function FavoriteCard({
       alt=""
       className="h-full w-full object-cover"
       loading="lazy"
+      draggable={false}
       src={thumbnailUrl}
     />
   ) : (
@@ -166,6 +189,13 @@ export function FavoriteCard({
 
   return (
     <article
+      ref={cardRef}
+      draggable
+      onDragStart={(event) => {
+        event.stopPropagation();
+        setLibraryDragData(event.dataTransfer, { type: 'item', id: item.id });
+        event.dataTransfer.setDragImage(event.currentTarget, 24, 24);
+      }}
       className={`group relative overflow-hidden rounded-lg border bg-background transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${selected ? 'border-primary ring-1 ring-primary/40' : dropActive ? 'border-primary ring-2 ring-primary/40' : 'border-border'} ${layout === 'list' ? 'flex items-stretch' : ''}`}
       onDragEnter={(event) => {
         if (!hasLibraryDragData(event.dataTransfer)) return;
@@ -212,21 +242,6 @@ export function FavoriteCard({
             type="checkbox"
           />
         </label>
-        <button
-          aria-label={`Drag ${item.title}`}
-          className="absolute right-10 top-2 flex h-8 w-8 cursor-grab items-center justify-center rounded-md bg-background/90 text-text-secondary opacity-100 shadow-sm backdrop-blur-sm transition hover:text-text-primary active:cursor-grabbing sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-          draggable
-          onDragStart={(event) => {
-            event.stopPropagation();
-            setLibraryDragData(event.dataTransfer, { type: 'item', id: item.id });
-            const previewElement = event.currentTarget.closest('article');
-            if (previewElement) event.dataTransfer.setDragImage(previewElement, 24, 24);
-          }}
-          title="Drag to reorder or move into a group"
-          type="button"
-        >
-          <Bars3Icon aria-hidden="true" className="h-4 w-4" />
-        </button>
         <Menu>
           <MenuButton
             aria-label={`Actions for ${item.title}`}

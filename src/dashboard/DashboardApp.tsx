@@ -3,7 +3,9 @@ import {
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
   BookmarkIcon,
+  CheckCircleIcon,
   Cog6ToothIcon,
+  ExclamationCircleIcon,
   FolderPlusIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
@@ -58,6 +60,57 @@ interface HistoryStack {
   future: HistoryEntry[];
 }
 
+interface Toast {
+  id: number;
+  message: string;
+  type: 'success' | 'error';
+}
+
+function ToastItem({
+  toast,
+  onDismiss,
+}: {
+  toast: Toast;
+  onDismiss: (id: number) => void;
+}) {
+  useEffect(() => {
+    const timeout = window.setTimeout(() => onDismiss(toast.id), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [onDismiss, toast.id]);
+
+  const isError = toast.type === 'error';
+
+  return (
+    <div
+      className={`pointer-events-auto flex items-start gap-3 rounded-md border bg-background px-3 py-3 text-sm shadow-lg ${isError ? 'border-danger/30' : 'border-success/30'}`}
+      role={isError ? 'alert' : 'status'}
+    >
+      {isError ? (
+        <ExclamationCircleIcon
+          aria-hidden="true"
+          className="mt-0.5 h-5 w-5 shrink-0 text-danger"
+        />
+      ) : (
+        <CheckCircleIcon
+          aria-hidden="true"
+          className="mt-0.5 h-5 w-5 shrink-0 text-success"
+        />
+      )}
+      <span className="min-w-0 flex-1 break-words text-text-primary">
+        {toast.message}
+      </span>
+      <button
+        aria-label="Dismiss notification"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+        onClick={() => onDismiss(toast.id)}
+        type="button"
+      >
+        <XMarkIcon aria-hidden="true" className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 function compareOrder(
   left: { orderKey: string; id: string },
   right: { orderKey: string; id: string },
@@ -81,7 +134,8 @@ export function DashboardApp() {
   const [layout, setLayout] = useState<LibraryView>('grid');
   const [dialog, setDialog] = useState<DialogState>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [notice, setNotice] = useState<string>();
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const nextToastId = useRef(0);
   const history = useRef<HistoryStack>({ past: [], future: [] });
   const [historyVersion, setHistoryVersion] = useState(0);
   const groupLabels = useMemo(() => getGroupLabels(groups), [groups]);
@@ -91,13 +145,29 @@ export function DashboardApp() {
   );
   const selectedGroup = selectedGroupId ? groupsById.get(selectedGroupId) : undefined;
 
+  const notify = useCallback((message: string, type: Toast['type'] = 'success') => {
+    const id = ++nextToastId.current;
+    setToasts((current) => [...current, { id, message, type }]);
+  }, []);
+  const notifyError = useCallback(
+    (message: string) => notify(message, 'error'),
+    [notify],
+  );
+  const dismissToast = useCallback((id: number) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  useEffect(() => {
+    if (error) notifyError(error);
+  }, [error, notifyError]);
+
   useEffect(() => {
     void getDefaultView()
       .then((view) => {
         if (view) setLayout(view);
       })
-      .catch((cause: unknown) => setNotice(errorMessage(cause)));
-  }, []);
+      .catch((cause: unknown) => notifyError(errorMessage(cause)));
+  }, [notifyError]);
 
   const registerHistory = (entry: HistoryEntry) => {
     history.current.past.push(entry);
@@ -113,11 +183,11 @@ export function DashboardApp() {
       history.current.past.pop();
       history.current.future.push(entry);
       setHistoryVersion((version) => version + 1);
-      setNotice(`Undid ${entry.label}.`);
+      notify(`Undid ${entry.label}.`);
     } catch (cause) {
-      setNotice(errorMessage(cause));
+      notifyError(errorMessage(cause));
     }
-  }, []);
+  }, [notify, notifyError]);
 
   const redo = useCallback(async () => {
     const entry = history.current.future.at(-1);
@@ -127,11 +197,11 @@ export function DashboardApp() {
       history.current.future.pop();
       history.current.past.push(entry);
       setHistoryVersion((version) => version + 1);
-      setNotice(`Redid ${entry.label}.`);
+      notify(`Redid ${entry.label}.`);
     } catch (cause) {
-      setNotice(errorMessage(cause));
+      notifyError(errorMessage(cause));
     }
-  }, []);
+  }, [notify, notifyError]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -234,13 +304,13 @@ export function DashboardApp() {
           },
         });
       }
-      setNotice('Favorite updated.');
+      notify('Favorite updated.');
       return saved;
     }
 
     const created = await createItem(value);
     setSelectedGroupId(value.groupId ?? created.groupId);
-    setNotice('Favorite added.');
+    notify('Favorite added.');
     registerHistory({
       label: 'favorite added',
       undo: async () => deleteItem(created.id),
@@ -281,13 +351,13 @@ export function DashboardApp() {
           },
         });
       }
-      setNotice('Group updated.');
+      notify('Group updated.');
       return;
     }
 
     const created = await createGroup(value);
     setSelectedGroupId(created.id);
-    setNotice('Group created.');
+    notify('Group created.');
     registerHistory({
       label: 'group created',
       undo: async () => deleteGroup(created.id),
@@ -312,7 +382,7 @@ export function DashboardApp() {
       next.delete(item.id);
       return next;
     });
-    setNotice('Favorite deleted.');
+    notify('Favorite deleted.');
     return true;
   };
 
@@ -333,7 +403,7 @@ export function DashboardApp() {
         },
       });
     }
-    setNotice('Thumbnail updated.');
+    notify('Thumbnail updated.');
     return updated;
   };
 
@@ -348,7 +418,7 @@ export function DashboardApp() {
       redo: async () => deleteGroup(group.id),
     });
     if (selectedGroupId === group.id) setSelectedGroupId(group.parentId);
-    setNotice('Group deleted.');
+    notify('Group deleted.');
     return true;
   };
 
@@ -373,7 +443,7 @@ export function DashboardApp() {
       undo: () => restoreItemPositions([before]),
       redo: () => restoreItemPositions([after]),
     });
-    setNotice(previous.groupId === groupId ? 'Favorite reordered.' : 'Favorite moved.');
+    notify(previous.groupId === groupId ? 'Favorite reordered.' : 'Favorite moved.');
   };
 
   const handleMoveFavorite = async (
@@ -384,7 +454,7 @@ export function DashboardApp() {
     try {
       await moveFavorite(itemId, groupId, beforeItemId);
     } catch (cause) {
-      setNotice(errorMessage(cause));
+      notifyError(errorMessage(cause));
     }
   };
 
@@ -418,11 +488,9 @@ export function DashboardApp() {
           await updateGroup(saved.id, after);
         },
       });
-      setNotice(
-        previous.parentId === saved.parentId ? 'Group reordered.' : 'Group moved.',
-      );
+      notify(previous.parentId === saved.parentId ? 'Group reordered.' : 'Group moved.');
     } catch (cause) {
-      setNotice(errorMessage(cause));
+      notifyError(errorMessage(cause));
     }
   };
 
@@ -455,11 +523,11 @@ export function DashboardApp() {
         },
       });
       setSelectedIds(new Set());
-      setNotice(
+      notify(
         `Moved ${moved.length} favorites to ${groupLabels.get(groupId) ?? 'the selected group'}.`,
       );
     } catch (cause) {
-      setNotice(errorMessage(cause));
+      notifyError(errorMessage(cause));
     }
   };
 
@@ -477,9 +545,9 @@ export function DashboardApp() {
         redo: () => deleteItems(ids),
       });
       setSelectedIds(new Set());
-      setNotice(`Deleted ${label}.`);
+      notify(`Deleted ${label}.`);
     } catch (cause) {
-      setNotice(errorMessage(cause));
+      notifyError(errorMessage(cause));
     }
   };
 
@@ -578,7 +646,7 @@ export function DashboardApp() {
               items={items}
               onCreateChild={(parentId) => setDialog({ type: 'group', parentId })}
               onDelete={(group) =>
-                void removeGroup(group).catch((cause) => setNotice(errorMessage(cause)))
+                void removeGroup(group).catch((cause) => notifyError(errorMessage(cause)))
               }
               onEdit={(group) => setDialog({ type: 'group', group })}
               onMoveGroup={(groupId, parentId, beforeId) => {
@@ -655,26 +723,6 @@ export function DashboardApp() {
                 </div>
               </div>
             </div>
-
-            {(notice || error) && (
-              <div
-                aria-live="polite"
-                className={`mb-4 flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-sm ${error ? 'border-danger/30 bg-danger-light text-danger' : 'border-success/30 bg-success-light text-text-primary'}`}
-                role={error ? 'alert' : 'status'}
-              >
-                <span>{error ?? notice}</span>
-                {!error && (
-                  <button
-                    aria-label="Dismiss notification"
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-background"
-                    onClick={() => setNotice(undefined)}
-                    type="button"
-                  >
-                    <XMarkIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
 
             {visibleItems.length > 0 && (
               <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
@@ -769,7 +817,7 @@ export function DashboardApp() {
                       layout={layout}
                       onDelete={(selected) =>
                         void deleteFavorite(selected).catch((cause) =>
-                          setNotice(errorMessage(cause)),
+                          notifyError(errorMessage(cause)),
                         )
                       }
                       onDropItem={(itemId, beforeId) => {
@@ -787,7 +835,7 @@ export function DashboardApp() {
                       }
                       onMoveDown={(selected) => reorderFavorite(selected, 1)}
                       onMoveUp={(selected) => reorderFavorite(selected, -1)}
-                      onOpenError={setNotice}
+                      onOpenError={notifyError}
                       onToggleSelected={toggleSelected}
                       selected={selectedIds.has(item.id)}
                     />
@@ -874,6 +922,16 @@ export function DashboardApp() {
           onSaveDefaultView={saveDefaultView}
         />
       )}
+      <div
+        aria-label="Notifications"
+        aria-live="polite"
+        aria-relevant="additions text"
+        className="pointer-events-none fixed bottom-4 left-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 flex-col-reverse gap-2 overflow-y-auto sm:left-auto sm:right-4 sm:w-full sm:max-w-sm sm:translate-x-0"
+      >
+        {[...toasts].reverse().map((toast) => (
+          <ToastItem key={toast.id} toast={toast} onDismiss={dismissToast} />
+        ))}
+      </div>
     </main>
   );
 }

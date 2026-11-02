@@ -40,6 +40,21 @@ afterAll(async () => {
 });
 
 describe('local library storage', () => {
+  it('nests an entire group at the bottom while retaining its children after reopen', async () => {
+    const work = await createGroup({ title: 'Work' });
+    const child = await createGroup({ title: '123', parentId: work.id });
+    const favorites = await createGroup({ title: 'Favorites' });
+    const existing = await createGroup({ title: 'Existing', parentId: favorites.id });
+    await moveGroup(work.id, favorites.id);
+    db.close();
+    await db.open();
+    const groups = await listGroups();
+    expect(groups.find((group) => group.id === work.id)?.parentId).toBe(favorites.id);
+    expect(groups.find((group) => group.id === child.id)?.parentId).toBe(work.id);
+    expect(
+      groups.filter((group) => group.parentId === favorites.id).map((group) => group.id),
+    ).toEqual([existing.id, work.id]);
+  });
   it('upgrades legacy bookmarks without losing their saved icon or title', async () => {
     const item = await createItem({
       url: 'https://legacy.example',

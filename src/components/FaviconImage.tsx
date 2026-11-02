@@ -24,6 +24,7 @@ export function FaviconImage({
   return (
     <img
       alt=""
+      draggable={false}
       className={`${className} shrink-0 object-contain`}
       onError={() => setSourceIndex((index) => index + 1)}
       src={sources[sourceIndex]}

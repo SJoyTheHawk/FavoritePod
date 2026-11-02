@@ -28,8 +28,13 @@
    after closing and reopening the launcher.
 4. Drag a favorite before another favorite in the same group, then drag it to a
    different group. Verify the order and group persist after reloading.
-5. Drag a group to reorder siblings. Drag its folder target into another group
-   to nest it, then verify the child tree and counts update.
+5. Drag any group row directly. At the top or bottom edge of a target, check
+   the blue line and circle show sibling placement at that target's level.
+   Drop on the center to append it as the last child; verify its existing
+   descendants move with it. For example, moving Work (with child 123) onto
+   Favorites produces Favorites / Work / 123. Drag Work onto a root row's
+   edge to move it back to the root. Verify invalid descendant drops have
+   no insertion indicator. Favorite cards are also draggable without handles.
 6. Use the favorite and group action menus to reorder and move with the
    keyboard. Verify the same destinations are available without dragging.
 

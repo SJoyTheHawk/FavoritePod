@@ -1,5 +1,6 @@
 import {
   cloneElement,
+  useEffect,
   useMemo,
   useState,
   type DragEvent,
@@ -7,7 +8,6 @@ import {
 } from 'react';
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import {
-  Bars3Icon,
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronUpIcon,
@@ -18,7 +18,16 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import type { Group, Item } from '../../core/types';
-import { hasLibraryDragData, readLibraryDragData, setLibraryDragData } from '../drag';
+import {
+  clearLibraryDragData,
+  getActiveLibraryDragPayload,
+  getGroupDropPlacement,
+  hasLibraryDragData,
+  readLibraryDragData,
+  resolveGroupDrop,
+  setLibraryDragData,
+  type GroupDropPlacement,
+} from '../drag';
 
 interface GroupTreeProps {
   groups: Group[];
@@ -43,6 +52,9 @@ interface BranchProps extends Omit<
   onToggle: (groupId: string) => void;
   counts: Map<string, number>;
   depth: number;
+  dropTarget: { id: string; placement: GroupDropPlacement } | null;
+  onDropTarget: (value: { id: string; placement: GroupDropPlacement } | null) => void;
+  onExpand: (id: string) => void;
 }
 
 function compareOrder(left: Group, right: Group): number {
@@ -67,8 +79,10 @@ function GroupBranch({
   onToggle,
   counts,
   depth,
+  dropTarget,
+  onDropTarget,
+  onExpand,
 }: BranchProps) {
-  const [dropTargetId, setDropTargetId] = useState<string>();
   const childrenByParent = useMemo(() => {
     const result = new Map<string, Group[]>();
     for (const group of groups) {
@@ -89,45 +103,81 @@ function GroupBranch({
         const isSelected = selectedGroupId === group.id;
         const siblingIndex = siblings.findIndex((candidate) => candidate.id === group.id);
 
-        const handleDrop = (event: DragEvent, intoGroup: boolean) => {
+        const placementFor = (event: DragEvent<HTMLElement>) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          return getGroupDropPlacement(event.clientY, rect.top, rect.height);
+        };
+        const activePlacement = dropTarget?.id === group.id ? dropTarget.placement : null;
+        const handleDrop = (event: DragEvent<HTMLDivElement>) => {
           event.preventDefault();
           event.stopPropagation();
+          onDropTarget(null);
           const payload = readLibraryDragData(event.dataTransfer);
+          clearLibraryDragData();
           if (!payload || payload.id === group.id) return;
           if (payload.type === 'item') {
             onMoveItem(payload.id, group.id);
+            onExpand(group.id);
             return;
           }
-          if (intoGroup) {
-            void onMoveGroup(payload.id, group.id);
-          } else {
-            void onMoveGroup(payload.id, group.parentId, group.id);
+          const placement = placementFor(event);
+          const destination = resolveGroupDrop(groups, payload.id, group.id, placement);
+          if (destination) {
+            onMoveGroup(payload.id, destination.parentId, destination.beforeId);
+            if (placement === 'inside') onExpand(group.id);
           }
         };
 
         return (
-          <li key={group.id}>
+          <li key={group.id} className="relative">
+            {activePlacement && activePlacement !== 'inside' && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-1 z-10 h-0.5 bg-primary"
+                style={{ [activePlacement === 'before' ? 'top' : 'bottom']: 0 }}
+              >
+                <span className="absolute -left-0.5 -top-[3px] h-2 w-2 rounded-full border-2 border-primary bg-background" />
+              </div>
+            )}
             <div
-              className={`group/tree-row flex min-w-0 items-center gap-1 rounded-md border py-1 pr-1 transition-colors ${dropTargetId === group.id ? 'border-primary bg-primary-light/60' : 'border-transparent'} ${isSelected ? 'bg-primary-light text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
+              className={`group/tree-row flex min-w-0 items-center gap-1 rounded-md border py-1 pr-1 transition-colors ${activePlacement === 'inside' ? 'border-primary bg-primary-light/60' : 'border-transparent'} ${isSelected ? 'bg-primary-light text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
               data-group-row="true"
-              onDragEnter={(event) => {
-                if (hasLibraryDragData(event.dataTransfer)) setDropTargetId(group.id);
+              draggable
+              onDragStart={(event) => {
+                event.stopPropagation();
+                setLibraryDragData(event.dataTransfer, { type: 'group', id: group.id });
+                event.dataTransfer.setDragImage(event.currentTarget, 24, 18);
+              }}
+              onDragEnd={() => {
+                clearLibraryDragData();
+                onDropTarget(null);
               }}
               onDragOver={(event) => {
                 if (!hasLibraryDragData(event.dataTransfer)) return;
                 event.preventDefault();
+                event.stopPropagation();
+                const payload = getActiveLibraryDragPayload();
+                const placement =
+                  payload?.type === 'item' ? 'inside' : placementFor(event);
+                if (
+                  !payload ||
+                  (payload.type === 'group' &&
+                    !resolveGroupDrop(groups, payload.id, group.id, placement))
+                ) {
+                  event.dataTransfer.dropEffect = 'none';
+                  onDropTarget(null);
+                  return;
+                }
                 event.dataTransfer.dropEffect = 'move';
+                onDropTarget({ id: group.id, placement });
               }}
-              onDrop={(event) => {
-                setDropTargetId(undefined);
-                handleDrop(event, false);
-              }}
+              onDrop={handleDrop}
               onDragLeave={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                  setDropTargetId(undefined);
+                  onDropTarget(null);
                 }
               }}
-              style={{ paddingLeft: `${depth * 14 + 4}px` }}
+              style={{ paddingLeft: '4px' }}
             >
               <button
                 aria-label={
@@ -145,40 +195,7 @@ function GroupBranch({
                   <ChevronRightIcon aria-hidden="true" className="h-3.5 w-3.5" />
                 )}
               </button>
-              <button
-                aria-label={`Reorder ${group.title}`}
-                className="flex h-7 w-6 shrink-0 cursor-grab items-center justify-center rounded text-text-tertiary opacity-0 transition hover:bg-background hover:text-text-primary focus-visible:opacity-100 group-hover/tree-row:opacity-100 active:cursor-grabbing"
-                draggable
-                onDragStart={(event) => {
-                  event.stopPropagation();
-                  setLibraryDragData(event.dataTransfer, { type: 'group', id: group.id });
-                  const preview = event.currentTarget.closest('[data-group-row]');
-                  if (preview) event.dataTransfer.setDragImage(preview, 18, 18);
-                }}
-                title="Drag to reorder or move into another group"
-                type="button"
-              >
-                <Bars3Icon aria-hidden="true" className="h-4 w-4" />
-              </button>
-              <button
-                aria-label={`Drop a favorite or group into ${group.title}`}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-background"
-                onClick={() => onSelect(group.id)}
-                onDragOver={(event) => {
-                  if (!hasLibraryDragData(event.dataTransfer)) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  event.dataTransfer.dropEffect = 'move';
-                }}
-                onDrop={(event) => {
-                  setDropTargetId(undefined);
-                  handleDrop(event, true);
-                }}
-                title={`Drop into ${group.title}`}
-                type="button"
-              >
-                <FolderIcon aria-hidden="true" className="h-4 w-4" />
-              </button>
+              <FolderIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
               <button
                 aria-current={isSelected ? 'page' : undefined}
                 className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded px-1 text-left text-sm"
@@ -252,11 +269,14 @@ function GroupBranch({
               >
                 <div
                   className="min-h-0 overflow-hidden border-l border-border"
-                  style={{ marginLeft: `${depth * 14 + 17}px` }}
+                  style={{ marginLeft: '18px' }}
                 >
                   <GroupBranch
                     {...{
                       groups,
+                      dropTarget,
+                      onDropTarget,
+                      onExpand,
                       onEdit,
                       onDelete,
                       onCreateChild,
@@ -312,8 +332,24 @@ function GroupAction({
 }
 
 export function GroupTree(props: GroupTreeProps) {
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    placement: GroupDropPlacement;
+  } | null>(null);
   const [expandedState, setExpandedState] = useState<Set<string> | null>(null);
   const expanded = expandedState ?? new Set(props.groups.map((group) => group.id));
+  useEffect(() => {
+    const clear = () => {
+      clearLibraryDragData();
+      setDropTarget(null);
+    };
+    window.addEventListener('dragend', clear);
+    window.addEventListener('drop', clear);
+    return () => {
+      window.removeEventListener('dragend', clear);
+      window.removeEventListener('drop', clear);
+    };
+  }, []);
   const groupsById = useMemo(
     () => new Map(props.groups.map((group) => [group.id, group])),
     [props.groups],
@@ -360,6 +396,9 @@ export function GroupTree(props: GroupTreeProps) {
       </button>
       <GroupBranch
         {...props}
+        dropTarget={dropTarget}
+        onDropTarget={setDropTarget}
+        onExpand={(id) => setExpandedState(new Set([...expanded, id]))}
         counts={counts}
         depth={0}
         expanded={expanded}

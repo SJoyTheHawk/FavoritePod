@@ -4,6 +4,8 @@
 
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
+**Current status**: Phase 2 and Phase 3 implementation is complete and covered by automated checks. Manual Chrome validation for extension loading, HMR, screenshot capture, and `file://` access remains open under Phase 1/platform validation; see `NEXT_STEPS.md` for the checklist.
+
 ## Architecture Overview
 
 ```
@@ -109,7 +111,7 @@ favoritepod/
 - File:// links open correctly
 - Any blockers identified early
 
-## Phase 2: Core Data Layer (Week 2-3) - Complete
+## Phase 2: Core Data Layer (Week 2-3) - Implementation Complete
 
 ### 2.1 Data Model & HLC
 **Goal**: Build conflict-free data structures
@@ -181,7 +183,7 @@ db.version(1).stores({
 merge module is held to 100% branch, function, line, and statement coverage by
 `npm run test:coverage`.
 
-## Phase 3: Basic UI (Week 3-4) - Complete
+## Phase 3: Basic UI (Week 3-4) - Implementation Complete
 
 ### 3.1 Toolbar Popup
 **Goal**: Quick access to recent favorites with a bookmark-style add dialog

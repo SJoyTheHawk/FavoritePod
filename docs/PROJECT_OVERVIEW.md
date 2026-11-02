@@ -20,9 +20,10 @@ FavoritePod/
 └── vite.config.ts
 ```
 
-**Current status**: Phase 2 data-layer and Phase 3 popup/dashboard work are
-implemented. Unit and production-build checks pass. Loading the unpacked build,
-HMR, screenshot capture, and local-file opening still need manual Chrome checks.
+**Current status**: Phase 2 (Core Data Layer) and Phase 3 (Popup and Dashboard)
+implementation is complete. Automated tests, lint, type check, formatting, and
+production build pass. Manual Chrome checks for loading the unpacked build, HMR,
+screenshot capture, and local-file opening remain open; see `NEXT_STEPS.md`.
 
 ## UI Captures
 

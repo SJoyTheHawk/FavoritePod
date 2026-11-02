@@ -16,14 +16,7 @@ import { getUrlLabel, parseSafeUrl } from '../../core/validation';
 import type { Item } from '../../core/types';
 import { FavoriteFallback } from './FavoriteFallback';
 import { HoverPreview } from './HoverPreview';
-import {
-  clearLibraryDragData,
-  getActiveLibraryDragPayload,
-  getItemDropPlacement,
-  hasLibraryDragData,
-  setLibraryDragData,
-  type ItemDropPlacement,
-} from '../drag';
+import { clearLibraryDragData, setLibraryDragData } from '../drag';
 
 interface FavoriteCardProps {
   item: Item;
@@ -43,11 +36,6 @@ interface FavoriteCardProps {
   onMoveDown: (item: Item) => void;
   onDelete: (item: Item) => void;
   onOpenError: (message: string) => void;
-  onPreviewDrop: (
-    itemId: string,
-    targetItemId: string,
-    placement: ItemDropPlacement,
-  ) => void;
   onDragStart: (itemId: string, height: number) => void;
   onDragEnd: () => void;
 }
@@ -100,7 +88,6 @@ export function FavoriteCard({
   onMoveDown,
   onDelete,
   onOpenError,
-  onPreviewDrop,
   onDragStart,
   onDragEnd,
 }: FavoriteCardProps) {
@@ -439,41 +426,25 @@ export function FavoriteCard({
             }
           : {}),
       }}
-      onDragOver={(event) => {
-        if (!hasLibraryDragData(event.dataTransfer)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        const payload = getActiveLibraryDragPayload();
-        if (payload?.type === 'item' && payload.id !== item.id) {
-          onPreviewDrop(
-            payload.id,
-            item.id,
-            getItemDropPlacement(
-              event.clientX,
-              event.clientY,
-              event.currentTarget.getBoundingClientRect(),
-              layout,
-            ),
-          );
-        }
-      }}
     >
-      <div className="bookmark-preview relative min-w-0 shrink-0 overflow-hidden">
-        <button
-          ref={previewTriggerRef}
-          aria-label={`Open ${item.title}`}
-          aria-expanded={hoverPreviewOpen}
-          aria-haspopup="dialog"
-          className="absolute inset-0 h-full w-full text-left focus-visible:z-10 focus-visible:outline-offset-[-2px]"
-          onClick={() => void openItem()}
-          type="button"
-        >
-          {preview}
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-black/65 px-3 py-2 text-left text-xs font-medium text-white opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-            <span className="block truncate">{item.title}</span>
-          </span>
-        </button>
-      </div>
+      {size !== 'compact' && (
+        <div className="bookmark-preview relative min-w-0 shrink-0 overflow-hidden">
+          <button
+            ref={previewTriggerRef}
+            aria-label={`Open ${item.title}`}
+            aria-expanded={hoverPreviewOpen}
+            aria-haspopup="dialog"
+            className="absolute inset-0 h-full w-full text-left focus-visible:z-10 focus-visible:outline-offset-[-2px]"
+            onClick={() => void openItem()}
+            type="button"
+          >
+            {preview}
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-black/65 px-3 py-2 text-left text-xs font-medium text-white opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+              <span className="block truncate">{item.title}</span>
+            </span>
+          </button>
+        </div>
+      )}
       <label className="bookmark-select absolute left-2 top-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-sm">
         <input
           aria-label={`Select ${item.title}`}
@@ -532,6 +503,11 @@ export function FavoriteCard({
       </Menu>
       <div className="bookmark-details flex min-w-0 items-center justify-between gap-3">
         <button
+          ref={size === 'compact' ? previewTriggerRef : undefined}
+          aria-label={`Open ${item.title}`}
+          title={
+            size === 'compact' ? `${item.title} — ${getUrlLabel(item.url)}` : undefined
+          }
           className="min-w-0 text-left"
           onClick={() => void openItem()}
           type="button"
@@ -550,7 +526,7 @@ export function FavoriteCard({
             />
             <span className="truncate">{item.title}</span>
           </span>
-          <span className="mt-1 block truncate text-xs text-text-tertiary">
+          <span className="bookmark-domain mt-1 block truncate text-xs text-text-tertiary">
             {getUrlLabel(item.url)}
           </span>
         </button>

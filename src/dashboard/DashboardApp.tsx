@@ -49,6 +49,7 @@ import { SettingsDialog } from './components/SettingsDialog';
 import {
   clearLibraryDragData,
   getActiveLibraryDragPayload,
+  getItemDropTarget,
   readLibraryDragData,
   previewItemOrder,
   resolveItemDropDestination,
@@ -1058,7 +1059,9 @@ export function DashboardApp() {
                     data-size={bookmarkSize}
                     key={index}
                   >
-                    <div className="bookmark-preview shrink-0 animate-pulse bg-surface-hover" />
+                    {bookmarkSize !== 'compact' && (
+                      <div className="bookmark-preview shrink-0 animate-pulse bg-surface-hover" />
+                    )}
                     <div className="bookmark-details flex min-w-0 flex-col justify-center gap-2">
                       <div className="h-3 w-3/4 animate-pulse rounded bg-surface-hover" />
                       <div className="h-3 w-1/2 animate-pulse rounded bg-surface-hover" />
@@ -1068,9 +1071,39 @@ export function DashboardApp() {
               </div>
             ) : visibleItems.length > 0 ? (
               <div
-                className="bookmark-collection"
+                className="bookmark-collection relative"
                 data-layout={layout}
                 data-size={bookmarkSize}
+                onDragOver={(event) => {
+                  const payload = getActiveLibraryDragPayload();
+                  if (payload?.type !== 'item') return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  const collection = event.currentTarget;
+                  const rect = collection.getBoundingClientRect();
+                  const slots = Array.from(
+                    collection.querySelectorAll<HTMLElement>('[data-favorite-id]'),
+                  )
+                    .filter(
+                      (card) => !dragIdsRef.current.includes(card.dataset.favoriteId!),
+                    )
+                    .map((card) => ({
+                      id: card.dataset.favoriteId!,
+                      left: card.offsetLeft,
+                      top: card.offsetTop,
+                      width: card.offsetWidth,
+                      height: card.offsetHeight,
+                    }));
+                  const target = getItemDropTarget(
+                    event.clientX - rect.left + collection.scrollLeft,
+                    event.clientY - rect.top + collection.scrollTop,
+                    slots,
+                    layout,
+                  );
+                  // Keep the previous destination over a gap or the stack placeholder.
+                  if (target)
+                    previewFavoriteDrop(payload.id, target.targetId, target.placement);
+                }}
               >
                 {visibleItems.map((item) => {
                   const siblings = items
@@ -1108,7 +1141,6 @@ export function DashboardApp() {
                           notifyError(errorMessage(cause)),
                         )
                       }
-                      onPreviewDrop={previewFavoriteDrop}
                       onEdit={(selected) =>
                         setDialog({ type: 'favorite', item: selected })
                       }

@@ -25,6 +25,31 @@ export function getItemDropPlacement(
   return clientX < rect.left + rect.width / 2 ? 'before' : 'after';
 }
 
+/** Hit-test layout slots, excluding animation transforms and the dragged stack. */
+export function getItemDropTarget(
+  x: number,
+  y: number,
+  slots: readonly {
+    id: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }[],
+  layout: 'grid' | 'list',
+): { targetId: string; placement: ItemDropPlacement } | null {
+  const slot = slots.find(
+    (candidate) =>
+      x >= candidate.left &&
+      x < candidate.left + candidate.width &&
+      y >= candidate.top &&
+      y < candidate.top + candidate.height,
+  );
+  return slot
+    ? { targetId: slot.id, placement: getItemDropPlacement(x, y, slot, layout) }
+    : null;
+}
+
 export function previewItemOrder(
   itemIds: readonly string[],
   draggedId: string,

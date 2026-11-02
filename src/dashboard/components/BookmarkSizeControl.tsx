@@ -1,10 +1,41 @@
 import type { BookmarkSize, LibraryView } from '../../core/storage';
 
-const sizes: BookmarkSize[] = ['small', 'medium', 'large'];
-const labels = { small: 'Small', medium: 'Medium', large: 'Large' };
+const sizes: Record<LibraryView, BookmarkSize[]> = {
+  grid: ['compact', 'extra-small', 'medium', 'large'],
+  list: ['compact', 'small', 'medium', 'large'],
+};
+const labels = {
+  compact: 'Compact',
+  'extra-small': 'Extra small',
+  small: 'Small',
+  medium: 'Medium',
+  large: 'Large',
+};
 
 function SizeIcon({ view, size }: { view: LibraryView; size: BookmarkSize }) {
-  const count = size === 'small' ? 3 : size === 'medium' ? 2 : 1;
+  if (size === 'compact')
+    return (
+      <svg aria-hidden="true" className="h-6 w-6" viewBox="0 0 28 28" fill="currentColor">
+        {Array.from({ length: view === 'grid' ? 6 : 4 }, (_, i) => {
+          const x = view === 'grid' ? 2 + (i % 2) * 14 : 2;
+          const y = view === 'grid' ? 4 + Math.floor(i / 2) * 8 : 3 + i * 6;
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={3} height={3} rx={0.5} />
+              <rect
+                x={x + 5}
+                y={y + 1}
+                width={view === 'grid' ? 5 : 19}
+                height={1.5}
+                rx={0.5}
+              />
+            </g>
+          );
+        })}
+      </svg>
+    );
+  const count =
+    size === 'extra-small' ? 4 : size === 'small' ? 3 : size === 'medium' ? 2 : 1;
   const gap = 3;
   const side = (24 - gap * (count - 1)) / count;
   const rowHeight = (18 - gap * (count - 1)) / count;
@@ -46,8 +77,8 @@ export function BookmarkSizeControl({
       className="flex shrink-0 items-center gap-0.5 rounded-md border border-border p-1"
       role="group"
     >
-      {sizes.map((option) => {
-        const label = `${labels[option]} ${view === 'grid' ? 'cards' : 'rows'}`;
+      {sizes[view].map((option) => {
+        const label = `${labels[option]} ${view === 'grid' ? 'cards' : 'rows'}${option === 'compact' ? ' — no thumbnails' : ''}`;
         return (
           <button
             key={option}

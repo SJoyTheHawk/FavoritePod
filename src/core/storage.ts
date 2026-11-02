@@ -18,11 +18,18 @@ const SNAPSHOT_LIMIT = 3;
 const DISMISSED_RECENT_ITEM_IDS = 'dismissedRecentItemIds';
 
 export type LibraryView = 'grid' | 'list';
-export type BookmarkSize = 'small' | 'medium' | 'large';
+export type BookmarkSize = 'compact' | 'extra-small' | 'small' | 'medium' | 'large';
 
 export async function getBookmarkSize(view: LibraryView): Promise<BookmarkSize> {
   const record = await db.settings.get(`bookmarkSize:${view}`);
-  return record?.value === 'small' || record?.value === 'large' ? record.value : 'medium';
+  if (view === 'grid' && record?.value === 'small') return 'extra-small';
+  if (view === 'list' && record?.value === 'extra-small') return 'small';
+  return record?.value === 'compact' ||
+    record?.value === 'extra-small' ||
+    record?.value === 'small' ||
+    record?.value === 'large'
+    ? record.value
+    : 'medium';
 }
 
 export async function setBookmarkSize(

@@ -3,6 +3,7 @@ import type { Group } from '../core/types';
 import {
   getGroupDropPlacement,
   getItemDropPlacement,
+  getItemDropTarget,
   previewItemOrder,
   resolveGroupDrop,
   resolveItemDropDestination,
@@ -67,6 +68,56 @@ describe('tree drop destinations', () => {
 });
 
 describe('favorite drop destinations', () => {
+  it.each(['grid', 'list'] as const)(
+    'keeps a stationary pointer stable after a stack swap in %s',
+    (layout) => {
+      const slot = (index: number) => ({
+        id: 'neighbor',
+        left: layout === 'grid' ? index * 112 : 0,
+        top: layout === 'list' ? index * 72 : 0,
+        width: 100,
+        height: 60,
+      });
+      const x = layout === 'grid' ? 190 : 50;
+      const y = layout === 'list' ? 120 : 30;
+      const target = getItemDropTarget(x, y, [slot(1)], layout);
+      expect(target).toEqual({ targetId: 'neighbor', placement: 'after' });
+      expect(
+        previewItemOrder(
+          ['a', 'b', 'neighbor'],
+          'a',
+          target!.targetId,
+          target!.placement,
+          ['a', 'b'],
+        ),
+      ).toEqual(['neighbor', 'a', 'b']);
+      // After swapping, the pointer is over the placeholder, even while the
+      // neighbor's visual animation crosses it. Do not reverse the destination.
+      for (let frame = 0; frame < 20; frame++) {
+        expect(getItemDropTarget(x, y, [slot(0)], layout)).toBeNull();
+      }
+      expect(getItemDropTarget(10, 10, [slot(0)], layout)).toEqual({
+        targetId: 'neighbor',
+        placement: 'before',
+      });
+    },
+  );
+
+  it('ignores grid gaps and targets the correct row', () => {
+    const slots = [
+      { id: 'top', left: 0, top: 0, width: 100, height: 60 },
+      { id: 'bottom', left: 0, top: 72, width: 100, height: 60 },
+    ];
+    expect(getItemDropTarget(50, 65, slots, 'grid')).toBeNull();
+    expect(getItemDropTarget(20, 90, slots, 'grid')).toEqual({
+      targetId: 'bottom',
+      placement: 'before',
+    });
+    expect(getItemDropTarget(80, 90, slots, 'grid')).toEqual({
+      targetId: 'bottom',
+      placement: 'after',
+    });
+  });
   it('gathers seven nonadjacent selections in visual order and ignores selected targets', () => {
     const ids = Array.from({ length: 10 }, (_, index) => String(index));
     const selected = ['0', '2', '3', '5', '6', '7', '9'];

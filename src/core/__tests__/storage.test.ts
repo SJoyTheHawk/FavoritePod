@@ -42,6 +42,22 @@ afterAll(async () => {
 });
 
 describe('local library storage', () => {
+  it.each(['compact', 'extra-small'] as const)(
+    'persists %s independently for both layouts',
+    async (size) => {
+      await setBookmarkSize('grid', size);
+      await setBookmarkSize('list', 'large');
+      db.close();
+      await db.open();
+      expect(await getBookmarkSize('grid')).toBe(size);
+      expect(await getBookmarkSize('list')).toBe('large');
+      await setBookmarkSize('list', size);
+      db.close();
+      await db.open();
+      expect(await getBookmarkSize('grid')).toBe(size);
+      expect(await getBookmarkSize('list')).toBe(size === 'extra-small' ? 'small' : size);
+    },
+  );
   it('defaults invalid sizes to medium and persists independent sizes across reopen', async () => {
     expect(await getBookmarkSize('grid')).toBe('medium');
     expect(await getBookmarkSize('list')).toBe('medium');
@@ -51,7 +67,7 @@ describe('local library storage', () => {
     await setBookmarkSize('list', 'large');
     db.close();
     await db.open();
-    expect(await getBookmarkSize('grid')).toBe('small');
+    expect(await getBookmarkSize('grid')).toBe('extra-small');
     expect(await getBookmarkSize('list')).toBe('large');
     await setBookmarkSize('grid', 'medium');
     expect(await getBookmarkSize('grid')).toBe('medium');

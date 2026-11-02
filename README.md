@@ -8,8 +8,13 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 
 ## 🎯 Project Status
 
-**Current Phase**: Phases 2 and 3 implemented; local Chrome load/HMR check remains manual
+**Current status**: Phases 2 and 3 are closed as implementation milestones.
+
+**Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, and `file://` access.
+
 **Target**: v1.0 (Simplified scope with file:// priority)
+
+Start with [NEXT_STEPS.md](NEXT_STEPS.md) for the validation checklist, development workflow, and remaining milestones.
 
 ---
 
@@ -20,23 +25,28 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 - Hybrid Logical Clocks and deterministic merge rules
 - Fractional ordering and tombstone deletion
 - IndexedDB storage for groups, favorites, and thumbnails
+- Versioned migrations, including compatibility with existing favicon records
 - Three restorable local snapshots
 
 ### Phase 3: Popup and Dashboard
 
 - Add the active page through a bookmark-style review dialog with a compressed screenshot
 - Edit its name or folder, remove it, or confirm with Done
-- Keep the five most recent favorites available from the popup home screen
+- Show up to five recent, non-dismissed favorites on the popup home screen
 - Dismiss individual pages from recent pages without deleting their favorites
+- Store captured favicons locally and display them in the popup and dashboard
 - Search and organize favorites in responsive grid or list views
-- Add and remove groups; add, edit, and delete favorites
+- Create flat groups; add, edit, move between groups, and delete favorites
+- Save a preferred grid or list view in settings
 - Save web and `file://` URLs locally
 
 ### Planned for Later Phases
 
-- Drag-and-drop and nested group management
+- Drag-and-drop and remaining group management controls
 - ZIP import/export and theme preferences
 - Per-device file path overrides and Google Drive sync
+
+Nested groups remain deferred to v2 under the simplified scope.
 
 ## Interface Preview
 
@@ -48,13 +58,15 @@ See the [full set of UI captures](docs/PROJECT_OVERVIEW.md#ui-captures).
 
 ## 📚 Documentation
 
-| Document                                                       | Purpose                               |
-| -------------------------------------------------------------- | ------------------------------------- |
-| [**docs/IMPLEMENTATION_PLAN.md**](docs/IMPLEMENTATION_PLAN.md) | Phase-by-phase development roadmap    |
-| [**docs/CODE_GUIDE.md**](docs/CODE_GUIDE.md)                   | Technical reference for AI agents     |
-| [**docs/DESIGN_GUIDE.md**](docs/DESIGN_GUIDE.md)               | UI/UX patterns and components         |
-| [**docs/AI_AGENT_GUIDE.md**](docs/AI_AGENT_GUIDE.md)           | Quick start for AI development agents |
-| [docs/project_plan.md](docs/project_plan.md)                   | Original requirements (full v2 scope) |
+| Document                                                       | Purpose                                   |
+| -------------------------------------------------------------- | ----------------------------------------- |
+| [**NEXT_STEPS.md**](NEXT_STEPS.md)                             | Current checklist and development handoff |
+| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)           | Architecture and UI captures              |
+| [**docs/IMPLEMENTATION_PLAN.md**](docs/IMPLEMENTATION_PLAN.md) | Phase-by-phase development roadmap        |
+| [**docs/CODE_GUIDE.md**](docs/CODE_GUIDE.md)                   | Technical reference for AI agents         |
+| [**docs/DESIGN_GUIDE.md**](docs/DESIGN_GUIDE.md)               | UI/UX patterns and components             |
+| [**docs/AI_AGENT_GUIDE.md**](docs/AI_AGENT_GUIDE.md)           | Quick start for AI development agents     |
+| [docs/project_plan.md](docs/project_plan.md)                   | Original requirements (full v2 scope)     |
 
 ---
 
@@ -127,20 +139,21 @@ This project is designed for **AI-assisted development**:
 
 1. Read the relevant guide (IMPLEMENTATION_PLAN, CODE_GUIDE, DESIGN_GUIDE)
 2. Pick a specific module/feature from the plan
-3. Implement using the code examples
+3. Follow the existing code and design tokens; adapt guide examples to the current implementation
 4. Run the automated core tests, then manually check Chrome extension behavior
 5. Iterate with AI agent on feedback
 6. Move to next feature
 
 **Testing**:
 
-- Vitest covers the core data layer and merge behavior
-- Popup APIs and the full extension workflow need manual Chrome checks
+- Last recorded implementation checks: 29 tests passed, with 100% merge coverage; type check, lint, formatting, and production build passed
+- Vitest covers core storage, migrations, merge behavior, and favicon capture with mocked browser APIs
+- Popup APIs and the full extension workflow need manual Chrome checks; the screenshots are visual references, not evidence that these checks passed
 
 **Codebase principles**:
 
 - Clear modular architecture
-- Copy-paste ready patterns
+- Shared components and consistent design tokens
 - Comprehensive type definitions
 
 ---
@@ -163,7 +176,7 @@ We're starting with a focused v1 to validate core functionality:
 - Advanced animations
 - Automated E2E tests
 
-**Timeline**: ~5 weeks for v1 (AI-driven development)
+Historical estimates in the implementation plan are planning references; no release date is committed.
 
 ---
 
@@ -172,6 +185,7 @@ We're starting with a focused v1 to validate core functionality:
 ### Required Permissions
 
 - `activeTab` - Screenshot capture
+- `favicon` - Access to Chrome's cached page icons
 - `unlimitedStorage` - Large thumbnail DB
 
 ### Optional Permissions (v2)
@@ -179,7 +193,7 @@ We're starting with a focused v1 to validate core functionality:
 - `history` - Visited site suggestions
 - `topSites` - Frequently visited
 
-The current manifest requests only `activeTab` and `unlimitedStorage`. IndexedDB
+The current manifest requests `activeTab`, `favicon`, and `unlimitedStorage`. IndexedDB
 does not require Chrome's separate `storage` permission.
 
 ### No Scary Permissions
@@ -225,11 +239,11 @@ To work on this project:
 
 ## 🗺️ Roadmap
 
-### V1 (Current) - ~5 weeks
+### V1 (Current)
 
 Focus on core launcher with file:// support
 
-### V2 (Future) - ~6 weeks
+### V2 (Future)
 
 - Google Drive synchronization
 - Nested groups

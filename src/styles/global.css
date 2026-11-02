@@ -150,6 +150,14 @@ input:focus-visible {
   height: 100%;
   padding: 0.375rem 3rem 0.375rem 2.75rem;
 }
+.bookmark-card[data-layout='grid'][data-size='compact'] .bookmark-details {
+  padding-right: 0.75rem;
+  transition: padding-right 150ms ease;
+}
+.bookmark-card[data-layout='grid'][data-size='compact']:is(:hover, :focus-within)
+  .bookmark-details {
+  padding-right: 3rem;
+}
 .bookmark-card[data-size='compact'] .bookmark-domain {
   display: none;
 }
@@ -158,12 +166,12 @@ input:focus-visible {
   top: 50%;
   transform: translateY(-50%);
 }
-.bookmark-card[data-size='compact'] .bookmark-actions {
-  opacity: 1;
-}
 @media (hover: none) {
   .bookmark-actions {
     opacity: 1;
+  }
+  .bookmark-card[data-layout='grid'][data-size='compact'] .bookmark-details {
+    padding-right: 3rem;
   }
 }
 

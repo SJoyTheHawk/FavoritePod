@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "FavoritePod",
+  "version": "0.1.0",
+  "description": "A visual launcher for favorite web pages and local tools.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2YY8O7xI3tzkEvnq9CkcKmPswQr0hJMXxYuRzQmXZVb2+tlxztTN2Hz6wzIgq8UNK0bM9yLAWBEeN7PMTYlxd+5yTLMmnKigUYWuRCM2HYiB5L/LClhv7Pmno3uSnqxrlrSXlSMO+iJQU/dGDDBbCLZUvz4O3Y1gUx2we2DCNl7oTFkDkpwms0+jzIUJFPWCN2k1ZmCXBvpAafHAOuwhyhgt2I3k5QRSZq5tOTkTJjd4/FdTm0sMUxRHnXy/h0BJpindIeu6HfEwGOdnproIAVetMVhlkgsMM68JFpU91JD+CFMgGoZGuIrGJYbKenUUXs9yWJkqUSPWgGfs61CKMwIDAQAB",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Open FavoritePod",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "options_page": "src/dashboard/dashboard.html",
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "unlimitedStorage"],
+  "optional_permissions": ["history", "topSites"]
+}

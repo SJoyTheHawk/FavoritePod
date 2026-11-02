@@ -1,0 +1,19 @@
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+
+# Local signing material and machine-specific settings
+.local/
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

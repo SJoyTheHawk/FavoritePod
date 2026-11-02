@@ -20,6 +20,7 @@ import {
   deleteItem,
   deleteItems,
   getDefaultView,
+  getBookmarkSize,
   moveGroup,
   moveItem,
   moveItems,
@@ -28,6 +29,8 @@ import {
   restoreItems,
   restoreItemPositions,
   setDefaultView,
+  setBookmarkSize,
+  type BookmarkSize,
   updateGroup,
   updateItem,
   updateItemThumbnail,
@@ -37,6 +40,7 @@ import {
 import { useLibrary } from '../core/use-library';
 import type { Group, Item } from '../core/types';
 import { FavoriteCard } from './components/FavoriteCard';
+import { BookmarkSizeControl } from './components/BookmarkSizeControl';
 import { FavoriteDialog } from './components/FavoriteDialog';
 import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
 import { GroupDialog } from './components/GroupDialog';
@@ -175,6 +179,13 @@ export function DashboardApp() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState('');
   const [layout, setLayout] = useState<LibraryView>('grid');
+  const [bookmarkSizes, setBookmarkSizes] = useState<Record<LibraryView, BookmarkSize>>({
+    grid: 'medium',
+    list: 'medium',
+  });
+  const [sizesReady, setSizesReady] = useState(false);
+  const sizeSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const bookmarkSize = bookmarkSizes[layout];
   const [dialog, setDialog] = useState<DialogState>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -253,6 +264,32 @@ export function DashboardApp() {
       clearFavoriteDrag();
     }
   }, [clearFavoriteDrag, items]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([getBookmarkSize('grid'), getBookmarkSize('list')])
+      .then(([grid, list]) => {
+        if (active) setBookmarkSizes({ grid, list });
+      })
+      .catch(() => {
+        if (active) notifyError('Could not load bookmark sizes.');
+      })
+      .finally(() => {
+        if (active) setSizesReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [notifyError]);
+
+  const changeBookmarkSize = (size: BookmarkSize) => {
+    setBookmarkSizes((current) => ({ ...current, [layout]: size }));
+    sizeSaveQueue.current = sizeSaveQueue.current
+      .then(() => setBookmarkSize(layout, size))
+      .catch(() =>
+        notifyError('Could not save bookmark size. Choose a size again to retry.'),
+      );
+  };
 
   const registerHistory = (entry: HistoryEntry) => {
     history.current.past.push(entry);
@@ -903,8 +940,8 @@ export function DashboardApp() {
                   {visibleItems.length === 1 ? 'favorite' : 'favorites'}
                 </p>
               </div>
-              <div className="flex min-w-0 items-center gap-2">
-                <label className="relative block w-[min(19rem,58vw)]">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <label className="relative block w-full sm:w-[min(19rem,35vw)]">
                   <MagnifyingGlassIcon
                     aria-hidden="true"
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary"
@@ -943,6 +980,12 @@ export function DashboardApp() {
                     <ListBulletIcon aria-hidden="true" className="h-4 w-4" />
                   </button>
                 </div>
+                <BookmarkSizeControl
+                  view={layout}
+                  size={bookmarkSize}
+                  disabled={!sizesReady || !!draggingFavoriteId}
+                  onChange={changeBookmarkSize}
+                />
               </div>
             </div>
 
@@ -1000,15 +1043,23 @@ export function DashboardApp() {
               </div>
             )}
 
-            {loading ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {loading || !sizesReady ? (
+              <div
+                className="bookmark-collection"
+                data-layout={layout}
+                data-size={bookmarkSize}
+                aria-label="Loading favorites"
+                aria-busy="true"
+              >
                 {Array.from({ length: 8 }, (_, index) => (
                   <div
-                    className="overflow-hidden rounded-lg border border-border"
+                    className="bookmark-card flex min-w-0 overflow-hidden rounded-lg border border-border"
+                    data-layout={layout}
+                    data-size={bookmarkSize}
                     key={index}
                   >
-                    <div className="aspect-[16/10] animate-pulse bg-surface-hover" />
-                    <div className="space-y-2 p-3">
+                    <div className="bookmark-preview shrink-0 animate-pulse bg-surface-hover" />
+                    <div className="bookmark-details flex min-w-0 flex-col justify-center gap-2">
                       <div className="h-3 w-3/4 animate-pulse rounded bg-surface-hover" />
                       <div className="h-3 w-1/2 animate-pulse rounded bg-surface-hover" />
                     </div>
@@ -1017,11 +1068,9 @@ export function DashboardApp() {
               </div>
             ) : visibleItems.length > 0 ? (
               <div
-                className={
-                  layout === 'grid'
-                    ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-                    : 'grid gap-3'
-                }
+                className="bookmark-collection"
+                data-layout={layout}
+                data-size={bookmarkSize}
               >
                 {visibleItems.map((item) => {
                   const siblings = items
@@ -1037,6 +1086,7 @@ export function DashboardApp() {
                       item={item}
                       key={item.id}
                       layout={layout}
+                      size={bookmarkSize}
                       sortOrder={
                         dragPreviewRank
                           ? (dragPreviewRank.get(item.id) ?? dragPreviewOrder?.length)

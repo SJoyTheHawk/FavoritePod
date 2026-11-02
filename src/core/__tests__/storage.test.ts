@@ -11,6 +11,7 @@ import {
   deleteItem,
   deleteItems,
   getDefaultView,
+  getBookmarkSize,
   getLastUsedGroupId,
   getRecentItems,
   listGroups,
@@ -25,6 +26,7 @@ import {
   restoreItemPositions,
   restoreSnapshot,
   setDefaultView,
+  setBookmarkSize,
   updateGroup,
   updateItem,
   updateItemThumbnail,
@@ -40,6 +42,21 @@ afterAll(async () => {
 });
 
 describe('local library storage', () => {
+  it('defaults invalid sizes to medium and persists independent sizes across reopen', async () => {
+    expect(await getBookmarkSize('grid')).toBe('medium');
+    expect(await getBookmarkSize('list')).toBe('medium');
+    await db.settings.put({ key: 'bookmarkSize:grid', value: 'invalid' });
+    expect(await getBookmarkSize('grid')).toBe('medium');
+    await setBookmarkSize('grid', 'small');
+    await setBookmarkSize('list', 'large');
+    db.close();
+    await db.open();
+    expect(await getBookmarkSize('grid')).toBe('small');
+    expect(await getBookmarkSize('list')).toBe('large');
+    await setBookmarkSize('grid', 'medium');
+    expect(await getBookmarkSize('grid')).toBe('medium');
+    expect(await getBookmarkSize('list')).toBe('large');
+  });
   it('inserts seven selected favorites as an ordered batch and restores them on undo', async () => {
     const group = await createGroup({ title: 'Stack' });
     const records: Awaited<ReturnType<typeof createItem>>[] = [];

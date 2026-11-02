@@ -18,6 +18,19 @@ const SNAPSHOT_LIMIT = 3;
 const DISMISSED_RECENT_ITEM_IDS = 'dismissedRecentItemIds';
 
 export type LibraryView = 'grid' | 'list';
+export type BookmarkSize = 'small' | 'medium' | 'large';
+
+export async function getBookmarkSize(view: LibraryView): Promise<BookmarkSize> {
+  const record = await db.settings.get(`bookmarkSize:${view}`);
+  return record?.value === 'small' || record?.value === 'large' ? record.value : 'medium';
+}
+
+export async function setBookmarkSize(
+  view: LibraryView,
+  size: BookmarkSize,
+): Promise<void> {
+  await db.settings.put({ key: `bookmarkSize:${view}`, value: size });
+}
 
 function compareLexically(left: string, right: string): number {
   return left === right ? 0 : left < right ? -1 : 1;

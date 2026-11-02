@@ -4,7 +4,7 @@
 
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
-**Current status**: Phases 2-5 are implemented and covered by automated checks. Manual Chrome validation for extension loading, HMR, screenshots, nested drag-and-drop, keyboard navigation, thumbnail previews, and `file://` access remains open; see `NEXT_STEPS.md`, `docs/phase-4-manual-test.md`, and `docs/phase-5-manual-test.md` for checklists.
+**Current status**: Phases 2-5 are implemented and covered by automated checks. Phases 4 and 5 closed on 2026-11-03 at the user's request. Manual Chrome validation for extension loading, HMR, screenshots, nested drag-and-drop, keyboard navigation, thumbnail previews, and `file://` access remains open; see `NEXT_STEPS.md`, `docs/phase-4-manual-test.md`, and `docs/phase-5-manual-test.md` for checklists.
 
 ## Architecture Overview
 
@@ -260,7 +260,7 @@ in `docs/phase-4-manual-test.md`; this closure does not claim those checks passe
 
 Includes the New group action beside All favorites, No parent group wording,
 and » hierarchy separators. Long-path display changes are deferred at the
-user's request; keep full paths for now. Phase 5 is implemented; Phase 6 is next.
+user's request; keep full paths for now. Phases 4 and 5 closed on 2026-11-03; Phase 6 is next.
 
 ### 4.1 Nested Groups & Items
 **Goal**: Hierarchical organization with drag-and-drop
@@ -351,7 +351,7 @@ environment because the npm registry was unreachable.
 build pass. Drag behavior, keyboard navigation, dialogs, and Chrome file URL
 opening still need the manual checks in `docs/phase-4-manual-test.md`.
 
-## Phase 5: Thumbnail System (Week 6-7) - Implementation Complete
+## Phase 5: Thumbnail System (Week 6-7) - Closed on 2026-11-03
 
 ### 5.1 Capture & Storage
 **Goal**: High-quality previews with efficient storage
@@ -395,8 +395,8 @@ Capture (activeTab)
 - [x] Show thumbnail on 400ms hover
 - [x] Display full URL
 - [x] Add "Open" and "Edit" quick actions
-- [x] Implement opt-in iframe preview
-- [x] Add iframe timeout fallback (2s)
+- [x] Use saved thumbnail previews for sites that prohibit embedding
+- [x] Open pages through the Open action; remove unreliable live iframe previews
 
 **Popover Design**:
 ```
@@ -414,14 +414,14 @@ Capture (activeTab)
 **Acceptance**:
 - Hover is smooth and responsive
 - Popover doesn't block interaction
-- Iframe fallback works
+- Saved previews work for sites that block embedding
 - Keyboard accessible (focus + enter)
 
 **Implementation note**: Existing thumbnail records remain readable. New captures
 store a 640x400 preview and a 320x200 card preview under the same SHA-256 keyed
-record. Capture calls are serialized with a 500ms minimum interval. Live page
-previews are opt-in and sandboxed; they fall back to the stored preview after
-two seconds.
+record. Capture calls are serialized with a 500ms minimum interval. Unreliable
+live iframe previews were removed; sites that block embedding rely on the saved
+preview, and Open visits the page in a browser tab.
 
 **Validation**: 53 tests across 7 suites, type check, lint, formatting, and
 production build pass. Browser behavior remains open for the checklist in

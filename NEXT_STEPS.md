@@ -1,6 +1,6 @@
 # FavoritePod Next Steps
 
-**Status**: Phases 2–5 are implemented as milestones. Phase 4 closed on 2026-11-03 at the user's request; Phase 5 implementation is complete.
+**Status**: Phases 2–5 are implemented as milestones. Phase 4 closed on 2026-11-03 and Phase 5 closed on 2026-11-03 at the user's request.
 
 **Pending validation**: Manual Chrome checks for loading the unpacked extension, HMR, screenshot capture, favicon persistence, hover previews, and local-file access.
 
@@ -11,7 +11,7 @@
 - Phase 3: bookmark review dialog, recent favorites, responsive dashboard, search, groups, favorite CRUD, and saved view preference
 - Favicon persistence and display, including refresh of an existing favorite from the popup
 - Phase 4: nested groups, direct dragging with placement indicators, group management, bulk actions, and undo/redo
-- Phase 5: two-size thumbnail pipeline, SHA-256 deduplication, fallback cards, hover previews, and opt-in sandboxed live previews
+- Phase 5: two-size thumbnail pipeline, SHA-256 deduplication, fallback cards, hover previews, and saved previews for sites that block embedding
 - Closure checks: 53 tests across 7 suites, lint, formatting, and production build (including TypeScript) passed.
 
 ## Next: Verify in Chrome
@@ -45,7 +45,7 @@ These boxes track checks that still need recorded results, not features that sti
 - [ ] Confirm a captured thumbnail appears in the dashboard after reopening.
 - [ ] Hover a favorite for 400ms; confirm the preview popover shows the stored preview, full URL, Open, Edit, and Copy URL actions.
 - [ ] Focus a favorite with the keyboard; confirm the preview opens and Escape closes it.
-- [ ] Choose Preview page for an HTTP(S) favorite; confirm the sandboxed iframe loads or the saved preview returns after two seconds.
+- [ ] Hover an EasyEDA favorite; confirm the saved preview appears without a frame-ancestors error and Open visits the page in a browser tab.
 - [ ] Confirm favicons persist across popup and dashboard reopening, including after refreshing an older favorite through Add bookmark.
 - [ ] Verify at most five recent favorites appear; dismiss one and confirm it remains in the dashboard and stays dismissed after reopening.
 - [ ] Check search, group filtering, favorite editing/deletion, responsive layouts, and saved default-view preference.
@@ -65,7 +65,7 @@ The original Phase 1.2 list also includes Drive authentication and upload/downlo
 
 ## After Browser Validation
 
-Phase 4 is closed and Phase 5 (Thumbnail System) is implemented. Record browser acceptance separately using [phase-4-manual-test.md](docs/phase-4-manual-test.md) and [phase-5-manual-test.md](docs/phase-5-manual-test.md). Phase 6 (File:// Link Support) is next.
+Phase 4 and Phase 5 (Thumbnail System) are closed. Record browser acceptance separately using [phase-4-manual-test.md](docs/phase-4-manual-test.md) and [phase-5-manual-test.md](docs/phase-5-manual-test.md). Phase 6 (File:// Link Support) is next.
 
 Nested groups are implemented under the user-approved Phase 4 scope, superseding earlier flat-group-only guidance. Drive sync remains deferred. Long group-path shortening is deferred at the user's request; retain full paths with » separators. Use numbered phase sections for task references; the historical revised-timeline table uses different numbering.
 
@@ -80,7 +80,7 @@ Work on one agreed subphase at a time. Finish its implementation, checks, docume
 | Phase 3 popup/dashboard | Implementation complete                   | Record browser acceptance above                                                  |
 | Local-file support      | URL storage and opening paths implemented | Validate permissions/opening; finish dedicated guidance and file-status features |
 | Phase 4 organization    | Closed on 2026-11-03                      | Record browser acceptance; long-path display changes deferred                    |
-| Phase 5 thumbnails      | Implementation complete                   | Record browser acceptance for capture and previews                                |
+| Phase 5 thumbnails      | Closed on 2026-11-03                      | Record browser acceptance for capture and previews                                |
 | Portability             | Planned                                   | ZIP export/import and round-trip validation                                      |
 | Polish                  | Planned                                   | Theme preferences, accessibility/error-state review, and release testing         |
 | Public release          | Deferred by user decision                 | Evaluate extension readiness before Store registration and submission            |

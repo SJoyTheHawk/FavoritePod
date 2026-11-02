@@ -11,7 +11,7 @@ import {
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { FaviconImage } from '../../components/FaviconImage';
-import { getThumbnail } from '../../core/storage';
+import { getThumbnail, type BookmarkSize } from '../../core/storage';
 import { getUrlLabel, parseSafeUrl } from '../../core/validation';
 import type { Item } from '../../core/types';
 import { FavoriteFallback } from './FavoriteFallback';
@@ -28,6 +28,7 @@ import {
 interface FavoriteCardProps {
   item: Item;
   layout: 'grid' | 'list';
+  size: BookmarkSize;
   sortOrder?: number;
   isDragging: boolean;
   dragItemIds: string[];
@@ -84,6 +85,7 @@ function MenuAction({
 export function FavoriteCard({
   item,
   layout,
+  size,
   sortOrder,
   isDragging,
   dragItemIds,
@@ -254,7 +256,7 @@ export function FavoriteCard({
       src={thumbnailUrl}
     />
   ) : (
-    <FavoriteFallback item={item} />
+    <FavoriteFallback item={item} compact={layout === 'list' || size !== 'large'} />
   );
 
   return (
@@ -418,7 +420,9 @@ export function FavoriteCard({
         setDragSize(undefined);
         onDragEnd();
       }}
-      className={`group relative flex min-w-0 self-start overflow-hidden rounded-lg border bg-background transition-shadow duration-200 hover:shadow-md ${selected ? 'border-primary ring-1 ring-primary/40' : 'border-border'} ${layout === 'list' ? 'h-[102px] items-stretch' : 'flex-col'}`}
+      data-layout={layout}
+      data-size={size}
+      className={`bookmark-card group relative flex min-w-0 self-start overflow-hidden rounded-lg border bg-background transition-shadow duration-200 hover:shadow-md ${selected ? 'border-primary ring-1 ring-primary/40' : 'border-border'}`}
       aria-hidden={isDragging || undefined}
       style={{
         ...(sortOrder === undefined ? {} : { order: sortOrder }),
@@ -454,9 +458,7 @@ export function FavoriteCard({
         }
       }}
     >
-      <div
-        className={`relative min-w-0 shrink-0 overflow-hidden ${layout === 'grid' ? 'aspect-[16/10] w-full' : 'h-full w-32 sm:w-40'}`}
-      >
+      <div className="bookmark-preview relative min-w-0 shrink-0 overflow-hidden">
         <button
           ref={previewTriggerRef}
           aria-label={`Open ${item.title}`}
@@ -471,66 +473,64 @@ export function FavoriteCard({
             <span className="block truncate">{item.title}</span>
           </span>
         </button>
-        <label className="absolute left-2 top-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-sm">
-          <input
-            aria-label={`Select ${item.title}`}
-            checked={selected}
-            className="h-4 w-4 accent-[var(--color-primary)]"
-            onChange={() => onToggleSelected(item)}
-            type="checkbox"
-          />
-        </label>
-        <Menu>
-          <MenuButton
-            aria-label={`Actions for ${item.title}`}
-            className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-text-primary opacity-0 shadow-md transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-hover hover:text-primary data-[open]:bg-surface-hover data-[open]:opacity-100"
-            title="Favorite actions"
-            type="button"
-          >
-            <EllipsisHorizontalIcon
-              aria-hidden="true"
-              className="h-5 w-5"
-              strokeWidth={2}
-            />
-          </MenuButton>
-          <MenuItems
-            anchor="bottom end"
-            className="z-40 min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
-          >
-            <MenuAction
-              icon={<PencilSquareIcon className="h-4 w-4" />}
-              label="Edit"
-              onClick={() => onEdit(item)}
-            />
-            <MenuAction
-              icon={<ArrowsRightLeftIcon className="h-4 w-4" />}
-              label="Move to…"
-              onClick={() => onMove(item)}
-            />
-            <MenuAction
-              icon={<ChevronUpIcon className="h-4 w-4" />}
-              label="Move up"
-              onClick={() => onMoveUp(item)}
-              disabled={!canMoveUp}
-            />
-            <MenuAction
-              icon={<ChevronDownIcon className="h-4 w-4" />}
-              label="Move down"
-              onClick={() => onMoveDown(item)}
-              disabled={!canMoveDown}
-            />
-            <MenuAction
-              icon={<TrashIcon className="h-4 w-4" />}
-              label="Delete"
-              onClick={() => onDelete(item)}
-              danger
-            />
-          </MenuItems>
-        </Menu>
       </div>
-      <div
-        className={`flex min-w-0 items-center justify-between gap-3 p-3 ${layout === 'grid' ? 'h-[68px] shrink-0' : 'flex-1'}`}
-      >
+      <label className="bookmark-select absolute left-2 top-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-sm">
+        <input
+          aria-label={`Select ${item.title}`}
+          checked={selected}
+          className="h-4 w-4 accent-[var(--color-primary)]"
+          onChange={() => onToggleSelected(item)}
+          type="checkbox"
+        />
+      </label>
+      <Menu>
+        <MenuButton
+          aria-label={`Actions for ${item.title}`}
+          className="bookmark-actions absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-text-primary opacity-0 shadow-md transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-hover hover:text-primary data-[open]:bg-surface-hover data-[open]:opacity-100"
+          title="Favorite actions"
+          type="button"
+        >
+          <EllipsisHorizontalIcon
+            aria-hidden="true"
+            className="h-5 w-5"
+            strokeWidth={2}
+          />
+        </MenuButton>
+        <MenuItems
+          anchor="bottom end"
+          className="z-40 min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
+        >
+          <MenuAction
+            icon={<PencilSquareIcon className="h-4 w-4" />}
+            label="Edit"
+            onClick={() => onEdit(item)}
+          />
+          <MenuAction
+            icon={<ArrowsRightLeftIcon className="h-4 w-4" />}
+            label="Move to…"
+            onClick={() => onMove(item)}
+          />
+          <MenuAction
+            icon={<ChevronUpIcon className="h-4 w-4" />}
+            label="Move up"
+            onClick={() => onMoveUp(item)}
+            disabled={!canMoveUp}
+          />
+          <MenuAction
+            icon={<ChevronDownIcon className="h-4 w-4" />}
+            label="Move down"
+            onClick={() => onMoveDown(item)}
+            disabled={!canMoveDown}
+          />
+          <MenuAction
+            icon={<TrashIcon className="h-4 w-4" />}
+            label="Delete"
+            onClick={() => onDelete(item)}
+            danger
+          />
+        </MenuItems>
+      </Menu>
+      <div className="bookmark-details flex min-w-0 items-center justify-between gap-3">
         <button
           className="min-w-0 text-left"
           onClick={() => void openItem()}
@@ -574,6 +574,7 @@ export function FavoriteCard({
         onPanelEnter={cancelPreviewHide}
         onPanelLeave={hidePreview}
         open={hoverPreviewOpen}
+        positionRef={cardRef}
         thumbnailUrl={thumbnailUrl}
       />
     </article>

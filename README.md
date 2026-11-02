@@ -8,7 +8,7 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 
 ## 🎯 Project Status
 
-**Current status**: Phases 2–5 are implemented as milestones. Phase 4 closed on November 3, 2026; Phase 5 thumbnail implementation is complete.
+**Current status**: Phases 2–5 are implemented as milestones. Phase 4 closed on November 3, 2026 and Phase 5 closed the same day at the user's request.
 
 **Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, hover previews, and `file://` access.
 
@@ -40,7 +40,7 @@ Start with [NEXT_STEPS.md](NEXT_STEPS.md) for the validation checklist, developm
 - Save a preferred grid or list view in settings
 - Save web and `file://` URLs locally
 - Generate two-size page previews with SHA-256 deduplication
-- Show fallback cards and hover previews with Open, Edit, Copy URL, and optional live preview actions
+- Show fallback cards and hover previews with Open, Edit, and Copy URL actions; saved previews remain usable for sites that block embedding
 
 ### Planned for Later Phases
 
@@ -52,7 +52,23 @@ Phase 4 includes nested groups, direct drag-and-drop with placement indicators, 
 
 ## Interface Preview
 
-![FavoritePod dashboard with saved favorites in grid view](docs/screenshots/dashboard-grid.png)
+Popup:
+
+![FavoritePod popup home screen with recent pages and the Add bookmark review dialog](docs/screenshots/popup.png)
+
+Dashboard grid view:
+
+![FavoritePod dashboard showing saved favorites in grid view](docs/screenshots/dashboard-grid.png)
+
+Dashboard list view:
+
+![FavoritePod dashboard showing saved favorites in list view](docs/screenshots/dashboard-list.png)
+
+Empty dashboard (desktop and mobile):
+
+![FavoritePod empty dashboard at desktop size](docs/screenshots/dashboard-empty-desktop.png)
+
+![FavoritePod empty dashboard at mobile size](docs/screenshots/dashboard-empty-mobile.png)
 
 See the [full set of UI captures](docs/PROJECT_OVERVIEW.md#ui-captures).
 

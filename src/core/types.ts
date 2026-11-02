@@ -28,6 +28,7 @@ export interface Item {
 export interface Thumbnail {
   hash: string;
   blob: Blob;
+  smallBlob?: Blob;
   size: number;
   width: number;
   height: number;
@@ -63,4 +64,5 @@ export interface ThumbnailInput {
   blob: Blob;
   width: number;
   height: number;
+  smallBlob?: Blob;
 }

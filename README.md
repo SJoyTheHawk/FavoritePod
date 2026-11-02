@@ -8,9 +8,9 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 
 ## 🎯 Project Status
 
-**Current status**: Phases 2 and 3 are closed as implementation milestones.
+**Current status**: Phases 2–5 are implemented as milestones. Phase 4 closed on November 3, 2026; Phase 5 thumbnail implementation is complete.
 
-**Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, and `file://` access.
+**Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, hover previews, and `file://` access.
 
 **Target**: v1.0 (Simplified scope with file:// priority)
 
@@ -36,17 +36,19 @@ Start with [NEXT_STEPS.md](NEXT_STEPS.md) for the validation checklist, developm
 - Dismiss individual pages from recent pages without deleting their favorites
 - Store captured favicons locally and display them in the popup and dashboard
 - Search and organize favorites in responsive grid or list views
-- Create flat groups; add, edit, move between groups, and delete favorites
+- Create nested groups; add, edit, move between groups, and delete favorites
 - Save a preferred grid or list view in settings
 - Save web and `file://` URLs locally
+- Generate two-size page previews with SHA-256 deduplication
+- Show fallback cards and hover previews with Open, Edit, Copy URL, and optional live preview actions
 
 ### Planned for Later Phases
 
-- Drag-and-drop and remaining group management controls
+- File:// link support and permission guidance (Phase 6)
 - ZIP import/export and theme preferences
 - Per-device file path overrides and Google Drive sync
 
-Nested groups remain deferred to v2 under the simplified scope.
+Phase 4 includes nested groups, direct drag-and-drop with placement indicators, group management, bulk actions, and undo/redo. Phase 5 adds two-size thumbnails, fallback cards, and hover previews. Manual browser acceptance remains tracked in [the Phase 4 checklist](docs/phase-4-manual-test.md) and [the Phase 5 checklist](docs/phase-5-manual-test.md).
 
 ## Interface Preview
 
@@ -165,13 +167,11 @@ We're starting with a focused v1 to validate core functionality:
 ### Remaining V1 Work
 
 - Chrome validation of screenshot capture and `file://` access ⭐ **PRIORITY**
-- Manual drag-and-drop
 - ZIP export/import
 
 ### ❌ Deferred to V2
 
 - Google Drive sync (most complex)
-- Nested groups
 - Visited-site discovery
 - Advanced animations
 - Automated E2E tests
@@ -246,7 +246,6 @@ Focus on core launcher with file:// support
 ### V2 (Future)
 
 - Google Drive synchronization
-- Nested groups
 - Advanced features (history discovery, context menus)
 - Browser E2E testing
 

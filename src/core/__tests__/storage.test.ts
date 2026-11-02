@@ -163,6 +163,7 @@ describe('local library storage', () => {
   it('creates a default group and stores a validated favorite with its preview', async () => {
     const preview = {
       blob: new Blob(['jpeg-data'], { type: 'image/jpeg' }),
+      smallBlob: new Blob(['small-jpeg-data'], { type: 'image/jpeg' }),
       width: 2,
       height: 1,
     };
@@ -178,6 +179,7 @@ describe('local library storage', () => {
     expect(await db.thumbnails.get(item.previewHash!)).toMatchObject({
       width: 2,
       height: 1,
+      smallBlob: preview.smallBlob,
     });
   });
 
@@ -185,6 +187,7 @@ describe('local library storage', () => {
     const item = await createItem({ url: 'https://preview.example' });
     const updated = await updateItemThumbnail(item.id, {
       blob: new Blob(['new-jpeg-data'], { type: 'image/jpeg' }),
+      smallBlob: new Blob(['small-new-jpeg-data'], { type: 'image/jpeg' }),
       width: 640,
       height: 400,
     });
@@ -194,6 +197,7 @@ describe('local library storage', () => {
     expect(await db.thumbnails.get(updated.previewHash!)).toMatchObject({
       width: 640,
       height: 400,
+      smallBlob: expect.any(Blob),
       size: 13,
     });
   });

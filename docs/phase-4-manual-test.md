@@ -1,5 +1,8 @@
 # Phase 4 Manual Test
 
+Phase 4 implementation closed on 2026-11-03. This checklist remains open for
+recorded browser acceptance; closure does not mark these manual checks passed.
+
 ## Setup
 
 1. Run `npm run build`.
@@ -8,7 +11,9 @@
 
 ## Nested Groups
 
-1. Create a root group, a child group, and a grandchild group.
+1. Use the folder + button after the All favorites count to create a group;
+   verify its New group hover hint. Create a child and grandchild, checking
+   No parent group wording and » hierarchy separators in the group choices.
 2. Expand and collapse the parent; verify indentation and connector lines.
 3. Check the count beside each group includes items in its descendants.
 4. Select a parent and verify favorites from its subtree appear. Select the
@@ -32,7 +37,7 @@
    the blue line and circle show sibling placement at that target's level.
    Drop on the center to append it as the last child; verify its existing
    descendants move with it. For example, moving Work (with child 123) onto
-   Favorites produces Favorites / Work / 123. Drag Work onto a root row's
+   Favorites produces Favorites » Work » 123. Drag Work onto a root row's
    edge to move it back to the root. Verify invalid descendant drops have
    no insertion indicator. Favorite cards are also draggable without handles.
 6. Use the favorite and group action menus to reorder and move with the

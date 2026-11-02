@@ -1,8 +1,8 @@
 # FavoritePod Next Steps
 
-**Status**: Phase 2 (Core Data Layer) and Phase 3 (Popup and Dashboard) implementation complete.
+**Status**: Phases 2–5 are implemented as milestones. Phase 4 closed on 2026-11-03 at the user's request; Phase 5 implementation is complete.
 
-**Pending validation**: Manual Chrome checks for loading the unpacked extension, HMR, screenshot capture, favicon persistence, and local-file access.
+**Pending validation**: Manual Chrome checks for loading the unpacked extension, HMR, screenshot capture, favicon persistence, hover previews, and local-file access.
 
 ## Completed
 
@@ -10,7 +10,9 @@
 - Phase 2: HLC data model, fractional ordering, deterministic merge, IndexedDB storage, migrations, and restorable snapshots
 - Phase 3: bookmark review dialog, recent favorites, responsive dashboard, search, groups, favorite CRUD, and saved view preference
 - Favicon persistence and display, including refresh of an existing favorite from the popup
-- Last recorded implementation checks: 29 tests passed; merge logic had 100% coverage; lint, formatting, type check, and production build passed. This documentation review does not constitute a new test run.
+- Phase 4: nested groups, direct dragging with placement indicators, group management, bulk actions, and undo/redo
+- Phase 5: two-size thumbnail pipeline, SHA-256 deduplication, fallback cards, hover previews, and opt-in sandboxed live previews
+- Closure checks: 53 tests across 7 suites, lint, formatting, and production build (including TypeScript) passed.
 
 ## Next: Verify in Chrome
 
@@ -28,7 +30,7 @@ Chrome Web Store registration is not needed for local testing. To test the curre
 
 The local key is ignored by Git at `.local/favoritepod-local.pem`. Keep a secure backup if the same local extension ID will be needed later.
 
-Record browser-specific results in `docs/PROJECT_OVERVIEW.md` or a dedicated validation note, including the commit, Chrome version, development or production build, steps, and outcome. Phases 2 and 3 are closed as implementation milestones; browser acceptance remains open. Existing UI captures are visual references, not proof of Chrome API behavior.
+Record browser-specific results in `docs/PROJECT_OVERVIEW.md` or a dedicated validation note, including the commit, Chrome version, development or production build, steps, and outcome. Phases 2–5 are implementation milestones; browser acceptance remains open. Existing UI captures are visual references, not proof of Chrome API behavior.
 
 ### Browser Acceptance Checklist
 
@@ -41,6 +43,9 @@ These boxes track checks that still need recorded results, not features that sti
 - [ ] Reopen Add bookmark on an existing URL; confirm no duplicate is created.
 - [ ] Verify Remove deletes the favorite, while closing the dialog retains the default save.
 - [ ] Confirm a captured thumbnail appears in the dashboard after reopening.
+- [ ] Hover a favorite for 400ms; confirm the preview popover shows the stored preview, full URL, Open, Edit, and Copy URL actions.
+- [ ] Focus a favorite with the keyboard; confirm the preview opens and Escape closes it.
+- [ ] Choose Preview page for an HTTP(S) favorite; confirm the sandboxed iframe loads or the saved preview returns after two seconds.
 - [ ] Confirm favicons persist across popup and dashboard reopening, including after refreshing an older favorite through Add bookmark.
 - [ ] Verify at most five recent favorites appear; dismiss one and confirm it remains in the dashboard and stays dismissed after reopening.
 - [ ] Check search, group filtering, favorite editing/deletion, responsive layouts, and saved default-view preference.
@@ -60,9 +65,9 @@ The original Phase 1.2 list also includes Drive authentication and upload/downlo
 
 ## After Browser Validation
 
-Use the numbered Phase 4 sections in [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) to assess the remaining group/item controls, ordering, and edit/delete interactions. First account for the grid/list cards, thumbnails, favicons, and favorite CRUD already implemented in Phase 3.
+Phase 4 is closed and Phase 5 (Thumbnail System) is implemented. Record browser acceptance separately using [phase-4-manual-test.md](docs/phase-4-manual-test.md) and [phase-5-manual-test.md](docs/phase-5-manual-test.md). Phase 6 (File:// Link Support) is next.
 
-The plan contains both a full roadmap and a later **V1 Simplified Scope** section. For the current v1, keep groups flat and defer nested groups and Drive sync to v2, as stated in the README. The previous next-step sentence incorrectly treated nested groups as immediate work. Use the numbered phase sections for task references; the historical revised-timeline table uses different numbering.
+Nested groups are implemented under the user-approved Phase 4 scope, superseding earlier flat-group-only guidance. Drive sync remains deferred. Long group-path shortening is deferred at the user's request; retain full paths with » separators. Use numbered phase sections for task references; the historical revised-timeline table uses different numbering.
 
 Work on one agreed subphase at a time. Finish its implementation, checks, documentation, and commit before advancing. Continue to follow [DESIGN_GUIDE.md](docs/DESIGN_GUIDE.md) and the existing components for coherent visuals.
 
@@ -74,7 +79,8 @@ Work on one agreed subphase at a time. Finish its implementation, checks, docume
 | Phase 2 data layer      | Implementation complete                   | Keep storage, migration, and merge regression checks passing                     |
 | Phase 3 popup/dashboard | Implementation complete                   | Record browser acceptance above                                                  |
 | Local-file support      | URL storage and opening paths implemented | Validate permissions/opening; finish dedicated guidance and file-status features |
-| Organization            | Flat groups and favorite CRUD implemented | Remaining group controls and drag-and-drop; nested groups deferred               |
+| Phase 4 organization    | Closed on 2026-11-03                      | Record browser acceptance; long-path display changes deferred                    |
+| Phase 5 thumbnails      | Implementation complete                   | Record browser acceptance for capture and previews                                |
 | Portability             | Planned                                   | ZIP export/import and round-trip validation                                      |
 | Polish                  | Planned                                   | Theme preferences, accessibility/error-state review, and release testing         |
 | Public release          | Deferred by user decision                 | Evaluate extension readiness before Store registration and submission            |
@@ -153,7 +159,7 @@ The following material remains removed from the active instructions:
 - `git init`, `npm init`, initial dependency scaffolding, and prompts to start Phase 1.1: already completed; use the existing repository and lockfile.
 - Duplicate startup commands and generic motivational text: consolidated into the setup and workflow sections.
 - Fixed documentation file sizes and conflicting week estimates: stale metadata, replaced by links and scope-based planning.
-- Checkmarks claiming ZIP, drag-and-drop, themes, or Store submission were done: replaced by the milestone table with accurate statuses.
+- Checkmarks claiming ZIP, themes, or Store submission were done: replaced by the milestone table with accurate statuses.
 - Advice to avoid automated tests: superseded by the project's existing regression suite.
 - Parallel-phase instructions: superseded by the user's preference for sequential work.
 

@@ -14,6 +14,8 @@ import { FaviconImage } from '../../components/FaviconImage';
 import { getThumbnail } from '../../core/storage';
 import { getUrlLabel, parseSafeUrl } from '../../core/validation';
 import type { Item } from '../../core/types';
+import { FavoriteFallback } from './FavoriteFallback';
+import { HoverPreview } from './HoverPreview';
 import {
   clearLibraryDragData,
   getActiveLibraryDragPayload,
@@ -22,15 +24,6 @@ import {
   setLibraryDragData,
   type ItemDropPlacement,
 } from '../drag';
-
-const tones = [
-  'bg-primary-light text-primary',
-  'bg-success-light text-success',
-  'bg-warning-light text-warning',
-  'bg-danger-light text-danger',
-  'bg-surface-hover text-text-secondary',
-  'bg-[#d9f0ee] text-[#14746f]',
-];
 
 interface FavoriteCardProps {
   item: Item;
@@ -56,14 +49,6 @@ interface FavoriteCardProps {
   ) => void;
   onDragStart: (itemId: string, height: number) => void;
   onDragEnd: () => void;
-}
-
-function toneFor(value: string): string {
-  const hash = [...value].reduce(
-    (total, character) => total + character.charCodeAt(0),
-    0,
-  );
-  return tones[hash % tones.length];
 }
 
 function MenuAction({
@@ -118,8 +103,13 @@ export function FavoriteCard({
   onDragEnd,
 }: FavoriteCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string>();
+  const [fullThumbnailUrl, setFullThumbnailUrl] = useState<string>();
+  const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
+  const previewTimer = useRef<number>();
+  const previewHideTimer = useRef<number>();
   const [dragSize, setDragSize] = useState<{ width: number; height: number }>();
   const cardRef = useRef<HTMLElement>(null);
+  const previewTriggerRef = useRef<HTMLButtonElement>(null);
   const dragImageRef = useRef<HTMLElement | null>(null);
   const nativeDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const dragImageCleanup = useRef<(() => void) | null>(null);
@@ -137,6 +127,13 @@ export function FavoriteCard({
   };
 
   useEffect(() => removeDragImage, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewTimer.current) window.clearTimeout(previewTimer.current);
+      if (previewHideTimer.current) window.clearTimeout(previewHideTimer.current);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const card = cardRef.current;
@@ -184,15 +181,19 @@ export function FavoriteCard({
 
   useEffect(() => {
     let currentUrl: string | undefined;
+    let fullUrl: string | undefined;
     let active = true;
     setThumbnailUrl(undefined);
+    setFullThumbnailUrl(undefined);
     if (!item.previewHash) return () => undefined;
 
     void getThumbnail(item.previewHash)
       .then((thumbnail) => {
         if (!active || !thumbnail) return;
-        currentUrl = URL.createObjectURL(thumbnail.blob);
+        currentUrl = URL.createObjectURL(thumbnail.smallBlob ?? thumbnail.blob);
+        fullUrl = URL.createObjectURL(thumbnail.blob);
         setThumbnailUrl(currentUrl);
+        setFullThumbnailUrl(fullUrl);
       })
       .catch(() => {
         if (active) setThumbnailUrl(undefined);
@@ -201,8 +202,34 @@ export function FavoriteCard({
     return () => {
       active = false;
       if (currentUrl) URL.revokeObjectURL(currentUrl);
+      if (fullUrl) URL.revokeObjectURL(fullUrl);
     };
   }, [item.previewHash]);
+
+  const cancelPreviewHide = () => {
+    if (previewHideTimer.current) window.clearTimeout(previewHideTimer.current);
+  };
+
+  const schedulePreview = () => {
+    if (isDragging) return;
+    cancelPreviewHide();
+    if (hoverPreviewOpen || previewTimer.current) return;
+    previewTimer.current = window.setTimeout(() => {
+      previewTimer.current = undefined;
+      setHoverPreviewOpen(true);
+    }, 400);
+  };
+
+  const hidePreview = () => {
+    if (previewTimer.current) {
+      window.clearTimeout(previewTimer.current);
+      previewTimer.current = undefined;
+    }
+    previewHideTimer.current = window.setTimeout(() => {
+      setHoverPreviewOpen(false);
+      previewHideTimer.current = undefined;
+    }, 150);
+  };
 
   const openItem = async () => {
     if (!parseSafeUrl(item.url)) {
@@ -227,25 +254,7 @@ export function FavoriteCard({
       src={thumbnailUrl}
     />
   ) : (
-    <div
-      className={`flex h-full w-full flex-col items-center justify-center gap-2 ${toneFor(item.url)}`}
-    >
-      <FaviconImage
-        className="h-9 w-9"
-        faviconUrl={item.faviconUrl}
-        fallback={
-          isLocalFile ? (
-            <DocumentIcon aria-hidden="true" className="h-8 w-8" />
-          ) : (
-            <GlobeAltIcon aria-hidden="true" className="h-8 w-8" />
-          )
-        }
-        url={item.url}
-      />
-      <span className="max-w-[85%] truncate text-xs opacity-80">
-        {getUrlLabel(item.url)}
-      </span>
-    </div>
+    <FavoriteFallback item={item} />
   );
 
   return (
@@ -253,8 +262,30 @@ export function FavoriteCard({
       ref={cardRef}
       data-favorite-id={item.id}
       draggable
+      onMouseEnter={schedulePreview}
+      onMouseLeave={hidePreview}
+      onFocusCapture={schedulePreview}
+      onBlurCapture={(event) => {
+        const next = event.relatedTarget;
+        if (
+          next instanceof Node &&
+          (event.currentTarget.contains(next) ||
+            document.getElementById(`favorite-preview-${item.id}`)?.contains(next))
+        ) {
+          return;
+        }
+        hidePreview();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && hoverPreviewOpen) {
+          setHoverPreviewOpen(false);
+          previewTriggerRef.current?.focus();
+        }
+      }}
       onDragStart={(event) => {
         event.stopPropagation();
+        setHoverPreviewOpen(false);
+        if (previewTimer.current) window.clearTimeout(previewTimer.current);
         const { width, height, left, top } = event.currentTarget.getBoundingClientRect();
         removeDragImage();
         // A live overlay can animate; the native drag image is a static snapshot.
@@ -427,7 +458,10 @@ export function FavoriteCard({
         className={`relative min-w-0 shrink-0 overflow-hidden ${layout === 'grid' ? 'aspect-[16/10] w-full' : 'h-full w-32 sm:w-40'}`}
       >
         <button
+          ref={previewTriggerRef}
           aria-label={`Open ${item.title}`}
+          aria-expanded={hoverPreviewOpen}
+          aria-haspopup="dialog"
           className="absolute inset-0 h-full w-full text-left focus-visible:z-10 focus-visible:outline-offset-[-2px]"
           onClick={() => void openItem()}
           type="button"
@@ -521,6 +555,27 @@ export function FavoriteCard({
           </span>
         </button>
       </div>
+      <HoverPreview
+        anchorRef={previewTriggerRef}
+        fullThumbnailUrl={fullThumbnailUrl}
+        item={item}
+        onClose={() => {
+          setHoverPreviewOpen(false);
+          previewTriggerRef.current?.focus();
+        }}
+        onEdit={() => {
+          setHoverPreviewOpen(false);
+          onEdit(item);
+        }}
+        onOpen={() => {
+          setHoverPreviewOpen(false);
+          void openItem();
+        }}
+        onPanelEnter={cancelPreviewHide}
+        onPanelLeave={hidePreview}
+        open={hoverPreviewOpen}
+        thumbnailUrl={thumbnailUrl}
+      />
     </article>
   );
 }

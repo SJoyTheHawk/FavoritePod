@@ -20,10 +20,11 @@ FavoritePod/
 └── vite.config.ts
 ```
 
-**Current status**: Phases 2-4 are implemented. Automated storage tests, lint,
+**Current status**: Phases 2–5 are implemented as milestones. Phase 4 closed on 2026-11-03 and Phase 5 thumbnail implementation is complete. Automated storage and thumbnail tests, lint,
 type check, formatting, and production build pass. Manual Chrome checks remain
-open for drag-and-drop, keyboard navigation, screenshot capture, and local-file
-opening; see `docs/phase-4-manual-test.md` and `NEXT_STEPS.md`.
+open for drag-and-drop, keyboard navigation, screenshot capture, thumbnail
+previews, and local-file opening; see `docs/phase-4-manual-test.md`,
+`docs/phase-5-manual-test.md`, and `NEXT_STEPS.md`.
 
 ## UI Captures
 
@@ -237,7 +238,7 @@ AI Agent:
 | **file:// priority** | Main differentiator vs. browser bookmarks |
 | **Manual testing** | Token-efficient for v1, automate later |
 | **IndexedDB** | Handles binary (thumbnails), unlimited storage |
-| **Flat groups** | Simpler UX, faster to build, defer nesting |
+| **Nested groups** | Implemented in Phase 4 with direct dragging and cycle prevention |
 | **No Drive sync in v1** | Most complex feature, validate core first |
 | **TypeScript strict** | Catch errors early, AI-friendly |
 | **Pure functions** | Testable, predictable, AI can reason about |
@@ -266,7 +267,7 @@ AI Agent:
 
 ### User Experience Goals
 - Clear file access permission guidance
-- Smooth drag-and-drop (planned)
+- Direct drag-and-drop with nesting and sibling placement indicators
 - Intuitive group organization
 - Helpful error messages
 - Dark/light theme works (planned)
@@ -429,7 +430,7 @@ You now have:
 - ✅ AI-friendly architecture
 - ✅ Manual testing approach
 
-**Next step**: Start with Phase 1 (Foundation) in docs/IMPLEMENTATION_PLAN.md
+**Next step**: Review Phase 6 (File:// Link Support) in docs/IMPLEMENTATION_PLAN.md and browser acceptance in NEXT_STEPS.md.
 
 Good luck! 🚀
 

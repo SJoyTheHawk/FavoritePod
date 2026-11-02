@@ -150,15 +150,19 @@ export async function updateItemThumbnail(
   return db.transaction('rw', db.items, db.thumbnails, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item || isItemDeleted(item)) throw new Error('Favorite not found.');
-    if (!(await db.thumbnails.get(hash))) {
+    const existing = await db.thumbnails.get(hash);
+    if (!existing) {
       await db.thumbnails.put({
         hash,
         blob: thumbnail.blob,
+        ...(thumbnail.smallBlob ? { smallBlob: thumbnail.smallBlob } : {}),
         size: thumbnail.blob.size,
         width: thumbnail.width,
         height: thumbnail.height,
         createdAt: Date.now(),
       });
+    } else if (thumbnail.smallBlob && !existing.smallBlob) {
+      await db.thumbnails.put({ ...existing, smallBlob: thumbnail.smallBlob });
     }
     if (item.previewHash === hash) return item;
     const clock = await nextClock();
@@ -400,14 +404,23 @@ export async function createItem(data: CreateItemInput): Promise<Item> {
       };
 
       if (data.thumbnail && previewHash) {
-        await db.thumbnails.put({
-          hash: previewHash,
-          blob: data.thumbnail.blob,
-          size: data.thumbnail.blob.size,
-          width: data.thumbnail.width,
-          height: data.thumbnail.height,
-          createdAt: Date.now(),
-        });
+        const existing = await db.thumbnails.get(previewHash);
+        if (!existing) {
+          await db.thumbnails.put({
+            hash: previewHash,
+            blob: data.thumbnail.blob,
+            ...(data.thumbnail.smallBlob ? { smallBlob: data.thumbnail.smallBlob } : {}),
+            size: data.thumbnail.blob.size,
+            width: data.thumbnail.width,
+            height: data.thumbnail.height,
+            createdAt: Date.now(),
+          });
+        } else if (data.thumbnail.smallBlob && !existing.smallBlob) {
+          await db.thumbnails.put({
+            ...existing,
+            smallBlob: data.thumbnail.smallBlob,
+          });
+        }
       }
       await db.items.add(item);
       await db.settings.put({ key: 'lastUsedGroupId', value: group.id });

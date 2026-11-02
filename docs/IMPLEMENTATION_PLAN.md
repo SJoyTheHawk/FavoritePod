@@ -4,7 +4,7 @@
 
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
-**Current status**: Phases 2-4 are implemented and covered by automated checks. Manual Chrome validation for extension loading, HMR, screenshots, nested drag-and-drop, keyboard navigation, and `file://` access remains open; see `NEXT_STEPS.md` and `docs/phase-4-manual-test.md` for checklists.
+**Current status**: Phases 2-5 are implemented and covered by automated checks. Manual Chrome validation for extension loading, HMR, screenshots, nested drag-and-drop, keyboard navigation, thumbnail previews, and `file://` access remains open; see `NEXT_STEPS.md`, `docs/phase-4-manual-test.md`, and `docs/phase-5-manual-test.md` for checklists.
 
 ## Architecture Overview
 
@@ -251,7 +251,16 @@ merge module is held to 100% branch, function, line, and statement coverage by
 **Validation**: Production build and automated checks pass. Loading the unpacked
 extension and confirming HMR in Chrome remain manual Phase 1 checks.
 
-## Phase 4: Core Features (Week 4-6) - Implementation Complete
+## Phase 4: Core Features (Week 4-6) - Closed (2026-11-03)
+
+Closed as an implementation milestone at the user's request. Closure checks on
+2026-11-03: all 50 tests across 6 suites, production build (including TypeScript),
+lint, and formatting passed. Manual Chrome acceptance remains tracked separately
+in `docs/phase-4-manual-test.md`; this closure does not claim those checks passed.
+
+Includes the New group action beside All favorites, No parent group wording,
+and » hierarchy separators. Long-path display changes are deferred at the
+user's request; keep full paths for now. Phase 5 is implemented; Phase 6 is next.
 
 ### 4.1 Nested Groups & Items
 **Goal**: Hierarchical organization with drag-and-drop
@@ -268,7 +277,7 @@ extension and confirming HMR in Chrome remain manual Phase 1 checks.
 - Collapsible with smooth animation
 - Visual depth indicator (indent + line)
 - Badge showing item count
-- Drag handle for reordering
+- Drag rows directly; edge line and circle show sibling placement, center drops nest
 
 **Item Card Component**:
 - Thumbnail (640x400 local, lazy-loaded)
@@ -342,19 +351,19 @@ environment because the npm registry was unreachable.
 build pass. Drag behavior, keyboard navigation, dialogs, and Chrome file URL
 opening still need the manual checks in `docs/phase-4-manual-test.md`.
 
-## Phase 5: Thumbnail System (Week 6-7)
+## Phase 5: Thumbnail System (Week 6-7) - Implementation Complete
 
 ### 5.1 Capture & Storage
 **Goal**: High-quality previews with efficient storage
 
 **Tasks**:
-- [ ] Implement `captureVisibleTab()` wrapper
-- [ ] Build OffscreenCanvas resizing
-- [ ] Generate two sizes: 640x400, 320x200
-- [ ] Calculate SHA-256 hash
-- [ ] Store in IndexedDB by hash
-- [ ] Implement fallback card generator
-- [ ] Add favicon fetching via `chrome-extension://_favicon/`
+- [x] Implement `captureVisibleTab()` wrapper
+- [x] Build OffscreenCanvas resizing
+- [x] Generate two sizes: 640x400, 320x200
+- [x] Calculate SHA-256 hash
+- [x] Store in IndexedDB by hash
+- [x] Implement fallback card generator
+- [x] Add favicon fetching via `chrome-extension://_favicon/`
 
 **Thumbnail Pipeline**:
 ```
@@ -382,12 +391,12 @@ Capture (activeTab)
 **Goal**: Rich previews on hover
 
 **Tasks**:
-- [ ] Build popover component
-- [ ] Show thumbnail on 400ms hover
-- [ ] Display full URL
-- [ ] Add "Open" and "Edit" quick actions
-- [ ] Implement opt-in iframe preview
-- [ ] Add iframe timeout fallback (2s)
+- [x] Build popover component
+- [x] Show thumbnail on 400ms hover
+- [x] Display full URL
+- [x] Add "Open" and "Edit" quick actions
+- [x] Implement opt-in iframe preview
+- [x] Add iframe timeout fallback (2s)
 
 **Popover Design**:
 ```
@@ -407,6 +416,16 @@ Capture (activeTab)
 - Popover doesn't block interaction
 - Iframe fallback works
 - Keyboard accessible (focus + enter)
+
+**Implementation note**: Existing thumbnail records remain readable. New captures
+store a 640x400 preview and a 320x200 card preview under the same SHA-256 keyed
+record. Capture calls are serialized with a 500ms minimum interval. Live page
+previews are opt-in and sandboxed; they fall back to the stored preview after
+two seconds.
+
+**Validation**: 53 tests across 7 suites, type check, lint, formatting, and
+production build pass. Browser behavior remains open for the checklist in
+`docs/phase-5-manual-test.md`.
 
 ## Phase 6: File:// Link Support (Week 7)
 

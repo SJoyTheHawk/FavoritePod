@@ -24,6 +24,37 @@ FavoritePod/
 implemented. Unit and production-build checks pass. Loading the unpacked build,
 HMR, screenshot capture, and local-file opening still need manual Chrome checks.
 
+## UI Captures
+
+### Toolbar Popup
+
+![FavoritePod popup home screen with recent pages and the Add bookmark review dialog](screenshots/popup.png)
+
+The capture shows the popup home screen behind the focused bookmark review dialog.
+The page content and address are representative Chrome tab details.
+
+### Empty Dashboard
+
+Desktop:
+
+![FavoritePod empty dashboard at desktop size](screenshots/dashboard-empty-desktop.png)
+
+Mobile:
+
+![FavoritePod empty dashboard at mobile size](screenshots/dashboard-empty-mobile.png)
+
+### Grid and List Views
+
+The populated examples use Chrome documentation and GitHub favorites.
+
+Grid:
+
+![FavoritePod dashboard showing saved favorites in grid view](screenshots/dashboard-grid.png)
+
+List:
+
+![FavoritePod dashboard showing saved favorites in list view](screenshots/dashboard-list.png)
+
 ---
 
 ## 🎯 V1 Scope Summary
@@ -32,7 +63,7 @@ HMR, screenshot capture, and local-file opening still need manual Chrome checks.
 **Perfect file:// link support** - Enable saving and opening local HTML tools
 
 ### Core Features (5 weeks)
-1. Toolbar popup → Save current page
+1. Toolbar popup → Review and save the active page
 2. Dashboard → Visual launcher with thumbnails
 3. Groups → Flat organization (no nesting in v1)
 4. Drag-and-drop → Reordering

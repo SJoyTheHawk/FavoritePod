@@ -934,6 +934,18 @@ xl: 1280px  /* Desktops */
 </div>
 ```
 
+### Toolbar Capture Review
+
+The popup home screen keeps a single **Add bookmark** action, up to five recent
+pages, and access to the launcher. Each recent row has an x action that removes
+it from the recent list while keeping the favorite in the launcher. Opening the action shows a focused
+review dialog for the current supported page. Add it when the dialog opens, then
+show its captured thumbnail when available, its address, and compact fields for
+its name and folder. **Done** saves edits and closes the dialog; **Remove**
+deletes the favorite. If the current URL is already saved, edit that favorite
+instead of adding a duplicate. Keep recent pages on the home screen, outside the
+review dialog.
+
 ---
 
 ## Accessibility

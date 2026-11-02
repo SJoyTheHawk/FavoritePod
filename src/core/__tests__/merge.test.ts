@@ -17,6 +17,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
       url: clock,
       title: clock,
       previewHash: clock,
+      faviconUrl: clock,
     },
     ...overrides,
   };
@@ -37,6 +38,18 @@ function makeGroup(
 }
 
 describe('library merge', () => {
+  it('merges favicon changes with legacy records in either direction', () => {
+    const legacy = makeItem();
+    Reflect.deleteProperty(legacy.clock, 'faviconUrl');
+    const updated = makeItem({ faviconUrl: 'data:image/png;base64,aWNvbg==' });
+    updated.clock.faviconUrl = createHLC(30, 0, 'device-b');
+    const left = { groups: [], items: [legacy] };
+    const right = { groups: [], items: [updated] };
+    expect(mergeLibrary(left, right)).toEqual(mergeLibrary(right, left));
+    expect(mergeLibrary(left, right).items[0].faviconUrl).toBe(updated.faviconUrl);
+    expect(mergeLibrary(left, left).items[0].clock.faviconUrl).toBe(legacy.clock.url);
+  });
+
   it('merges independent field edits by their own clocks', () => {
     const old = createHLC(10, 0, 'device-a');
     const titleEdit = createHLC(20, 0, 'device-a');
@@ -49,11 +62,19 @@ describe('library merge', () => {
         url: old,
         title: titleEdit,
         previewHash: old,
+        faviconUrl: old,
       },
     });
     const right = makeItem({
       orderKey: 'a1',
-      clock: { groupId: old, orderKey: moveEdit, url: old, title: old, previewHash: old },
+      clock: {
+        groupId: old,
+        orderKey: moveEdit,
+        url: old,
+        title: old,
+        previewHash: old,
+        faviconUrl: old,
+      },
     });
     const state = (items: Item[]): LibraryState => ({ groups: [], items });
 
@@ -76,6 +97,7 @@ describe('library merge', () => {
         url: later,
         title: later,
         previewHash: later,
+        faviconUrl: later,
       },
     });
     expect(isItemDeleted(edited)).toBe(false);

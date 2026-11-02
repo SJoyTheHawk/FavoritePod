@@ -22,6 +22,6 @@
     "service_worker": "src/background/service-worker.ts",
     "type": "module"
   },
-  "permissions": ["activeTab", "unlimitedStorage"],
+  "permissions": ["activeTab", "favicon", "unlimitedStorage"],
   "optional_permissions": ["history", "topSites"]
 }

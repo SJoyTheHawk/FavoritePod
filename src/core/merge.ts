@@ -24,15 +24,15 @@ function mergeRecord<T extends ClockedRecord>(
   const rightValues = right as unknown as Record<string, unknown>;
 
   for (const field of fields) {
-    const leftClock = left.clock[field];
-    const rightClock = right.clock[field];
+    const leftClock = left.clock[field] ?? left.clock.url;
+    const rightClock = right.clock[field] ?? right.clock.url;
     const comparison = compareHLC(leftClock, rightClock);
     const takeRight =
       comparison < 0 ||
       (comparison === 0 && compareValue(leftValues[field], rightValues[field]) < 0);
     const source = takeRight ? right : left;
     target[field] = (takeRight ? rightValues : leftValues)[field];
-    result.clock[field] = source.clock[field];
+    result.clock[field] = source.clock[field] ?? source.clock.url;
   }
 
   if (left.deleted && right.deleted) {
@@ -89,6 +89,7 @@ function mergeItems(left: Item[], right: Item[]): Item[] {
             'url',
             'title',
             'previewHash',
+            'faviconUrl',
           ] satisfies ItemField[])
         : item,
     );

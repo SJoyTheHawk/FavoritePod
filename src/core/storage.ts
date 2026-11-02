@@ -15,6 +15,7 @@ import type {
 
 const DEFAULT_GROUP_TITLE = 'Favorites';
 const SNAPSHOT_LIMIT = 3;
+const DISMISSED_RECENT_ITEM_IDS = 'dismissedRecentItemIds';
 
 export type LibraryView = 'grid' | 'list';
 
@@ -95,8 +96,39 @@ export async function listItems(groupId?: string): Promise<Item[]> {
 }
 
 export async function getRecentItems(limit = 5): Promise<Item[]> {
-  const items = (await db.items.toArray()).filter((item) => !isItemDeleted(item));
+  const dismissed = await getDismissedRecentItemIds();
+  const items = (await db.items.toArray()).filter(
+    (item) => !isItemDeleted(item) && !dismissed.has(item.id),
+  );
   return items.sort((a, b) => compareLatestItemClock(b, a)).slice(0, limit);
+}
+
+async function getDismissedRecentItemIds(): Promise<Set<string>> {
+  const record = await db.settings.get(DISMISSED_RECENT_ITEM_IDS);
+  if (!Array.isArray(record?.value)) return new Set();
+  return new Set(
+    record.value.filter((value): value is string => typeof value === 'string'),
+  );
+}
+
+export async function dismissRecentItem(id: string): Promise<void> {
+  await db.transaction('rw', db.settings, async () => {
+    const dismissed = await getDismissedRecentItemIds();
+    dismissed.add(id);
+    await db.settings.put({
+      key: DISMISSED_RECENT_ITEM_IDS,
+      value: [...dismissed],
+    });
+  });
+}
+
+async function restoreRecentItem(id: string): Promise<void> {
+  const dismissed = await getDismissedRecentItemIds();
+  if (!dismissed.delete(id)) return;
+  await db.settings.put({
+    key: DISMISSED_RECENT_ITEM_IDS,
+    value: [...dismissed],
+  });
 }
 
 function compareLatestItemClock(left: Item, right: Item): number {
@@ -204,6 +236,7 @@ export interface CreateItemInput {
   url: string;
   title?: string;
   groupId?: string;
+  faviconUrl?: string;
   thumbnail?: ThumbnailInput;
 }
 
@@ -231,6 +264,7 @@ export async function createItem(data: CreateItemInput): Promise<Item> {
         orderKey: await orderKeyForGroup(group.id),
         url,
         title,
+        faviconUrl: data.faviconUrl,
         previewHash,
         clock: {
           groupId: clock,
@@ -238,6 +272,7 @@ export async function createItem(data: CreateItemInput): Promise<Item> {
           url: clock,
           title: clock,
           previewHash: clock,
+          faviconUrl: clock,
         },
       };
 
@@ -266,7 +301,7 @@ export async function updateItem(
     throw new Error('Use a web address or a local file URL.');
   }
 
-  return db.transaction('rw', db.items, db.groups, db.syncMeta, async () => {
+  return db.transaction('rw', db.items, db.groups, db.syncMeta, db.settings, async () => {
     const item = await db.items.get(id);
     if (!item || isItemDeleted(item)) throw new Error('Favorite not found.');
 
@@ -279,10 +314,17 @@ export async function updateItem(
     const changedFields = (Object.keys(updates) as ItemField[]).filter(
       (field) => Object.hasOwn(updates, field) && updates[field] !== item[field],
     );
+    const movedToGroup =
+      updates.groupId !== undefined && updates.groupId !== item.groupId;
+    if (movedToGroup && updates.orderKey === undefined) changedFields.push('orderKey');
+    await restoreRecentItem(id);
     if (changedFields.length === 0) return item;
 
     const clock = await nextClock();
     const next: Item = { ...item, ...updates, clock: { ...item.clock } };
+    if (movedToGroup && updates.orderKey === undefined) {
+      next.orderKey = await orderKeyForGroup(next.groupId);
+    }
     for (const field of changedFields) next.clock[field] = clock;
     if (updates.title !== undefined)
       next.title = normalizedTitle(updates.title, next.url);

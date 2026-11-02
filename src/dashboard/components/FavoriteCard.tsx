@@ -5,6 +5,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
+import { FaviconImage } from '../../components/FaviconImage';
 import { getThumbnail } from '../../core/storage';
 import { getUrlLabel, parseSafeUrl } from '../../core/validation';
 import type { Item } from '../../core/types';
@@ -118,8 +119,19 @@ export function FavoriteCard({
           onClick={() => void openItem()}
           type="button"
         >
-          <span className="block truncate text-sm font-medium text-text-primary transition-colors group-hover:text-primary">
-            {item.title}
+          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary transition-colors group-hover:text-primary">
+            <FaviconImage
+              url={item.url}
+              faviconUrl={item.faviconUrl}
+              fallback={
+                isLocalFile ? (
+                  <DocumentIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                ) : (
+                  <GlobeAltIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                )
+              }
+            />
+            <span className="truncate">{item.title}</span>
           </span>
           <span className="mt-1 block truncate text-xs text-text-tertiary">
             {getUrlLabel(item.url)}

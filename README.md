@@ -24,8 +24,10 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 
 ### Phase 3: Popup and Dashboard
 
-- Save the active page from the toolbar popup with a compressed screenshot
-- Pick a group and reopen one of the five most recent favorites
+- Add the active page through a bookmark-style review dialog with a compressed screenshot
+- Edit its name or folder, remove it, or confirm with Done
+- Keep the five most recent favorites available from the popup home screen
+- Dismiss individual pages from recent pages without deleting their favorites
 - Search and organize favorites in responsive grid or list views
 - Add and remove groups; add, edit, and delete favorites
 - Save web and `file://` URLs locally
@@ -35,6 +37,12 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 - Drag-and-drop and nested group management
 - ZIP import/export and theme preferences
 - Per-device file path overrides and Google Drive sync
+
+## Interface Preview
+
+![FavoritePod dashboard with saved favorites in grid view](docs/screenshots/dashboard-grid.png)
+
+See the [full set of UI captures](docs/PROJECT_OVERVIEW.md#ui-captures).
 
 ---
 
@@ -88,6 +96,14 @@ To load it locally in Chrome:
 3. Pin FavoritePod, then click its toolbar icon to open the popup.
 
 For development, keep `npm run dev` running while Chrome has the unpacked `dist/` build loaded. For a production build, run `npm run build` and reload the extension from `chrome://extensions/`.
+
+Development uses `localhost:5173` for both HTTP and hot reload. Run only one
+development server for this project; if port 5173 is occupied, stop the previous
+server before restarting. The port is fixed so extension pages can connect to
+the correct WebSocket. After changing Vite configuration or switching between
+development and production builds, reload FavoritePod in `chrome://extensions/`
+and reopen its popup/dashboard. Stop the development server before building for
+production, since both commands write to `dist/`.
 
 Useful checks:
 

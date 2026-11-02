@@ -28,6 +28,16 @@ export class FavoritePodDB extends Dexie {
       deviceFiles: 'deviceId,lastSync',
       settings: 'key',
     });
+    this.version(2)
+      .stores({})
+      .upgrade(async (transaction) => {
+        await transaction
+          .table<Item, string>('items')
+          .toCollection()
+          .modify((item) => {
+            item.clock.faviconUrl ??= item.clock.url;
+          });
+      });
   }
 }
 

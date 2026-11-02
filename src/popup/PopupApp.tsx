@@ -1,86 +1,49 @@
 import { useEffect, useState } from 'react';
 import {
   BookmarkIcon,
-  CheckCircleIcon,
   DocumentIcon,
-  FolderIcon,
   GlobeAltIcon,
+  PlusIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { captureThumbnail } from '../core/thumbnail';
-import { createItem, getLastUsedGroupId } from '../core/storage';
+import { dismissRecentItem } from '../core/storage';
 import { useLibrary, useRecentItems } from '../core/use-library';
-import { getDefaultTitle, getUrlLabel, parseSafeUrl } from '../core/validation';
-import type { ThumbnailInput } from '../core/types';
+import { getUrlLabel, parseSafeUrl } from '../core/validation';
+import { BookmarkDialog } from './BookmarkDialog';
+import { FaviconImage } from '../components/FaviconImage';
 
 export function PopupApp() {
-  const { groups } = useLibrary();
-  const { items: recentItems } = useRecentItems(5);
+  const { groups, items, loading: libraryLoading, error: libraryError } = useLibrary();
+  const { items: recentItems, loading: recentLoading } = useRecentItems(5);
   const [tab, setTab] = useState<chrome.tabs.Tab>();
-  const [groupId, setGroupId] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [tabLoading, setTabLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string>();
-  const [previewNotice, setPreviewNotice] = useState(false);
-  const [faviconFailed, setFaviconFailed] = useState(false);
 
   useEffect(() => {
+    let active = true;
     void chrome.tabs
       .query({ active: true, currentWindow: true })
-      .then(([activeTab]) => setTab(activeTab));
-    void getLastUsedGroupId().then((lastGroupId) => {
-      if (lastGroupId) setGroupId(lastGroupId);
-    });
+      .then(([activeTab]) => {
+        if (active) setTab(activeTab);
+      })
+      .catch(() => {
+        if (active) setError('Could not read the current browser tab.');
+      })
+      .finally(() => {
+        if (active) setTabLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
-
-  useEffect(() => {
-    if (groups.length === 0) return;
-    if (groups.some((group) => group.id === groupId)) return;
-    void getLastUsedGroupId().then((lastGroupId) => {
-      setGroupId(
-        lastGroupId && groups.some((group) => group.id === lastGroupId)
-          ? lastGroupId
-          : groups[0].id,
-      );
-    });
-  }, [groups, groupId]);
 
   const currentUrl = tab?.url ?? '';
   const parsedCurrentUrl = parseSafeUrl(currentUrl);
-  const pageTitle = tab?.title?.trim() || getDefaultTitle(currentUrl) || 'Untitled page';
-
-  useEffect(() => setFaviconFailed(false), [tab?.favIconUrl]);
-
-  const saveCurrentPage = async () => {
-    if (!parsedCurrentUrl) return;
-    setSaving(true);
-    setError(undefined);
-    setSaved(false);
-    setPreviewNotice(false);
-
-    let thumbnail: ThumbnailInput | undefined;
-    try {
-      thumbnail = await captureThumbnail(tab?.windowId);
-    } catch {
-      setPreviewNotice(true);
-    }
-
-    try {
-      const item = await createItem({
-        url: currentUrl,
-        title: pageTitle,
-        groupId: groupId || undefined,
-        thumbnail,
-      });
-      setGroupId(item.groupId);
-      setSaved(true);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save this page.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const canAddCurrentPage = !tabLoading && !libraryLoading && Boolean(parsedCurrentUrl);
 
   const openItem = async (url: string) => {
+    setError(undefined);
     try {
       await chrome.tabs.create({ url });
       window.close();
@@ -91,106 +54,61 @@ export function PopupApp() {
     }
   };
 
+  const openLauncher = async () => {
+    setError(undefined);
+    try {
+      await chrome.tabs.create({
+        url: chrome.runtime.getURL('src/dashboard/dashboard.html'),
+      });
+      window.close();
+    } catch {
+      setError('Chrome could not open the launcher.');
+    }
+  };
+
+  const openBookmarkDialog = () => {
+    setError(undefined);
+    setDialogOpen(true);
+  };
+
+  const dismissPage = async (id: string) => {
+    try {
+      await dismissRecentItem(id);
+    } catch {
+      setError('Could not remove this page from recents. Please try again.');
+    }
+  };
+
   return (
     <main className="flex h-[480px] w-80 flex-col overflow-hidden bg-background text-text-primary">
-      <header className="flex h-[68px] shrink-0 items-center justify-between border-b border-border px-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-light text-primary">
-            <BookmarkIcon aria-hidden="true" className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold leading-tight">FavoritePod</h1>
-            <p className="mt-0.5 text-xs text-text-secondary">Quick save</p>
-          </div>
-        </div>
+      <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-light text-primary">
+          <BookmarkIcon aria-hidden="true" className="h-4 w-4" />
+        </span>
+        <h1 className="text-sm font-semibold">FavoritePod</h1>
       </header>
 
-      <section className="border-b border-border px-4 py-4">
-        <div className="mb-2 flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface text-text-secondary">
-            {tab?.favIconUrl && !faviconFailed ? (
-              <img
-                alt=""
-                className="h-5 w-5 object-contain"
-                onError={() => setFaviconFailed(true)}
-                src={tab.favIconUrl}
-              />
-            ) : parsedCurrentUrl?.protocol === 'file:' ? (
-              <DocumentIcon aria-hidden="true" className="h-4 w-4" />
-            ) : (
-              <GlobeAltIcon aria-hidden="true" className="h-4 w-4" />
-            )}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium" title={pageTitle}>
-              {tab ? pageTitle : 'Loading current page…'}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-text-tertiary" title={currentUrl}>
-              {currentUrl ? getUrlLabel(currentUrl) : ''}
-            </p>
-          </div>
-        </div>
-
-        {groups.length > 0 && (
-          <label className="mb-3 flex h-9 items-center gap-2 rounded-md border border-border px-2.5 text-xs text-text-secondary">
-            <FolderIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-            <span className="shrink-0">Save to</span>
-            <select
-              aria-label="Save to group"
-              className="min-w-0 flex-1 bg-transparent text-right text-xs text-text-primary outline-none"
-              onChange={(event) => setGroupId(event.target.value)}
-              value={groupId}
-            >
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.title}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
+      <section className="shrink-0 border-b border-border px-4 py-3">
         <button
-          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!parsedCurrentUrl || saving || saved}
-          onClick={() => void saveCurrentPage()}
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canAddCurrentPage}
+          onClick={openBookmarkDialog}
           type="button"
         >
-          {saved ? (
-            <>
-              <CheckCircleIcon aria-hidden="true" className="h-4 w-4" />
-              Saved
-            </>
-          ) : saving ? (
-            'Saving…'
-          ) : (
-            <>
-              <BookmarkIcon aria-hidden="true" className="h-4 w-4" />
-              Save current page
-            </>
-          )}
+          <PlusIcon aria-hidden="true" className="h-4 w-4" />
+          Add bookmark
         </button>
-        {!parsedCurrentUrl && tab && (
+        {!tabLoading && tab && !parsedCurrentUrl && (
           <p className="mt-2 text-xs text-text-secondary">
             This browser page can’t be saved.
-          </p>
-        )}
-        {previewNotice && saved && (
-          <p className="mt-2 text-xs text-text-secondary">
-            Saved without a page preview.
-          </p>
-        )}
-        {error && (
-          <p className="mt-2 text-xs text-danger" role="alert">
-            {error}
           </p>
         )}
       </section>
 
       <section className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex h-5 items-center justify-between">
           <h2 className="text-xs font-semibold uppercase text-text-tertiary">
-            Recently saved
+            Recent pages (up to 5)
           </h2>
           <span className="text-xs tabular-nums text-text-tertiary">
             {recentItems.length}
@@ -202,51 +120,81 @@ export function PopupApp() {
               const isLocal = parseSafeUrl(item.url)?.protocol === 'file:';
               return (
                 <li key={item.id}>
-                  <button
-                    className="flex min-h-[54px] w-full items-center gap-3 py-2 text-left transition hover:bg-surface-hover"
-                    onClick={() => void openItem(item.url)}
-                    type="button"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface text-text-secondary">
-                      {isLocal ? (
-                        <DocumentIcon aria-hidden="true" className="h-4 w-4" />
-                      ) : (
-                        <GlobeAltIcon aria-hidden="true" className="h-4 w-4" />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">
-                        {item.title}
+                  <div className="flex min-h-12 items-center gap-2">
+                    <button
+                      className="flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left transition hover:bg-surface-hover"
+                      onClick={() => void openItem(item.url)}
+                      type="button"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface text-text-secondary">
+                        <FaviconImage
+                          fallback={
+                            isLocal ? (
+                              <DocumentIcon aria-hidden="true" className="h-4 w-4" />
+                            ) : (
+                              <GlobeAltIcon aria-hidden="true" className="h-4 w-4" />
+                            )
+                          }
+                          faviconUrl={item.faviconUrl}
+                          url={item.url}
+                        />
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-text-tertiary">
-                        {getUrlLabel(item.url)}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {item.title}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-text-tertiary">
+                          {getUrlLabel(item.url)}
+                        </span>
                       </span>
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      aria-label={`Remove ${item.title} from recent pages`}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary transition hover:bg-surface-hover hover:text-text-primary"
+                      onClick={() => void dismissPage(item.id)}
+                      title="Remove from recent pages"
+                      type="button"
+                    >
+                      <XMarkIcon aria-hidden="true" className="h-4 w-4" />
+                    </button>
+                  </div>
                 </li>
               );
             })}
           </ul>
+        ) : recentLoading || libraryLoading ? (
+          <p className="py-3 text-sm text-text-secondary">Loading recent pages…</p>
         ) : (
           <p className="rounded-md bg-surface px-3 py-3 text-sm text-text-secondary">
-            No favorites yet
+            No recent pages
+          </p>
+        )}
+        {(error || libraryError) && (
+          <p className="mt-2 text-xs text-danger" role="alert">
+            {error ?? libraryError}
           </p>
         )}
       </section>
 
-      <footer className="border-t border-border p-3">
+      <footer className="flex h-[52px] shrink-0 items-center border-t border-border px-3">
         <button
-          className="min-h-9 w-full rounded-md text-sm font-medium text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
-          onClick={() =>
-            void chrome.tabs.create({
-              url: chrome.runtime.getURL('src/dashboard/dashboard.html'),
-            })
-          }
+          className="h-9 w-full rounded-md text-sm font-medium text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
+          onClick={() => void openLauncher()}
           type="button"
         >
           Open launcher
         </button>
       </footer>
+
+      {dialogOpen && tab && (
+        <BookmarkDialog
+          groups={groups}
+          items={items}
+          libraryLoading={libraryLoading}
+          onClose={() => setDialogOpen(false)}
+          tab={tab}
+        />
+      )}
     </main>
   );
 }

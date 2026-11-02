@@ -233,16 +233,19 @@ Context:
 - Task: Implement Phase 3.1 (Toolbar Popup)
 - References:
   * docs/IMPLEMENTATION_PLAN.md - Phase 3.1
-  * docs/CODE_GUIDE.md - Pattern 1 (Save Current Page)
+  * docs/CODE_GUIDE.md - Pattern 1 (Add Bookmark Review)
   * docs/DESIGN_GUIDE.md - Button, Input components
   * docs/AI_AGENT_GUIDE.md - Common patterns
 
 Task:
-Create src/popup/PopupApp.tsx with:
-- "Save Current Page" button
-- "Open Launcher" button  
-- Recent items preview (last 5)
-- Group selection dropdown
+Create the toolbar popup with:
+- An Add bookmark action for the current page
+- A focused review dialog that adds the page when opened
+- Page preview and address in the dialog
+- Name and folder editing, confirmed with Done
+- A Remove action in the dialog
+- The five most recent pages on the popup home screen
+- An Open Launcher button
 
 Follow the design system from DESIGN_GUIDE.md.
 Provide manual test instructions.
@@ -261,7 +264,7 @@ Track your progress against these key milestones:
 - ✅ Dashboard opens (even if empty)
 
 ### Milestone 2: Save Page Works (Week 2-3)
-- ✅ Click popup → captures screenshot
+- ✅ Click "Add bookmark" → opens review dialog and captures screenshot
 - ✅ Saves to IndexedDB
 - ✅ Appears in dashboard
 

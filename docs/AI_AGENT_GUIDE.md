@@ -232,7 +232,7 @@ Chrome. Add tests when they verify behavior outside the implementation details.
 When implementing a feature, provide a manual test checklist:
 
 ```markdown
-## Manual Test: Save Current Page
+## Manual Test: Add Bookmark Review
 
 ### Setup
 1. Load extension in Chrome (unpacked from dist/)
@@ -241,17 +241,25 @@ When implementing a feature, provide a manual test checklist:
 ### Test Steps
 1. Click extension icon in toolbar
 2. Popup should open (320x480px)
-3. Click "Save Current Page" button
-4. Should see success message
-5. Open dashboard (click "Open Launcher")
-6. New item should appear with thumbnail
+3. Confirm the popup home screen shows "Add bookmark" and recent pages
+4. Click "Add bookmark"
+5. The review dialog should add the current page and show its preview
+6. Change the name or folder, then click "Done"
+7. Reopen the popup and confirm the page appears in recent pages
+8. Open dashboard (click "Open launcher")
+9. New item should appear with thumbnail
 
 ### Expected Results
 - ✅ Popup opens without errors
-- ✅ Screenshot captured successfully
+- ✅ Screenshot captured successfully when the review dialog opens
 - ✅ Item appears in dashboard
 - ✅ Thumbnail displays correctly
 - ✅ Title matches page title
+- ✅ Favicon remains visible after closing and reopening the popup and launcher
+- ✅ Reopening Add bookmark refreshes an existing favorite’s icon without duplication
+- ✅ Name and folder edits persist
+- ✅ Remove deletes the current favorite
+- ✅ The x action removes a page from recent pages without deleting its favorite
 - ✅ Clicking item opens correct URL
 
 ### Edge Cases to Test

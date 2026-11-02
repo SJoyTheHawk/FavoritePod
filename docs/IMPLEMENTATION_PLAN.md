@@ -184,25 +184,35 @@ merge module is held to 100% branch, function, line, and statement coverage by
 ## Phase 3: Basic UI (Week 3-4) - Complete
 
 ### 3.1 Toolbar Popup
-**Goal**: Quick-action popup with save button
+**Goal**: Quick access to recent favorites with a bookmark-style add dialog
 
 **Tasks**:
 - [x] Create popup UI (320x480px)
-- [x] Add "Save current page" button
+- [x] Add an "Add bookmark" action for the active page
+- [x] Keep a preview of the five most recent pages in the popup
+- [x] Allow dismissing individual pages from the recent list without deleting favorites
+- [x] Open a focused review dialog from the add action
+- [x] Add the page by default when the review dialog opens
+- [x] Open an existing favorite for its URL instead of creating a duplicate
+- [x] Allow changing its name and folder before confirming with Done
+- [x] Allow removing the favorite from the dialog
 - [x] Capture visible tab screenshot
 - [x] Resize and compress to JPEG
-- [x] Show active-tab title and favicon when available
-- [x] Show save confirmation
+- [x] Show the active page, address, and saved state
 - [x] Add "Open launcher" button
 
 **Design Requirements**:
 - Fast load time (<100ms)
-- Clear call-to-action buttons
-- Recent items preview (last 5)
-- Group selection dropdown
+- Recent pages preview (last 5)
+- Maximum of five non-dismissed pages, with an x action to remove a page from this list
+- Use Chrome's favicon API and the tab-provided favicon URL as a fallback
+- Keep page details and edit controls inside the review dialog
+- Group selection dropdown in the review dialog
 
 **Acceptance**:
-- Clicking "Save page" captures and stores
+- The add action opens the review dialog and saves the page by default
+- Done persists name and folder edits; Remove deletes the favorite
+- Recent pages remain available from the popup home screen
 - Popup opens launcher dashboard
 - Works on activeTab without broad permissions
 

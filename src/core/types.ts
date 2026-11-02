@@ -1,7 +1,8 @@
 export type HLC = string;
 
 export type GroupField = 'parentId' | 'orderKey' | 'title';
-export type ItemField = 'groupId' | 'orderKey' | 'url' | 'title' | 'previewHash';
+export type ItemField =
+  'groupId' | 'orderKey' | 'url' | 'title' | 'previewHash' | 'faviconUrl';
 
 export interface Group {
   id: string;
@@ -19,6 +20,7 @@ export interface Item {
   url: string;
   title: string;
   previewHash?: string;
+  faviconUrl?: string;
   clock: Record<ItemField, HLC>;
   deleted?: HLC;
 }

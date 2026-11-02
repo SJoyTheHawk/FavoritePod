@@ -220,6 +220,7 @@ export default defineConfig({
 | Permission | Purpose | User Experience |
 |------------|---------|-----------------|
 | `activeTab` | Read the active tab, capture its screenshot, open its URL | Temporary when the popup is used |
+| `favicon` | Read Chrome’s cached website icons as a fallback | Reload the extension after manifest changes |
 | `unlimitedStorage` | Protect the IndexedDB library from normal quota eviction | No install warning |
 | `history` (optional) | Visited-site suggestions (planned) | Runtime permission dialog |
 
@@ -806,46 +807,27 @@ const data = await chrome.storage.local.get('key');
 
 ## Common Patterns
 
-### Pattern 1: Save Current Page
+### Pattern 1: Add Bookmark Review
 
-```typescript
-// In popup (popup/PopupApp.tsx)
-async function handleSaveCurrentPage() {
-  try {
-    // 1. Capture thumbnail
-    const capture = await captureVisibleTab();
-    if (!capture) {
-      throw new Error('Could not capture page');
-    }
-    
-    // 2. Save thumbnail
-    await saveThumbnail(capture.blob, capture.hash);
-    
-    // 3. Get page info
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true
-    });
-    
-    if (!tab.url || !tab.title) {
-      throw new Error('Could not get page info');
-    }
-    
-    // 4. Save item
-    const item = await createItem({
-      groupId: selectedGroupId, // From UI state
-      url: tab.url,
-      title: tab.title,
-      previewHash: capture.hash
-    });
-    
-    // 5. Show success
-    setSuccessMessage('Page saved!');
-  } catch (error) {
-    setErrorMessage(error.message);
-  }
-}
-```
+The toolbar popup keeps recent favorites on its home screen. Its **Add bookmark**
+action opens a review dialog for the active tab. When that dialog opens, look up
+the exact URL in the library; edit the existing favorite when found, otherwise
+capture a thumbnail when possible and create the favorite in the last-used
+folder. **Done** persists name and folder edits, while **Remove** deletes the
+favorite. Closing the dialog without either action leaves the default favorite
+in place when it was newly created.
+
+The popup's recent-pages list uses `useRecentItems(5)` so updates from the review
+dialog appear without reloading the popup. `dismissRecentItem(id)` hides a row
+from this list without deleting its favorite; editing that favorite restores it
+to recent pages. `captureFavicon` reads the tab icon (then Chrome's `_favicon/`
+endpoint if necessary), decodes it, and stores a 32px PNG data URL in `faviconUrl`.
+The shared `FaviconImage` prefers saved pixels, then the cached Chrome icon, and
+finally a globe/file fallback. It is used by the popup, review dialog, and launcher.
+Reopening Add bookmark for an existing URL refreshes its icon without duplicating
+the favorite. A failed capture preserves the previous icon. The `faviconUrl` field
+has its own merge clock; database version 2 backfills clocks for legacy records.
+The `_favicon/` endpoint requires the manifest's `favicon` permission.
 
 ### Pattern 2: Display Items with Thumbnails
 

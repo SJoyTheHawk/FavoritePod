@@ -1,6 +1,6 @@
 import { compareHLC, latestHLC, tickHLC } from './hlc';
 import { isGroupDeleted, isItemDeleted } from './merge';
-import { nextOrderKey } from './ordering';
+import { keyBetween, nextOrderKey } from './ordering';
 import { hashBlob } from './thumbnail';
 import { getDefaultTitle, isValidUrl } from './validation';
 import { db } from './db';
@@ -142,6 +142,36 @@ export async function getThumbnail(hash: string) {
   return db.thumbnails.get(hash);
 }
 
+export async function updateItemThumbnail(
+  id: string,
+  thumbnail: ThumbnailInput,
+): Promise<Item> {
+  const hash = await hashBlob(thumbnail.blob);
+  return db.transaction('rw', db.items, db.thumbnails, db.syncMeta, async () => {
+    const item = await db.items.get(id);
+    if (!item || isItemDeleted(item)) throw new Error('Favorite not found.');
+    if (!(await db.thumbnails.get(hash))) {
+      await db.thumbnails.put({
+        hash,
+        blob: thumbnail.blob,
+        size: thumbnail.blob.size,
+        width: thumbnail.width,
+        height: thumbnail.height,
+        createdAt: Date.now(),
+      });
+    }
+    if (item.previewHash === hash) return item;
+    const clock = await nextClock();
+    const next: Item = {
+      ...item,
+      previewHash: hash,
+      clock: { ...item.clock, previewHash: clock },
+    };
+    await db.items.put(next);
+    return next;
+  });
+}
+
 export async function getLastUsedGroupId(): Promise<string | undefined> {
   const record = await db.settings.get('lastUsedGroupId');
   return typeof record?.value === 'string' ? record.value : undefined;
@@ -198,14 +228,107 @@ export async function updateGroup(
     const group = await db.groups.get(id);
     if (!group || isGroupDeleted(group)) throw new Error('Group not found.');
 
+    const parentId = updates.parentId === undefined ? group.parentId : updates.parentId;
+    if (parentId === id || (parentId && (await isGroupDescendant(id, parentId)))) {
+      throw new Error('A group cannot be moved into itself or one of its descendants.');
+    }
+    if (parentId) {
+      const parent = await db.groups.get(parentId);
+      if (!parent || isGroupDeleted(parent))
+        throw new Error('The selected parent group is unavailable.');
+    }
+
+    const movedToParent = parentId !== group.parentId;
+    const destinationOrderKey =
+      movedToParent && updates.orderKey === undefined
+        ? await nextOrderKeyForGroupParent(parentId, id)
+        : (updates.orderKey ?? group.orderKey);
+    const changes = { ...updates, parentId, orderKey: destinationOrderKey };
+
     const changedFields = (Object.keys(updates) as GroupField[]).filter(
       (field) => updates[field] !== undefined && updates[field] !== group[field],
     );
+    if (movedToParent && !changedFields.includes('orderKey'))
+      changedFields.push('orderKey');
     if (changedFields.length === 0) return group;
 
     const clock = await nextClock();
-    const next = { ...group, ...updates, clock: { ...group.clock } };
+    const next = { ...group, ...changes, clock: { ...group.clock } };
     for (const field of changedFields) next.clock[field] = clock;
+    await db.groups.put(next);
+    return next;
+  });
+}
+
+async function isGroupDescendant(
+  ancestorId: string,
+  candidateId: string,
+): Promise<boolean> {
+  const visited = new Set<string>();
+  let currentId: string | null = candidateId;
+  while (currentId && !visited.has(currentId)) {
+    if (currentId === ancestorId) return true;
+    visited.add(currentId);
+    currentId = (await db.groups.get(currentId))?.parentId ?? null;
+  }
+  return false;
+}
+
+async function nextOrderKeyForGroupParent(
+  parentId: string | null,
+  excludeId?: string,
+): Promise<string> {
+  const siblings = (await db.groups.toArray()).filter(
+    (group) =>
+      !isGroupDeleted(group) && group.id !== excludeId && group.parentId === parentId,
+  );
+  return nextOrderKey(siblings.map((group) => group.orderKey));
+}
+
+export async function moveGroup(
+  id: string,
+  parentId: string | null,
+  beforeGroupId?: string,
+): Promise<Group> {
+  return db.transaction('rw', db.groups, db.syncMeta, async () => {
+    const group = await db.groups.get(id);
+    if (!group || isGroupDeleted(group)) throw new Error('Group not found.');
+    if (parentId === id || (parentId && (await isGroupDescendant(id, parentId)))) {
+      throw new Error('A group cannot be moved into itself or one of its descendants.');
+    }
+    if (parentId) {
+      const parent = await db.groups.get(parentId);
+      if (!parent || isGroupDeleted(parent))
+        throw new Error('The selected parent group is unavailable.');
+    }
+
+    const siblings = ordered(
+      (await db.groups.toArray()).filter(
+        (candidate) =>
+          !isGroupDeleted(candidate) &&
+          candidate.id !== id &&
+          candidate.parentId === parentId,
+      ),
+    );
+    const beforeIndex = beforeGroupId
+      ? siblings.findIndex((sibling) => sibling.id === beforeGroupId)
+      : -1;
+    if (beforeGroupId && beforeIndex < 0)
+      throw new Error('The destination group is unavailable.');
+    const index = beforeIndex < 0 ? siblings.length : beforeIndex;
+    const orderKey = keyBetween(
+      siblings[index - 1]?.orderKey ?? null,
+      siblings[index]?.orderKey ?? null,
+    );
+    if (group.parentId === parentId && group.orderKey === orderKey) return group;
+
+    const clock = await nextClock();
+    const next: Group = {
+      ...group,
+      parentId,
+      orderKey,
+      clock: { ...group.clock, parentId: clock, orderKey: clock },
+    };
     await db.groups.put(next);
     return next;
   });
@@ -333,12 +456,187 @@ export async function updateItem(
   });
 }
 
+export async function moveItem(
+  id: string,
+  groupId: string,
+  beforeItemId?: string,
+): Promise<Item> {
+  return db.transaction('rw', db.items, db.groups, db.syncMeta, db.settings, async () => {
+    const item = await db.items.get(id);
+    if (!item || isItemDeleted(item)) throw new Error('Favorite not found.');
+    const group = await db.groups.get(groupId);
+    if (!group || isGroupDeleted(group))
+      throw new Error('The selected group is unavailable.');
+
+    const siblings = ordered(
+      (await db.items.where('groupId').equals(groupId).toArray()).filter(
+        (candidate) => !isItemDeleted(candidate) && candidate.id !== id,
+      ),
+    );
+    const beforeIndex = beforeItemId
+      ? siblings.findIndex((sibling) => sibling.id === beforeItemId)
+      : -1;
+    if (beforeItemId && beforeIndex < 0)
+      throw new Error('The destination favorite is unavailable.');
+    const index = beforeIndex < 0 ? siblings.length : beforeIndex;
+    const orderKey = keyBetween(
+      siblings[index - 1]?.orderKey ?? null,
+      siblings[index]?.orderKey ?? null,
+    );
+    if (item.groupId === groupId && item.orderKey === orderKey) return item;
+
+    const clock = await nextClock();
+    const next: Item = {
+      ...item,
+      groupId,
+      orderKey,
+      clock: { ...item.clock, groupId: clock, orderKey: clock },
+    };
+    await restoreRecentItem(id);
+    await db.items.put(next);
+    await db.settings.put({ key: 'lastUsedGroupId', value: groupId });
+    return next;
+  });
+}
+
+export async function moveItems(
+  ids: readonly string[],
+  groupId: string,
+): Promise<Item[]> {
+  const uniqueIds = [...new Set(ids)];
+  if (!uniqueIds.length) return [];
+
+  return db.transaction('rw', db.items, db.groups, db.syncMeta, db.settings, async () => {
+    const group = await db.groups.get(groupId);
+    if (!group || isGroupDeleted(group))
+      throw new Error('The selected group is unavailable.');
+
+    const selected = await Promise.all(uniqueIds.map((id) => db.items.get(id)));
+    if (selected.some((item) => !item || isItemDeleted(item)))
+      throw new Error('One or more selected favorites are unavailable.');
+    const items = selected as Item[];
+    const movingIds = new Set(uniqueIds);
+    const destination = ordered(
+      (await db.items.where('groupId').equals(groupId).toArray()).filter(
+        (item) => !isItemDeleted(item) && !movingIds.has(item.id),
+      ),
+    );
+    let orderKeys = destination.map((item) => item.orderKey);
+    const moved: Item[] = [];
+    for (const item of items) {
+      const orderKey = nextOrderKey(orderKeys);
+      orderKeys = [...orderKeys, orderKey];
+      const clock = await nextClock();
+      const next: Item = {
+        ...item,
+        groupId,
+        orderKey,
+        clock: { ...item.clock, groupId: clock, orderKey: clock },
+      };
+      await restoreRecentItem(item.id);
+      await db.items.put(next);
+      moved.push(next);
+    }
+    await db.settings.put({ key: 'lastUsedGroupId', value: groupId });
+    return moved;
+  });
+}
+
+export interface ItemPosition {
+  id: string;
+  groupId: string;
+  orderKey: string;
+}
+
+export async function restoreItemPositions(
+  positions: readonly ItemPosition[],
+): Promise<void> {
+  await db.transaction('rw', db.items, db.groups, db.syncMeta, async () => {
+    const records = await Promise.all(
+      positions.map((position) => db.items.get(position.id)),
+    );
+    if (records.some((item) => !item || isItemDeleted(item)))
+      throw new Error('One or more favorites are unavailable.');
+    for (let index = 0; index < positions.length; index += 1) {
+      const position = positions[index];
+      const item = records[index] as Item;
+      const group = await db.groups.get(position.groupId);
+      if (!group || isGroupDeleted(group))
+        throw new Error('The destination group is unavailable.');
+      const clock = await nextClock();
+      await db.items.put({
+        ...item,
+        groupId: position.groupId,
+        orderKey: position.orderKey,
+        clock: { ...item.clock, groupId: clock, orderKey: clock },
+      });
+    }
+  });
+}
+
 export async function deleteItem(id: string): Promise<void> {
   await db.transaction('rw', db.items, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item || isItemDeleted(item)) return;
     const clock = await nextClock();
     await db.items.put({ ...item, deleted: clock });
+  });
+}
+
+export async function deleteItems(ids: readonly string[]): Promise<void> {
+  const uniqueIds = [...new Set(ids)];
+  if (!uniqueIds.length) return;
+  await db.transaction('rw', db.items, db.syncMeta, async () => {
+    const records = await Promise.all(uniqueIds.map((id) => db.items.get(id)));
+    if (records.some((item) => !item || isItemDeleted(item)))
+      throw new Error('One or more selected favorites are unavailable.');
+    for (const item of records as Item[]) {
+      const clock = await nextClock();
+      await db.items.put({ ...item, deleted: clock });
+    }
+  });
+}
+
+export async function restoreItem(id: string): Promise<Item> {
+  return db.transaction('rw', db.items, db.syncMeta, async () => {
+    const item = await db.items.get(id);
+    if (!item) throw new Error('Favorite not found.');
+    if (!isItemDeleted(item)) return item;
+    const clock = await nextClock();
+    const next = { ...item, clock: { ...item.clock, title: clock } };
+    delete next.deleted;
+    await db.items.put(next);
+    return next;
+  });
+}
+
+export async function restoreItems(ids: readonly string[]): Promise<void> {
+  const uniqueIds = [...new Set(ids)];
+  if (!uniqueIds.length) return;
+  await db.transaction('rw', db.items, db.syncMeta, async () => {
+    const records = await Promise.all(uniqueIds.map((id) => db.items.get(id)));
+    if (records.some((item) => !item))
+      throw new Error('A favorite could not be restored.');
+    for (const item of records as Item[]) {
+      if (!isItemDeleted(item)) continue;
+      const clock = await nextClock();
+      const restored = { ...item, clock: { ...item.clock, title: clock } };
+      delete restored.deleted;
+      await db.items.put(restored);
+    }
+  });
+}
+
+export async function restoreGroup(id: string): Promise<Group> {
+  return db.transaction('rw', db.groups, db.syncMeta, async () => {
+    const group = await db.groups.get(id);
+    if (!group) throw new Error('Group not found.');
+    if (!isGroupDeleted(group)) return group;
+    const clock = await nextClock();
+    const next = { ...group, clock: { ...group.clock, title: clock } };
+    delete next.deleted;
+    await db.groups.put(next);
+    return next;
   });
 }
 

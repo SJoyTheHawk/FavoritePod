@@ -891,40 +891,18 @@ async function handleOpenItem(item: Item) {
 }
 ```
 
-### Pattern 4: Drag-and-Drop Reordering (Simple v1)
+### Pattern 4: Drag-and-Drop Ordering (v1)
 
-```typescript
-// Simple HTML5 drag-and-drop for v1
-function ItemCard({ item, onReorder }: Props) {
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('itemId', item.id);
-  };
-  
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault(); // Allow drop
-  };
-  
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    const draggedId = e.dataTransfer.getData('itemId');
-    
-    if (draggedId !== item.id) {
-      await onReorder(draggedId, item.id);
-    }
-  };
-  
-  return (
-    <div
-      draggable
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      {/* Item content */}
-    </div>
-  );
-}
-```
+The dashboard uses the HTML5 drag-and-drop API for favorite and group moves.
+`src/dashboard/drag.ts` writes a typed payload; persistence stays in
+`src/core/storage.ts` through `moveItem()` and `moveGroup()`, which calculate
+fractional keys and prevent group cycles. The target row or card shows the drop
+state, and the dragged card supplies its preview image.
+
+Native drag-and-drop does not provide keyboard operation. Keep equivalent
+actions in the menus: favorites can move to a group or move up/down, and groups
+can change parent or move up/down. This keeps ordering available without a
+pointer and avoids putting ordering logic in the React components.
 
 ---
 

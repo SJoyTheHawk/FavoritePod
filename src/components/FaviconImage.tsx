@@ -5,9 +5,15 @@ interface FaviconImageProps {
   url: string;
   faviconUrl?: string;
   fallback: ReactNode;
+  className?: string;
 }
 
-export function FaviconImage({ url, faviconUrl, fallback }: FaviconImageProps) {
+export function FaviconImage({
+  url,
+  faviconUrl,
+  fallback,
+  className = 'h-4 w-4',
+}: FaviconImageProps) {
   const sources = useMemo(() => faviconSources(url, faviconUrl), [faviconUrl, url]);
   const [sourceIndex, setSourceIndex] = useState(0);
 
@@ -18,7 +24,7 @@ export function FaviconImage({ url, faviconUrl, fallback }: FaviconImageProps) {
   return (
     <img
       alt=""
-      className="h-4 w-4 shrink-0 object-contain"
+      className={`${className} shrink-0 object-contain`}
       onError={() => setSourceIndex((index) => index + 1)}
       src={sources[sourceIndex]}
       referrerPolicy="no-referrer"

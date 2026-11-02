@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../db';
 import Dexie from 'dexie';
+import { compareHLC } from '../hlc';
 import {
   createItem,
   createGroup,
@@ -8,16 +9,25 @@ import {
   dismissRecentItem,
   deleteGroup,
   deleteItem,
+  deleteItems,
   getDefaultView,
   getLastUsedGroupId,
   getRecentItems,
   listGroups,
   listItems,
   listSnapshots,
+  moveGroup,
+  moveItem,
+  moveItems,
+  restoreGroup,
+  restoreItem,
+  restoreItems,
+  restoreItemPositions,
   restoreSnapshot,
   setDefaultView,
   updateGroup,
   updateItem,
+  updateItemThumbnail,
 } from '../storage';
 
 beforeEach(async () => {
@@ -115,6 +125,23 @@ describe('local library storage', () => {
     });
   });
 
+  it('stores a replacement preview and updates its merge clock', async () => {
+    const item = await createItem({ url: 'https://preview.example' });
+    const updated = await updateItemThumbnail(item.id, {
+      blob: new Blob(['new-jpeg-data'], { type: 'image/jpeg' }),
+      width: 640,
+      height: 400,
+    });
+
+    expect(updated.previewHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(updated.clock.previewHash > item.clock.previewHash).toBe(true);
+    expect(await db.thumbnails.get(updated.previewHash!)).toMatchObject({
+      width: 640,
+      height: 400,
+      size: 13,
+    });
+  });
+
   it('rejects executable URL schemes and writes edits as newer field clocks', async () => {
     await expect(createItem({ url: 'javascript:alert(1)' })).rejects.toThrow(
       'web address',
@@ -152,6 +179,82 @@ describe('local library storage', () => {
       first.id,
     ]);
     expect(await getLastUsedGroupId()).toBe(personal.id);
+  });
+
+  it('moves groups between levels, orders siblings, and prevents cycles', async () => {
+    const parent = await createGroup({ title: 'Parent' });
+    const sibling = await createGroup({ title: 'Sibling' });
+    const child = await createGroup({ title: 'Child', parentId: parent.id });
+    const grandchild = await createGroup({ title: 'Grandchild', parentId: child.id });
+
+    await moveGroup(sibling.id, parent.id);
+    expect((await db.groups.get(sibling.id))?.parentId).toBe(parent.id);
+    await expect(moveGroup(parent.id, grandchild.id)).rejects.toThrow('descendants');
+
+    await moveGroup(grandchild.id, parent.id, sibling.id);
+    expect(
+      (await db.groups.get(grandchild.id))!.orderKey <
+        (await db.groups.get(sibling.id))!.orderKey,
+    ).toBe(true);
+  });
+
+  it('moves and reorders items using fractional keys', async () => {
+    const source = await createGroup({ title: 'Source' });
+    const destination = await createGroup({ title: 'Destination' });
+    const first = await createItem({
+      url: 'https://first.example',
+      groupId: destination.id,
+    });
+    const second = await createItem({
+      url: 'https://second.example',
+      groupId: destination.id,
+    });
+    const moved = await createItem({ url: 'https://moved.example', groupId: source.id });
+
+    await moveItem(moved.id, destination.id, first.id);
+    expect((await listItems(destination.id)).map((item) => item.id)).toEqual([
+      moved.id,
+      first.id,
+      second.id,
+    ]);
+    await moveItem(second.id, destination.id, moved.id);
+    expect((await listItems(destination.id)).map((item) => item.id)).toEqual([
+      second.id,
+      moved.id,
+      first.id,
+    ]);
+  });
+
+  it('moves and deletes a selected set as one undoable batch', async () => {
+    const source = await createGroup({ title: 'Batch source' });
+    const destination = await createGroup({ title: 'Batch destination' });
+    const first = await createItem({
+      url: 'https://batch-first.example',
+      groupId: source.id,
+    });
+    const second = await createItem({
+      url: 'https://batch-second.example',
+      groupId: source.id,
+    });
+
+    await moveItems([first.id, second.id], destination.id);
+    expect((await listItems(destination.id)).map((item) => item.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
+    await restoreItemPositions([
+      { id: first.id, groupId: source.id, orderKey: first.orderKey },
+      { id: second.id, groupId: source.id, orderKey: second.orderKey },
+    ]);
+    expect((await listItems(source.id)).map((item) => item.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
+
+    await deleteItems([first.id, second.id]);
+    expect(await listItems()).toHaveLength(0);
+    await restoreItems([first.id, second.id]);
+    expect((await listItems()).map((item) => item.id)).toEqual([first.id, second.id]);
   });
 
   it('appends a favorite to the end of its destination group when moved', async () => {
@@ -244,6 +347,22 @@ describe('local library storage', () => {
 
     expect(await listItems()).toHaveLength(0);
     expect((await db.items.get(item.id))?.deleted).toBeDefined();
+  });
+
+  it('restores deleted records with a newer field clock', async () => {
+    const group = await createGroup({ title: 'Undo group' });
+    const item = await createItem({ url: 'https://undo.example', groupId: group.id });
+    await deleteItem(item.id);
+    await deleteGroup(group.id);
+    const groupTombstone = (await db.groups.get(group.id))!.deleted!;
+    const itemTombstone = (await db.items.get(item.id))!.deleted!;
+
+    const restoredGroup = await restoreGroup(group.id);
+    const restoredItem = await restoreItem(item.id);
+    expect((await listGroups()).map((entry) => entry.id)).toContain(group.id);
+    expect((await listItems()).map((entry) => entry.id)).toContain(item.id);
+    expect(compareHLC(restoredGroup.clock.title, groupTombstone)).toBeGreaterThan(0);
+    expect(compareHLC(restoredItem.clock.title, itemTombstone)).toBeGreaterThan(0);
   });
 
   it('restores an atomic snapshot of records and thumbnails', async () => {

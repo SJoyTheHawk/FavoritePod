@@ -20,10 +20,10 @@ FavoritePod/
 └── vite.config.ts
 ```
 
-**Current status**: Phase 2 (Core Data Layer) and Phase 3 (Popup and Dashboard)
-implementation is complete. Automated tests, lint, type check, formatting, and
-production build pass. Manual Chrome checks for loading the unpacked build, HMR,
-screenshot capture, and local-file opening remain open; see `NEXT_STEPS.md`.
+**Current status**: Phases 2-4 are implemented. Automated storage tests, lint,
+type check, formatting, and production build pass. Manual Chrome checks remain
+open for drag-and-drop, keyboard navigation, screenshot capture, and local-file
+opening; see `docs/phase-4-manual-test.md` and `NEXT_STEPS.md`.
 
 ## UI Captures
 
@@ -66,15 +66,14 @@ List:
 ### Core Features (5 weeks)
 1. Toolbar popup → Review and save the active page
 2. Dashboard → Visual launcher with thumbnails
-3. Groups → Flat organization (no nesting in v1)
-4. Drag-and-drop → Reordering
+3. Groups → Nested organization with drag-and-drop
+4. Favorites → Grid/list views, editing, bulk actions, undo/redo
 5. IndexedDB → Local storage
 6. ZIP → Import/export for sharing
 7. **file:// → Full local file support** ⭐
 
 ### Deferred to V2
 - Google Drive sync (complex, 4 weeks)
-- Nested groups (simpler UX first)
 - History discovery (optional permissions)
 - Browser E2E testing (core logic and storage already have Vitest coverage)
 - Advanced animations
@@ -320,8 +319,7 @@ V1 LAUNCH 🚀
 
 Future:     V2 Development
             ├─ Google Drive sync (4 weeks)
-            ├─ Nested groups (1 week)
-            └─ Advanced features (3 weeks)
+            └─ History discovery and other optional features
 ```
 
 ---

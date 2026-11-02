@@ -44,7 +44,7 @@ Key Technologies:
 - Chrome Extension Manifest V3
 
 Data Model:
-- Groups: Organize items (flat structure in v1)
+- Groups: Organize items in a nested parentId hierarchy
 - Items: Individual bookmarks (URL + thumbnail + metadata)
 - Thumbnails: JPEG blobs stored by SHA-256 hash
 ```
@@ -360,7 +360,7 @@ If you're choosing what to work on, prioritize in this order:
    - Edit/delete
    - ZIP export/import
 
-**Defer to v2**: Drive sync, nested groups, history discovery, animations
+**Defer to v2**: Drive sync, history discovery, animations
 
 ---
 

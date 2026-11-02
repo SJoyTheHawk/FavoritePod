@@ -40,6 +40,47 @@ afterAll(async () => {
 });
 
 describe('local library storage', () => {
+  it('inserts seven selected favorites as an ordered batch and restores them on undo', async () => {
+    const group = await createGroup({ title: 'Stack' });
+    const records: Awaited<ReturnType<typeof createItem>>[] = [];
+    for (let index = 0; index < 10; index++) {
+      records.push(
+        await createItem({ url: `https://stack.example/${index}`, groupId: group.id }),
+      );
+    }
+    const selected = [0, 2, 3, 5, 6, 7, 9].map((index) => records[index]);
+    const ids = selected.map((item) => item.id);
+    const before = selected.map(({ id, groupId, orderKey }) => ({
+      id,
+      groupId,
+      orderKey,
+    }));
+    await moveItems(ids, group.id, records[4].id);
+    expect((await listItems(group.id)).map((item) => item.id)).toEqual([
+      records[1].id,
+      ...ids,
+      records[4].id,
+      records[8].id,
+    ]);
+    await restoreItemPositions(before);
+    expect((await listItems(group.id)).map((item) => item.id)).toEqual(
+      records.map((item) => item.id),
+    );
+    await moveItems(ids, group.id);
+    expect((await listItems(group.id)).map((item) => item.id)).toEqual([
+      records[1].id,
+      records[4].id,
+      records[8].id,
+      ...ids,
+    ]);
+    await expect(moveItems(ids, group.id, ids[0])).rejects.toThrow('destination');
+    expect((await listItems(group.id)).map((item) => item.id)).toEqual([
+      records[1].id,
+      records[4].id,
+      records[8].id,
+      ...ids,
+    ]);
+  });
   it('nests an entire group at the bottom while retaining its children after reopen', async () => {
     const work = await createGroup({ title: 'Work' });
     const child = await createGroup({ title: '123', parentId: work.id });

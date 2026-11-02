@@ -36,6 +36,7 @@ interface GroupTreeProps {
   onSelect: (groupId: string | null) => void;
   onEdit: (group: Group) => void;
   onDelete: (group: Group) => void;
+  onCreateGroup: () => void;
   onCreateChild: (parentId: string) => void;
   onMoveGroup: (groupId: string, parentId: string | null, beforeId?: string) => void;
   onMoveItem: (itemId: string, groupId: string) => void;
@@ -43,7 +44,7 @@ interface GroupTreeProps {
 
 interface BranchProps extends Omit<
   GroupTreeProps,
-  'items' | 'selectedGroupId' | 'onSelect'
+  'items' | 'selectedGroupId' | 'onSelect' | 'onCreateGroup'
 > {
   siblings: Group[];
   selectedGroupId: string | null;
@@ -382,18 +383,30 @@ export function GroupTree(props: GroupTreeProps) {
 
   return (
     <nav aria-label="Favorite groups" className="grid gap-1">
-      <button
-        aria-current={props.selectedGroupId === null ? 'page' : undefined}
-        className={`flex h-10 min-w-0 items-center gap-2 rounded-md px-3 text-left text-sm transition ${props.selectedGroupId === null ? 'bg-primary-light font-medium text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
-        onClick={() => props.onSelect(null)}
-        type="button"
+      <div
+        className={`flex h-10 min-w-0 items-center rounded-md pr-1 text-sm transition ${props.selectedGroupId === null ? 'bg-primary-light font-medium text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
       >
-        <FolderIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">All favorites</span>
-        <span className="text-xs tabular-nums text-text-tertiary">
-          {props.items.length}
-        </span>
-      </button>
+        <button
+          aria-current={props.selectedGroupId === null ? 'page' : undefined}
+          className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-md pl-3 pr-2 text-left"
+          onClick={() => props.onSelect(null)}
+          type="button"
+        >
+          <span className="min-w-0 flex-1 truncate">All favorites</span>
+          <span className="text-xs tabular-nums text-text-tertiary">
+            {props.items.length}
+          </span>
+        </button>
+        <button
+          aria-label="New group"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
+          onClick={props.onCreateGroup}
+          title="New group"
+          type="button"
+        >
+          <FolderPlusIcon aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </div>
       <GroupBranch
         {...props}
         dropTarget={dropTarget}

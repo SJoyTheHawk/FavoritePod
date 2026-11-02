@@ -93,7 +93,11 @@ export function FavoriteDialog({
       return;
     }
     try {
-      await onSave({ title, url: url.trim(), groupId: groupId || undefined });
+      await onSave({
+        title,
+        url: url.trim(),
+        ...(!item ? { groupId: groupId || undefined } : {}),
+      });
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save this favorite.');
@@ -200,21 +204,23 @@ export function FavoriteDialog({
                 value={url}
               />
             </label>
-            <label className="grid gap-1.5 text-sm font-medium text-text-primary">
-              Group
-              <select
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary"
-                onChange={(event) => setGroupId(event.target.value)}
-                value={groupId}
-              >
-                {groups.length === 0 && <option value="">Favorites</option>}
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {labels.get(group.id) ?? group.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {!item && (
+              <label className="grid gap-1.5 text-sm font-medium text-text-primary">
+                Group
+                <select
+                  className="h-10 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary"
+                  onChange={(event) => setGroupId(event.target.value)}
+                  value={groupId}
+                >
+                  {groups.length === 0 && <option value="">Favorites</option>}
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {labels.get(group.id) ?? group.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {error && (
               <p className="text-sm text-danger" role="alert">
                 {error}

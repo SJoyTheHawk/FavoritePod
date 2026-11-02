@@ -6,7 +6,6 @@ import {
   CheckCircleIcon,
   Cog6ToothIcon,
   ExclamationCircleIcon,
-  FolderPlusIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
   PlusIcon,
@@ -39,13 +38,23 @@ import { useLibrary } from '../core/use-library';
 import type { Group, Item } from '../core/types';
 import { FavoriteCard } from './components/FavoriteCard';
 import { FavoriteDialog } from './components/FavoriteDialog';
+import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
 import { GroupDialog } from './components/GroupDialog';
 import { GroupTree } from './components/GroupTree';
 import { SettingsDialog } from './components/SettingsDialog';
+import {
+  clearLibraryDragData,
+  getActiveLibraryDragPayload,
+  readLibraryDragData,
+  previewItemOrder,
+  resolveItemDropDestination,
+  type ItemDropPlacement,
+} from './drag';
 import { getGroupLabels } from './group-labels';
 
 type DialogState =
   | { type: 'favorite'; item?: Item; groupId?: string }
+  | { type: 'move-favorite'; item: Item }
   | { type: 'group'; group?: Group; parentId?: string | null }
   | null;
 
@@ -58,6 +67,13 @@ interface HistoryEntry {
 interface HistoryStack {
   past: HistoryEntry[];
   future: HistoryEntry[];
+}
+
+interface FavoriteDropDestination {
+  itemId: string;
+  itemIds: string[];
+  groupId: string;
+  beforeItemId?: string;
 }
 
 interface Toast {
@@ -73,16 +89,27 @@ function ToastItem({
   toast: Toast;
   onDismiss: (id: number) => void;
 }) {
+  const [isExiting, setIsExiting] = useState(false);
+
   useEffect(() => {
-    const timeout = window.setTimeout(() => onDismiss(toast.id), 5000);
+    const timeout = window.setTimeout(() => setIsExiting(true), 5000);
     return () => window.clearTimeout(timeout);
-  }, [onDismiss, toast.id]);
+  }, [toast.id]);
 
   const isError = toast.type === 'error';
 
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-3 rounded-md border bg-background px-3 py-3 text-sm shadow-lg ${isError ? 'border-danger/30' : 'border-success/30'}`}
+      className={`pointer-events-auto flex items-start gap-3 rounded-md border bg-background px-3 py-3 text-sm shadow-lg ${isError ? 'border-danger/30' : 'border-success/30'} ${isExiting ? 'toast-exit' : 'toast-enter'}`}
+      onAnimationEnd={(event) => {
+        if (
+          isExiting &&
+          event.animationName === 'toast-exit' &&
+          event.target === event.currentTarget
+        ) {
+          onDismiss(toast.id);
+        }
+      }}
       role={isError ? 'alert' : 'status'}
     >
       {isError ? (
@@ -102,7 +129,7 @@ function ToastItem({
       <button
         aria-label="Dismiss notification"
         className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-        onClick={() => onDismiss(toast.id)}
+        onClick={() => setIsExiting(true)}
         type="button"
       >
         <XMarkIcon aria-hidden="true" className="h-4 w-4" />
@@ -122,6 +149,22 @@ function compareOrder(
       : 1;
 }
 
+function isFavoriteAtDestination(
+  items: readonly Item[],
+  destination: FavoriteDropDestination,
+): boolean {
+  const siblings = items
+    .filter((item) => item.groupId === destination.groupId)
+    .sort(compareOrder);
+  const index = siblings.findIndex((item) => item.id === destination.itemIds[0]);
+  if (index < 0) return false;
+  if (!destination.itemIds.every((id, offset) => siblings[index + offset]?.id === id))
+    return false;
+  return destination.beforeItemId
+    ? siblings[index + destination.itemIds.length]?.id === destination.beforeItemId
+    : index + destination.itemIds.length === siblings.length;
+}
+
 function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'The library could not be updated.';
 }
@@ -135,7 +178,18 @@ export function DashboardApp() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [dragPreviewOrder, setDragPreviewOrder] = useState<string[] | null>(null);
+  const [draggingFavoriteId, setDraggingFavoriteId] = useState<string | null>(null);
+  const [dragPlaceholderHeight, setDragPlaceholderHeight] = useState(0);
+  const [draggedIds, setDraggedIds] = useState<string[]>([]);
+  const dragIdsRef = useRef<string[]>([]);
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [dropOrigin, setDropOrigin] = useState<{ left: number; top: number } | null>(
+    null,
+  );
   const nextToastId = useRef(0);
+  const favoriteDropPending = useRef<FavoriteDropDestination | null>(null);
+  const favoritePreviewDestination = useRef<FavoriteDropDestination | null>(null);
   const history = useRef<HistoryStack>({ past: [], future: [] });
   const [historyVersion, setHistoryVersion] = useState(0);
   const groupLabels = useMemo(() => getGroupLabels(groups), [groups]);
@@ -156,6 +210,30 @@ export function DashboardApp() {
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
+  const clearFavoriteDrag = useCallback(() => {
+    favoriteDropPending.current = null;
+    favoritePreviewDestination.current = null;
+    dragIdsRef.current = [];
+    setDraggedIds([]);
+    setDragPreviewOrder(null);
+    setDraggingFavoriteId(null);
+    setDragPlaceholderHeight(0);
+  }, []);
+
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        !dragIdsRef.current.length ||
+        favoriteDropPending.current
+      )
+        return;
+      clearLibraryDragData();
+      clearFavoriteDrag();
+    };
+    window.addEventListener('keydown', cancel, true);
+    return () => window.removeEventListener('keydown', cancel, true);
+  }, [clearFavoriteDrag]);
 
   useEffect(() => {
     if (error) notifyError(error);
@@ -168,6 +246,13 @@ export function DashboardApp() {
       })
       .catch((cause: unknown) => notifyError(errorMessage(cause)));
   }, [notifyError]);
+
+  useEffect(() => {
+    const destination = favoriteDropPending.current;
+    if (destination && isFavoriteAtDestination(items, destination)) {
+      clearFavoriteDrag();
+    }
+  }, [clearFavoriteDrag, items]);
 
   const registerHistory = (entry: HistoryEntry) => {
     history.current.past.push(entry);
@@ -249,6 +334,125 @@ export function DashboardApp() {
       return `${item.title} ${item.url}`.toLocaleLowerCase().includes(searchTerm);
     });
   }, [groups, items, search, selectedGroupId]);
+
+  const dragPreviewRank = useMemo(() => {
+    if (!dragPreviewOrder) return null;
+    return new Map(dragPreviewOrder.map((id, index) => [id, index]));
+  }, [dragPreviewOrder]);
+
+  const previewFavoriteDrop = (
+    itemId: string,
+    targetItemId: string,
+    placement: ItemDropPlacement,
+  ) => {
+    const next = previewItemOrder(
+      items.map((item) => item.id),
+      itemId,
+      targetItemId,
+      placement,
+      dragIdsRef.current,
+    );
+    if (!next) return;
+    const destination = resolveItemDropDestination(
+      items,
+      itemId,
+      targetItemId,
+      placement,
+      dragIdsRef.current,
+    );
+    if (!destination) return;
+    favoritePreviewDestination.current = {
+      itemId,
+      itemIds: dragIdsRef.current,
+      ...destination,
+    };
+    setDragPreviewOrder((current) =>
+      current?.length === next.length && current.every((id, index) => id === next[index])
+        ? current
+        : next,
+    );
+  };
+
+  const finishFavoriteDrag = () => {
+    if (favoriteDropPending.current) return;
+    clearFavoriteDrag();
+  };
+
+  const startFavoriteDrag = (itemId: string, height: number) => {
+    const ids = visibleItems
+      .filter((item) =>
+        selectedIds.has(itemId) ? selectedIds.has(item.id) : item.id === itemId,
+      )
+      .map((item) => item.id);
+    dragIdsRef.current = ids;
+    setDraggedIds(ids);
+    setDropOrigin(null);
+    favoriteDropPending.current = null;
+    const first = items.find((item) => item.id === ids[0])!;
+    const originalIndex = items.findIndex((item) => item.id === first.id);
+    const remaining = items.filter((item) => !ids.includes(item.id));
+    const next = items.slice(originalIndex).find((item) => !ids.includes(item.id));
+    const index = next
+      ? remaining.findIndex((item) => item.id === next.id)
+      : remaining.length;
+    const order = remaining.map((item) => item.id);
+    order.splice(index, 0, ...ids);
+    favoritePreviewDestination.current = {
+      itemId,
+      itemIds: ids,
+      groupId: first.groupId,
+      beforeItemId: items
+        .slice(originalIndex)
+        .find((item) => item.groupId === first.groupId && !ids.includes(item.id))?.id,
+    };
+    setDraggingFavoriteId(itemId);
+    setDragPlaceholderHeight(height);
+    setDragPreviewOrder(order);
+  };
+
+  const moveDraggedFavorites = async (
+    ids: string[],
+    groupId: string,
+    beforeItemId?: string,
+  ) => {
+    const before = ids
+      .map((id) => items.find((item) => item.id === id)!)
+      .map(({ id, groupId, orderKey }) => ({ id, groupId, orderKey }));
+    const moved = await moveItems(ids, groupId, beforeItemId);
+    const after = moved.map(({ id, groupId, orderKey }) => ({ id, groupId, orderKey }));
+    registerHistory({
+      label: `${ids.length} favorites moved`,
+      undo: () => restoreItemPositions(before),
+      redo: () => restoreItemPositions(after),
+    });
+  };
+
+  const dropFavorite = async (itemId: string) => {
+    if (favoriteDropPending.current) return;
+    // Commit the destination that produced the visible preview. Re-hit-testing
+    // a moving tile on release can select a different insertion point.
+    const pendingDestination = favoritePreviewDestination.current;
+    if (!pendingDestination || pendingDestination.itemId !== itemId) {
+      clearFavoriteDrag();
+      return;
+    }
+    favoriteDropPending.current = pendingDestination;
+    const rect = slotRef.current?.getBoundingClientRect();
+    setDropOrigin(rect ? { left: rect.left, top: rect.top } : null);
+    setDraggingFavoriteId(null);
+    setDragPlaceholderHeight(0);
+    try {
+      await moveDraggedFavorites(
+        pendingDestination.itemIds,
+        pendingDestination.groupId,
+        pendingDestination.beforeItemId,
+      );
+      if (isFavoriteAtDestination(items, pendingDestination)) clearFavoriteDrag();
+    } catch (cause) {
+      clearFavoriteDrag();
+      notifyError(errorMessage(cause));
+    }
+  };
 
   const selectedVisibleItems = visibleItems.filter((item) => selectedIds.has(item.id));
   const allVisibleSelected =
@@ -450,11 +654,13 @@ export function DashboardApp() {
     itemId: string,
     groupId: string,
     beforeItemId?: string,
-  ) => {
+  ): Promise<boolean> => {
     try {
       await moveFavorite(itemId, groupId, beforeItemId);
+      return true;
     } catch (cause) {
       notifyError(errorMessage(cause));
+      return false;
     }
   };
 
@@ -644,6 +850,7 @@ export function DashboardApp() {
             <GroupTree
               groups={groups}
               items={items}
+              onCreateGroup={() => setDialog({ type: 'group', parentId: null })}
               onCreateChild={(parentId) => setDialog({ type: 'group', parentId })}
               onDelete={(group) =>
                 void removeGroup(group).catch((cause) => notifyError(errorMessage(cause)))
@@ -653,23 +860,38 @@ export function DashboardApp() {
                 void handleMoveGroup(groupId, parentId, beforeId);
               }}
               onMoveItem={(itemId, groupId) => {
-                void handleMoveFavorite(itemId, groupId);
+                if (dragIdsRef.current.length > 1) {
+                  const ids = [...dragIdsRef.current];
+                  clearFavoriteDrag();
+                  void moveDraggedFavorites(ids, groupId).catch((cause) =>
+                    notifyError(errorMessage(cause)),
+                  );
+                } else {
+                  void handleMoveFavorite(itemId, groupId);
+                }
               }}
               onSelect={setSelectedGroupId}
               selectedGroupId={selectedGroupId}
             />
           </div>
-          <button
-            className="mt-2 flex h-9 w-full items-center gap-2 rounded-md px-3 text-left text-sm text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
-            onClick={() => setDialog({ type: 'group', parentId: selectedGroupId })}
-            type="button"
-          >
-            <FolderPlusIcon aria-hidden="true" className="h-4 w-4" />
-            <span>New group</span>
-          </button>
         </aside>
 
-        <section className="min-w-0 flex-1 px-4 py-6 sm:px-7 sm:py-8">
+        <section
+          className="min-w-0 flex-1 px-4 py-6 sm:px-7 sm:py-8"
+          onDragOver={(event) => {
+            if (getActiveLibraryDragPayload()?.type !== 'item') return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+          }}
+          onDrop={(event) => {
+            const payload = readLibraryDragData(event.dataTransfer);
+            if (payload?.type !== 'item') return;
+            event.preventDefault();
+            event.stopPropagation();
+            void dropFavorite(payload.id);
+            clearLibraryDragData();
+          }}
+        >
           <div className="mx-auto max-w-7xl">
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div className="min-w-0">
@@ -815,23 +1037,33 @@ export function DashboardApp() {
                       item={item}
                       key={item.id}
                       layout={layout}
+                      sortOrder={
+                        dragPreviewRank
+                          ? (dragPreviewRank.get(item.id) ?? dragPreviewOrder?.length)
+                          : undefined
+                      }
+                      isDragging={!!draggingFavoriteId && draggedIds.includes(item.id)}
+                      dropOrigin={dropOrigin}
+                      dragItemIds={
+                        selectedIds.has(item.id)
+                          ? visibleItems
+                              .filter((candidate) => selectedIds.has(candidate.id))
+                              .map((candidate) => candidate.id)
+                          : [item.id]
+                      }
+                      onDragStart={startFavoriteDrag}
+                      onDragEnd={finishFavoriteDrag}
                       onDelete={(selected) =>
                         void deleteFavorite(selected).catch((cause) =>
                           notifyError(errorMessage(cause)),
                         )
                       }
-                      onDropItem={(itemId, beforeId) => {
-                        const target = items.find(
-                          (candidate) => candidate.id === beforeId,
-                        );
-                        if (target)
-                          void handleMoveFavorite(itemId, target.groupId, beforeId);
-                      }}
+                      onPreviewDrop={previewFavoriteDrop}
                       onEdit={(selected) =>
                         setDialog({ type: 'favorite', item: selected })
                       }
                       onMove={(selected) =>
-                        setDialog({ type: 'favorite', item: selected })
+                        setDialog({ type: 'move-favorite', item: selected })
                       }
                       onMoveDown={(selected) => reorderFavorite(selected, 1)}
                       onMoveUp={(selected) => reorderFavorite(selected, -1)}
@@ -841,6 +1073,17 @@ export function DashboardApp() {
                     />
                   );
                 })}
+                {draggingFavoriteId && dragPreviewRank?.has(draggedIds[0]) && (
+                  <div
+                    ref={slotRef}
+                    aria-hidden="true"
+                    className="pointer-events-none min-w-0 rounded-lg border border-dashed border-primary/50 bg-primary-light/20"
+                    style={{
+                      order: dragPreviewRank.get(draggedIds[0]),
+                      height: dragPlaceholderHeight,
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex min-h-[min(60vh,32rem)] flex-col items-center justify-center px-6 text-center">
@@ -902,6 +1145,15 @@ export function DashboardApp() {
           onDelete={deleteFavorite}
           onSave={saveFavorite}
           onUpdateThumbnail={updateFavoriteThumbnail}
+        />
+      )}
+      {dialog?.type === 'move-favorite' && (
+        <MoveFavoriteDialog
+          groups={groups}
+          item={dialog.item}
+          key={dialog.item.id}
+          onClose={() => setDialog(null)}
+          onMove={(groupId) => moveFavorite(dialog.item.id, groupId)}
         />
       )}
       {dialog?.type === 'group' && (

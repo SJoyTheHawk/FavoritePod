@@ -101,7 +101,7 @@ export function GroupDialog({
                 onChange={(event) => setParentId(event.target.value)}
                 value={parentId}
               >
-                <option value="">Root level</option>
+                <option value="">No parent group</option>
                 {availableParents.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
                     {labels.get(candidate.id) ?? candidate.title}

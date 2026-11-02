@@ -12,7 +12,7 @@ export function getGroupLabels(groups: readonly Group[]): Map<string, string> {
       path.push(current.title);
       current = current.parentId ? byId.get(current.parentId) : undefined;
     }
-    labels.set(group.id, path.reverse().join(' / '));
+    labels.set(group.id, path.reverse().join(' » '));
   }
   return labels;
 }

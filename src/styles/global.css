@@ -39,3 +39,42 @@ input:focus-visible {
 ::selection {
   background: var(--color-primary-light);
 }
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 180ms ease-out both;
+}
+
+.toast-exit {
+  animation: toast-exit 180ms ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter,
+  .toast-exit {
+    animation-duration: 1ms;
+  }
+}

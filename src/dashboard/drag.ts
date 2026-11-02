@@ -2,6 +2,7 @@ import type { Group } from '../core/types';
 
 export const LIBRARY_DRAG_TYPE = 'application/x-favoritepod-record';
 export type GroupDropPlacement = 'before' | 'inside' | 'after';
+export type ItemDropPlacement = 'before' | 'after';
 let activePayload: LibraryDragPayload | null = null;
 
 export function getActiveLibraryDragPayload(): LibraryDragPayload | null {
@@ -10,6 +11,78 @@ export function getActiveLibraryDragPayload(): LibraryDragPayload | null {
 
 export function clearLibraryDragData(): void {
   activePayload = null;
+}
+
+export function getItemDropPlacement(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>,
+  layout: 'grid' | 'list',
+): ItemDropPlacement {
+  if (layout === 'list') {
+    return clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+  }
+  return clientX < rect.left + rect.width / 2 ? 'before' : 'after';
+}
+
+export function previewItemOrder(
+  itemIds: readonly string[],
+  draggedId: string,
+  targetId: string,
+  placement: ItemDropPlacement,
+  draggedIds: readonly string[] = [draggedId],
+): string[] | null {
+  const moving = itemIds.filter((id) => draggedIds.includes(id));
+  if (
+    moving.includes(targetId) ||
+    !moving.includes(draggedId) ||
+    !itemIds.includes(targetId)
+  ) {
+    return null;
+  }
+
+  const next = itemIds.filter((id) => !moving.includes(id));
+  const targetIndex = next.indexOf(targetId);
+  next.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, ...moving);
+  return next;
+}
+
+export function resolveItemDropDestination(
+  items: readonly { id: string; groupId: string; orderKey: string }[],
+  draggedId: string,
+  targetId: string,
+  placement: ItemDropPlacement,
+  draggedIds: readonly string[] = [draggedId],
+): { groupId: string; beforeItemId?: string } | null {
+  const target = items.find((item) => item.id === targetId);
+  if (
+    !target ||
+    draggedIds.includes(targetId) ||
+    !items.some((item) => item.id === draggedId)
+  ) {
+    return null;
+  }
+
+  const siblings = items
+    .filter((item) => item.groupId === target.groupId && !draggedIds.includes(item.id))
+    .sort((a, b) =>
+      a.orderKey === b.orderKey
+        ? a.id < b.id
+          ? -1
+          : a.id === b.id
+            ? 0
+            : 1
+        : a.orderKey < b.orderKey
+          ? -1
+          : 1,
+    );
+  const targetIndex = siblings.findIndex((item) => item.id === targetId);
+  if (targetIndex < 0) return null;
+
+  return {
+    groupId: target.groupId,
+    beforeItemId: placement === 'before' ? target.id : siblings[targetIndex + 1]?.id,
+  };
 }
 
 export function getGroupDropPlacement(

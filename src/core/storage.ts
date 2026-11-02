@@ -502,6 +502,7 @@ export async function moveItem(
 export async function moveItems(
   ids: readonly string[],
   groupId: string,
+  beforeItemId?: string,
 ): Promise<Item[]> {
   const uniqueIds = [...new Set(ids)];
   if (!uniqueIds.length) return [];
@@ -521,11 +522,16 @@ export async function moveItems(
         (item) => !isItemDeleted(item) && !movingIds.has(item.id),
       ),
     );
-    let orderKeys = destination.map((item) => item.orderKey);
+    const index = beforeItemId
+      ? destination.findIndex((item) => item.id === beforeItemId)
+      : destination.length;
+    if (index < 0) throw new Error('The destination favorite is unavailable.');
+    let previousKey = destination[index - 1]?.orderKey ?? null;
+    const nextKey = destination[index]?.orderKey ?? null;
     const moved: Item[] = [];
     for (const item of items) {
-      const orderKey = nextOrderKey(orderKeys);
-      orderKeys = [...orderKeys, orderKey];
+      const orderKey = keyBetween(previousKey, nextKey);
+      previousKey = orderKey;
       const clock = await nextClock();
       const next: Item = {
         ...item,

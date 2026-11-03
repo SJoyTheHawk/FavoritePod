@@ -119,6 +119,7 @@ export function FavoriteCard({
   const previousPosition = useRef<{ left: number; top: number }>();
   const wasDragging = useRef(false);
   const isLocalFile = parseSafeUrl(item.url)?.protocol === 'file:';
+  const isMissingFile = isLocalFile && fileAvailability === 'missing';
 
   useEffect(() => {
     if (!isLocalFile) {
@@ -127,9 +128,13 @@ export function FavoriteCard({
     }
     let active = true;
     setFileAvailability('unknown');
-    void checkFileAvailability(item.url, pathOverrides).then((availability) => {
-      if (active) setFileAvailability(availability);
-    });
+    void checkFileAvailability(item.url, pathOverrides)
+      .then((availability) => {
+        if (active) setFileAvailability(availability);
+      })
+      .catch(() => {
+        if (active) setFileAvailability('unknown');
+      });
     return () => {
       active = false;
     };
@@ -544,7 +549,9 @@ export function FavoriteCard({
           />
         </MenuItems>
       </Menu>
-      <div className="bookmark-details flex min-w-0 items-center justify-between gap-3">
+      <div
+        className={`bookmark-details flex min-w-0 items-center justify-between gap-3 ${isMissingFile ? 'opacity-60' : ''}`}
+      >
         <button
           ref={size === 'compact' ? previewTriggerRef : undefined}
           aria-label={`Open ${item.title}`}
@@ -570,20 +577,28 @@ export function FavoriteCard({
             <span className="truncate">{item.title}</span>
           </span>
           <span className="bookmark-domain mt-1 flex min-w-0 items-center gap-1.5 truncate text-xs text-text-tertiary">
-            {isLocalFile && (
+            {isLocalFile && fileAvailability !== 'available' && (
               <span
                 aria-hidden="true"
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${fileAvailability === 'available' ? 'bg-success' : fileAvailability === 'missing' ? 'bg-danger' : 'bg-text-tertiary'}`}
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${fileAvailability === 'missing' ? 'bg-danger' : 'bg-text-tertiary'}`}
               />
             )}
             <span className="truncate">
               {isLocalFile
-                ? `Local file: ${fileAvailability[0].toUpperCase()}${fileAvailability.slice(1)}`
+                ? fileAvailability === 'available'
+                  ? 'Local file'
+                  : `Local file: ${fileAvailability[0].toUpperCase()}${fileAvailability.slice(1)}`
                 : getUrlLabel(item.url)}
             </span>
           </span>
         </button>
       </div>
+      {isMissingFile && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 bg-text-secondary opacity-10"
+        />
+      )}
       <HoverPreview
         anchorRef={previewTriggerRef}
         fullThumbnailUrl={fullThumbnailUrl}

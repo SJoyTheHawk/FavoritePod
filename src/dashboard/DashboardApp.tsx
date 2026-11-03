@@ -461,7 +461,7 @@ export function DashboardApp() {
   const saveLocalPathOverrides = async (overrides: PathOverride[]) => {
     await persistPathOverrides(overrides);
     setPathOverridesState(await getPathOverrides());
-    notify('Local file path overrides saved.');
+    notify('File locations saved for this device.');
   };
 
   const handleFileAccessDenied = () => {

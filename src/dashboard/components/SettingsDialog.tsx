@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import {
+  ChevronRightIcon,
   FolderPlusIcon,
   ListBulletIcon,
   Squares2X2Icon,
@@ -72,7 +73,7 @@ export function SettingsDialog({
       await onSavePathOverrides(normalized);
       setEditedOverrides(normalized);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save path overrides.');
+      setError(cause instanceof Error ? cause.message : 'Could not save file locations.');
     }
   };
 
@@ -176,25 +177,32 @@ export function SettingsDialog({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-medium text-text-primary">
-                  Local file path overrides
+                  File Locations Remap
                 </h3>
                 <p className="mt-1 text-xs text-text-secondary">
-                  Map saved folders to their locations on this device.
+                  Files in a different folder on this device? Tell FavoritePod where to
+                  find them when opening your favorites. This does not move your files.
                 </p>
               </div>
-              <span className="shrink-0 text-xs text-text-tertiary">This device</span>
+              <span className="shrink-0 text-xs text-text-tertiary">
+                This device only
+              </span>
             </div>
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 divide-y divide-border overflow-hidden rounded-md border border-border">
+              <div className="grid grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)_2rem] items-center gap-2 bg-surface px-3 py-2 text-xs font-medium text-text-secondary">
+                <span>Original folder</span>
+                <span className="col-start-3">Folder on this device</span>
+              </div>
               {editedOverrides.map((override, index) => (
                 <div
-                  className="grid gap-2 rounded-md bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem]"
-                  key={`${index}-${override.from}`}
+                  className="grid grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)_2rem] items-center gap-2 px-3 py-2"
+                  key={index}
                 >
                   <label className="min-w-0 text-xs font-medium text-text-secondary">
-                    Saved folder
+                    <span className="sr-only">Original folder {index + 1}</span>
                     <input
                       autoCapitalize="off"
-                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs font-normal text-text-primary outline-none focus:border-primary"
+                      className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs font-normal text-text-primary outline-none focus:border-primary"
                       onChange={(event) =>
                         setEditedOverrides((current) =>
                           current.map((entry, entryIndex) =>
@@ -204,17 +212,21 @@ export function SettingsDialog({
                           ),
                         )
                       }
-                      placeholder="file:///original/folder/"
+                      placeholder="file:///Users/Alex/Documents/"
                       spellCheck={false}
                       type="text"
                       value={override.from}
                     />
                   </label>
+                  <ChevronRightIcon
+                    aria-hidden="true"
+                    className="h-4 w-4 text-text-tertiary"
+                  />
                   <label className="min-w-0 text-xs font-medium text-text-secondary">
-                    This device
+                    <span className="sr-only">Folder on this device {index + 1}</span>
                     <input
                       autoCapitalize="off"
-                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs font-normal text-text-primary outline-none focus:border-primary"
+                      className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs font-normal text-text-primary outline-none focus:border-primary"
                       onChange={(event) =>
                         setEditedOverrides((current) =>
                           current.map((entry, entryIndex) =>
@@ -224,21 +236,21 @@ export function SettingsDialog({
                           ),
                         )
                       }
-                      placeholder="file:///local/folder/"
+                      placeholder="file:///Users/Sam/Documents/"
                       spellCheck={false}
                       type="text"
                       value={override.to}
                     />
                   </label>
                   <button
-                    aria-label={`Remove path override ${index + 1}`}
-                    className="mt-4 flex h-8 w-8 items-center justify-center self-end rounded-md text-text-secondary hover:bg-surface-hover hover:text-danger sm:mt-0"
+                    aria-label={`Remove folder location ${index + 1}`}
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-text-secondary hover:bg-surface-hover hover:text-danger"
                     onClick={() =>
                       setEditedOverrides((current) =>
                         current.filter((_, entryIndex) => entryIndex !== index),
                       )
                     }
-                    title="Remove path override"
+                    title="Remove folder location"
                     type="button"
                   >
                     <TrashIcon aria-hidden="true" className="h-4 w-4" />
@@ -246,6 +258,12 @@ export function SettingsDialog({
                 </div>
               ))}
             </div>
+            {editedOverrides.length > 0 && (
+              <p className="mt-2 text-xs text-text-secondary">
+                Use folder addresses beginning with file:///. The original folder is the
+                one in your saved favorites.
+              </p>
+            )}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <button
                 className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-sm text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
@@ -255,14 +273,14 @@ export function SettingsDialog({
                 type="button"
               >
                 <FolderPlusIcon aria-hidden="true" className="h-4 w-4" />
-                Add override
+                Add folder location
               </button>
               <button
                 className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover"
                 onClick={() => void saveOverrides()}
                 type="button"
               >
-                Save path overrides
+                Save locations
               </button>
             </div>
           </section>

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   ClipboardDocumentIcon,
   ExclamationTriangleIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 interface FileAccessHintProps {
@@ -74,15 +73,6 @@ export function FileAccessHint({ settingsUrl, onDismiss }: FileAccessHintProps) 
           </p>
         )}
       </div>
-      <button
-        aria-label="Dismiss file access notice"
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary hover:bg-background/60 hover:text-text-primary"
-        onClick={onDismiss}
-        title="Dismiss"
-        type="button"
-      >
-        <XMarkIcon aria-hidden="true" className="h-4 w-4" />
-      </button>
     </aside>
   );
 }

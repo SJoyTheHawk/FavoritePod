@@ -25,7 +25,9 @@ function normalizeFilePrefix(value: string): string {
     parsed.search ||
     parsed.hash
   ) {
-    throw new Error('Enter a valid local folder URL beginning with file://.');
+    throw new Error(
+      'Enter a folder address beginning with file:///, such as file:///Users/Alex/Documents/.',
+    );
   }
   if (!parsed.pathname.endsWith('/')) parsed.pathname += '/';
   return parsed.href;
@@ -35,15 +37,19 @@ export function normalizePathOverrides(overrides: PathOverride[]): PathOverride[
   const sources = new Set<string>();
   return overrides.map(({ from, to }) => {
     if (!from.trim() || !to.trim()) {
-      throw new Error('Enter both folder URLs for each path override.');
+      throw new Error('Enter the original folder and the folder on this device.');
     }
     const normalizedFrom = normalizeFilePrefix(from);
     const normalizedTo = normalizeFilePrefix(to);
     if (normalizedFrom === normalizedTo) {
-      throw new Error('The source and destination folders must be different.');
+      throw new Error(
+        'Choose a different folder on this device from the original folder.',
+      );
     }
     if (sources.has(normalizedFrom)) {
-      throw new Error('Each source folder can only have one path override.');
+      throw new Error(
+        'This original folder is already listed. Update its existing location instead.',
+      );
     }
     sources.add(normalizedFrom);
     return { from: normalizedFrom, to: normalizedTo };

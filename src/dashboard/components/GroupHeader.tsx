@@ -1,9 +1,5 @@
 import { useState } from 'react';
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  FolderIcon,
-} from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import type { Group } from '../../core/types';
 import { getActiveLibraryDragPayload, readLibraryDragData } from '../drag';
 
@@ -26,9 +22,10 @@ export function GroupHeader({
 
   return (
     <button
+      aria-label={`${group.title}, ${count} ${count === 1 ? 'favorite' : 'favorites'}`}
       aria-controls={`group-section-${group.id}`}
       aria-expanded={!collapsed}
-      className={`flex h-12 w-full min-w-0 items-center justify-between gap-3 rounded-lg border px-3 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isDragOver ? 'border-primary bg-primary-light/30' : 'border-border bg-surface hover:bg-surface-hover'}`}
+      className={`group flex h-9 w-full min-w-0 items-center justify-between gap-3 rounded-md px-1 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isDragOver ? 'bg-primary-light/30 ring-1 ring-inset ring-primary/60' : 'hover:bg-surface-hover/60'}`}
       onClick={onToggle}
       onDragOver={(event) => {
         const payload =
@@ -57,19 +54,21 @@ export function GroupHeader({
       type="button"
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        <FolderIcon aria-hidden="true" className="h-5 w-5 shrink-0 text-text-secondary" />
-        <span className="truncate text-sm font-medium text-text-primary">
+        <span className="truncate text-base font-semibold text-text-primary">
           {group.title}
         </span>
-      </span>
-      <span className="flex shrink-0 items-center gap-2">
-        <span className="rounded bg-surface-hover px-2 py-0.5 text-xs tabular-nums text-text-tertiary">
-          {count === 0 ? '0 favorites' : count}
+        <span
+          aria-hidden="true"
+          className="shrink-0 text-sm tabular-nums text-text-tertiary"
+        >
+          {count === 0 ? '(0 favorites)' : `(${count})`}
         </span>
+      </span>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-hover text-primary transition-colors group-hover:bg-border">
         {collapsed ? (
-          <ChevronRightIcon aria-hidden="true" className="h-4 w-4 text-text-tertiary" />
+          <ChevronRightIcon aria-hidden="true" className="h-4 w-4" />
         ) : (
-          <ChevronDownIcon aria-hidden="true" className="h-4 w-4 text-text-tertiary" />
+          <ChevronDownIcon aria-hidden="true" className="h-4 w-4" />
         )}
       </span>
     </button>

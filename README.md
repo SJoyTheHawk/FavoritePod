@@ -8,9 +8,9 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 
 ## 🎯 Project Status
 
-**Current status**: Phases 2–5 are implemented as milestones. Phase 4 closed on November 3, 2026 and Phase 5 closed the same day at the user's request.
+**Current status**: Phases 2–7 are implemented. Phases 4 and 5 closed on November 3, 2026 at the user's request.
 
-**Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, hover previews, and `file://` access.
+**Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, hover previews, `file://` access, and ZIP import/export.
 
 **Target**: v1.0 (Simplified scope with file:// priority)
 
@@ -41,14 +41,25 @@ Start with [NEXT_STEPS.md](NEXT_STEPS.md) for the validation checklist, developm
 - Save web and `file://` URLs locally
 - Generate two-size page previews with SHA-256 deduplication
 - Show fallback cards and hover previews with Open, Edit, and Copy URL actions; saved previews remain usable for sites that block embedding
+- Organize groups with drag-and-drop, bulk actions, and undo/redo
+
+### Phase 6: Local File Links
+
+- Check file URL access and show permission guidance
+- Report local-file availability and apply per-device path overrides when opening
+
+### Phase 7: ZIP Import/Export
+
+- Export all groups or selected group trees with preview images
+- Validate ZIP contents and preview imports before writing
+- Merge as copy, update matching IDs, or replace after saving a snapshot
 
 ### Planned for Later Phases
 
-- File:// link support and permission guidance (Phase 6)
-- ZIP import/export and theme preferences
-- Per-device file path overrides and Google Drive sync
+- Theme preferences and accessibility polish
+- Google Drive sync (Phase 8)
 
-Phase 4 includes nested groups, direct drag-and-drop with placement indicators, group management, bulk actions, and undo/redo. Phase 5 adds two-size thumbnails, fallback cards, and hover previews. Manual browser acceptance remains tracked in [the Phase 4 checklist](docs/phase-4-manual-test.md) and [the Phase 5 checklist](docs/phase-5-manual-test.md).
+Manual browser acceptance remains tracked in the [Phase 4](docs/phase-4-manual-test.md), [Phase 5](docs/phase-5-manual-test.md), [Phase 6](docs/phase-6-manual-test.md), and [Phase 7](docs/phase-7-manual-test.md) checklists.
 
 ## Interface Preview
 

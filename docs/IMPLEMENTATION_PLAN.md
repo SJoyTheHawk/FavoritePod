@@ -4,7 +4,12 @@
 
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
-**Current status**: Phases 2-5 are implemented and covered by automated checks. Phases 4 and 5 closed on 2026-11-03 at the user's request. Manual Chrome validation for extension loading, HMR, screenshots, nested drag-and-drop, keyboard navigation, thumbnail previews, and `file://` access remains open; see `NEXT_STEPS.md`, `docs/phase-4-manual-test.md`, and `docs/phase-5-manual-test.md` for checklists.
+**Current status**: Phases 2-7 are implemented and covered by automated checks.
+Phases 4 and 5 closed on 2026-11-03 at the user's request. Manual Chrome
+validation for extension loading, HMR, screenshots, nested drag-and-drop,
+keyboard navigation, thumbnail previews, `file://` access, and ZIP
+import/export remains open; see `NEXT_STEPS.md` and the phase 4-7 manual test
+checklists.
 
 ## Architecture Overview
 
@@ -260,7 +265,9 @@ in `docs/phase-4-manual-test.md`; this closure does not claim those checks passe
 
 Includes the New group action beside All favorites, No parent group wording,
 and » hierarchy separators. Long-path display changes are deferred at the
-user's request; keep full paths for now. Phases 4 and 5 closed on 2026-11-03; Phase 6 is next.
+user's request; keep full paths for now. Phases 4 and 5 closed on 2026-11-03;
+Phase 6 and Phase 7 implementations are complete, with manual Chrome acceptance
+tracked separately. Google Drive Sync is the next planned phase.
 
 ### 4.1 Nested Groups & Items
 **Goal**: Hierarchical organization with drag-and-drop
@@ -472,16 +479,19 @@ navigation behavior remain for the manual acceptance steps in
 
 ## Phase 7: Import/Export (Week 8-9)
 
+Implementation complete; manual Chrome acceptance remains open in
+`docs/phase-7-manual-test.md`.
+
 ### 7.1 ZIP Export
 **Goal**: Share libraries with colleagues
 
 **Tasks**:
-- [ ] Build export dialog (select groups)
-- [ ] Serialize groups/items to JSON
-- [ ] Copy thumbnails to `previews/` by hash
-- [ ] Create ZIP with fflate
-- [ ] Trigger download
-- [ ] Add export metadata (version, timestamp)
+- [x] Build export dialog (select groups)
+- [x] Serialize groups/items to JSON
+- [x] Copy thumbnails to `previews/` by hash
+- [x] Create ZIP with fflate
+- [x] Trigger download
+- [x] Add export metadata (version, timestamp)
 
 **Export Format**:
 ```typescript
@@ -504,17 +514,17 @@ interface LauncherExport {
 **Goal**: Safe, validated import with merge options
 
 **Tasks**:
-- [ ] Build import dialog (drag/drop + file picker)
-- [ ] Validate ZIP structure with zod
-- [ ] Validate and sanitize URLs (reject javascript:)
-- [ ] Decode images with createImageBitmap
-- [ ] Show preview of import contents
-- [ ] Implement three import modes:
-  - Merge as copy (new IDs, new group)
-  - Update from source (match by ID)
-  - Replace (with snapshot)
-- [ ] Show progress during import
-- [ ] Rollback on error
+- [x] Build import dialog (drag/drop + file picker)
+- [x] Validate ZIP structure with zod
+- [x] Validate URLs and reject unsafe schemes (including `javascript:`)
+- [x] Decode images with createImageBitmap
+- [x] Show preview of import contents
+- [x] Implement three import modes:
+  - [x] Merge as copy (new IDs, new group)
+  - [x] Update from source (match by ID)
+  - [x] Replace (with snapshot)
+- [x] Show progress during import
+- [x] Rollback on error
 
 **Validation Rules**:
 - Max archive size: 100 MB

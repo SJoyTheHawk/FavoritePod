@@ -571,6 +571,19 @@ export function applyPathOverride(url: string, overrides: PathOverride[]): strin
 
 ### 4. ZIP Export/Import
 
+The Phase 7 implementation is in `src/core/archive.ts`, `src/core/export.ts`,
+and `src/core/import.ts`. Use `exportToZip({ groupIds?, onProgress? })` to create
+an archive and `downloadZip(blob, filename)` to download it. For imports, call
+`parseImportFile(file, onProgress)` first so the UI can show the validated
+contents, then call `importArchive(archive, 'copy' | 'update' | 'replace',
+onProgress)`. The parser validates schema version 1, URLs, record references,
+group cycles, image hashes and decoding, and archive limits. Replace mode stores
+a snapshot before its atomic IndexedDB transaction. See
+`docs/SCHEMA_VERSIONS.md` for the current v1 payload.
+
+The following snippets are the original implementation sketch and are retained
+as background only. They are not the current implementation; use the APIs above.
+
 **src/core/export.ts**:
 ```typescript
 import { strToU8, zipSync } from 'fflate';
@@ -642,14 +655,21 @@ import { db, Group, Item } from './db';
 import { z } from 'zod';
 import { isValidUrl } from './validation';
 
-// Validation schema
-const ExportSchema = z.object({
+// IMPORTANT: Schema version handling
+// See docs/SCHEMA_VERSIONS.md for version migration guide
+
+// Validation schema for v1
+const ExportSchemaV1 = z.object({
   format: z.literal('visual-launcher'),
   schemaVersion: z.literal(1),
   exportedAt: z.string(),
+  exportedBy: z.string().optional(),
   groups: z.array(z.any()), // Define full schemas later
   items: z.array(z.any())
 });
+
+const CURRENT_EXPORT_VERSION = 1;
+const SUPPORTED_IMPORT_VERSIONS = [1]; // Add more as versions are released
 
 export type ImportMode = 'merge' | 'replace';
 
@@ -673,10 +693,19 @@ export async function importFromZip(
     const jsonStr = strFromU8(launcherJson);
     const data = JSON.parse(jsonStr);
     
-    // Validate format
-    const parseResult = ExportSchema.safeParse(data);
+    // Validate format and check version
+    const parseResult = ExportSchemaV1.safeParse(data);
     if (!parseResult.success) {
-      throw new Error('Invalid export format');
+      throw new Error('Invalid export format: ' + parseResult.error.message);
+    }
+
+    // Check if version is supported
+    if (!SUPPORTED_IMPORT_VERSIONS.includes(data.schemaVersion)) {
+      throw new Error(
+        `Unsupported schema version ${data.schemaVersion}. ` +
+        `This extension supports versions: ${SUPPORTED_IMPORT_VERSIONS.join(', ')}. ` +
+        `Please update the extension or use a compatible export.`
+      );
     }
     
     // Validate all URLs

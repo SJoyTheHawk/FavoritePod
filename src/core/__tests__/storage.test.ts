@@ -471,16 +471,33 @@ describe('local library storage', () => {
     );
   });
 
-  it('soft-deletes empty groups and protects groups that still contain records', async () => {
+  it('deletes an empty group subtree and restores the subtree together', async () => {
     const group = await createGroup({ title: 'Archive' });
+    const child = await createGroup({ title: 'Nested', parentId: group.id });
+    const grandchild = await createGroup({ title: 'Deeply nested', parentId: child.id });
     await expect(deleteGroup(group.id)).resolves.toBeUndefined();
     expect(await listGroups()).toHaveLength(0);
     expect((await db.groups.get(group.id))?.deleted).toBeDefined();
+    expect((await db.groups.get(child.id))?.deleted).toBeDefined();
+    expect((await db.groups.get(grandchild.id))?.deleted).toBeDefined();
 
-    const occupied = await createGroup({ title: 'Work' });
-    await createItem({ url: 'https://example.com', groupId: occupied.id });
-    await expect(deleteGroup(occupied.id)).rejects.toThrow('Move favorites');
-    expect((await db.groups.get(occupied.id))?.deleted).toBeUndefined();
+    await restoreGroup(group.id);
+    expect((await listGroups()).map((entry) => entry.id).sort()).toEqual(
+      [group.id, child.id, grandchild.id].sort(),
+    );
+    expect((await db.groups.get(child.id))?.parentId).toBe(group.id);
+    expect((await db.groups.get(grandchild.id))?.parentId).toBe(child.id);
+  });
+
+  it('blocks deleting a group when any descendant contains a favorite', async () => {
+    const group = await createGroup({ title: 'Work' });
+    const child = await createGroup({ title: 'Nested work', parentId: group.id });
+    await createItem({ url: 'https://example.com', groupId: child.id });
+    await expect(deleteGroup(group.id)).rejects.toThrow(
+      'Move favorites before deleting this group.',
+    );
+    expect((await db.groups.get(group.id))?.deleted).toBeUndefined();
+    expect((await db.groups.get(child.id))?.deleted).toBeUndefined();
   });
 
   it('keeps deletions as tombstones while hiding them from the live library', async () => {

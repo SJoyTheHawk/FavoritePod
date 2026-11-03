@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  BookmarkIcon,
   DocumentIcon,
   GlobeAltIcon,
   PlusIcon,
@@ -85,9 +84,15 @@ export function PopupApp() {
   return (
     <main className="flex h-[480px] w-80 flex-col overflow-hidden bg-background text-text-primary">
       <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-light text-primary">
-          <BookmarkIcon aria-hidden="true" className="h-4 w-4" />
-        </span>
+        <picture className="block h-8 w-8 shrink-0">
+          <source srcSet="/icons/icon_dark.jpg" media="(prefers-color-scheme: dark)" />
+          <img
+            alt=""
+            aria-hidden="true"
+            className="h-full w-full rounded-md object-cover"
+            src="/icons/icon_light.jpg"
+          />
+        </picture>
         <h1 className="text-sm font-semibold">FavoritePod</h1>
       </header>
 

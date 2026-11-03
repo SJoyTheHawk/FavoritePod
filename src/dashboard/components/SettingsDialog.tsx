@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import {
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
   ChevronRightIcon,
   FolderPlusIcon,
   ListBulletIcon,
@@ -10,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { normalizePathOverrides, type PathOverride } from '../../core/file-links';
 import type { LibraryView, OpenBehavior } from '../../core/storage';
+import type { ArchiveDialogMode } from './ImportExportDialog';
 
 interface SettingsDialogProps {
   defaultView: LibraryView;
@@ -22,6 +25,7 @@ interface SettingsDialogProps {
   onSaveShowPreview: (showPreview: boolean) => Promise<void>;
   onSaveOpenBehavior: (behavior: OpenBehavior) => Promise<void>;
   onSavePathOverrides: (overrides: PathOverride[]) => Promise<void>;
+  onArchiveAction: (mode: ArchiveDialogMode) => void;
 }
 
 export function SettingsDialog({
@@ -35,6 +39,7 @@ export function SettingsDialog({
   onSaveShowPreview,
   onSaveOpenBehavior,
   onSavePathOverrides,
+  onArchiveAction,
 }: SettingsDialogProps) {
   const [error, setError] = useState<string>();
   const [editedOverrides, setEditedOverrides] = useState(pathOverrides);
@@ -172,6 +177,28 @@ export function SettingsDialog({
               </button>
             </div>
           </fieldset>
+
+          <section className="mt-6 border-t border-border pt-5">
+            <h3 className="text-sm font-medium text-text-primary">Import and export</h3>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover"
+                onClick={() => onArchiveAction('import')}
+                type="button"
+              >
+                <ArrowUpTrayIcon aria-hidden="true" className="h-4 w-4" />
+                Import library
+              </button>
+              <button
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover"
+                onClick={() => onArchiveAction('export')}
+                type="button"
+              >
+                <ArrowDownTrayIcon aria-hidden="true" className="h-4 w-4" />
+                Export library
+              </button>
+            </div>
+          </section>
 
           <section className="mt-6 border-t border-border pt-5">
             <div className="flex items-start justify-between gap-3">

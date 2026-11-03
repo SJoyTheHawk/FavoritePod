@@ -67,6 +67,8 @@ import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
 import { GroupDialog } from './components/GroupDialog';
 import { GroupTree } from './components/GroupTree';
 import { SettingsDialog } from './components/SettingsDialog';
+import { ImportExportDialog } from './components/ImportExportDialog';
+import type { ImportMode, ImportResult } from '../core/import';
 import { FileAccessHint } from './components/FileAccessHint';
 import {
   clearLibraryDragData,
@@ -84,6 +86,8 @@ type DialogState =
   | { type: 'move-favorite'; item: Item }
   | { type: 'group'; group?: Group; parentId?: string | null }
   | null;
+
+type ArchiveDialogState = 'export' | 'import' | null;
 
 interface HistoryEntry {
   label: string;
@@ -221,6 +225,7 @@ export function DashboardApp() {
   const bookmarkSize = bookmarkSizes[layout];
   const [dialog, setDialog] = useState<DialogState>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [archiveDialog, setArchiveDialog] = useState<ArchiveDialogState>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [dragPreviewOrder, setDragPreviewOrder] = useState<string[] | null>(null);
   const [draggingFavoriteId, setDraggingFavoriteId] = useState<string | null>(null);
@@ -258,6 +263,15 @@ export function DashboardApp() {
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
+  const completeImport = (mode: ImportMode, result: ImportResult) => {
+    history.current = { past: [], future: [] };
+    setHistoryVersion((version) => version + 1);
+    setSelectedIds(new Set());
+    if (mode === 'replace') setSelectedGroupId(null);
+    notify(
+      `Imported ${result.importedItems} ${result.importedItems === 1 ? 'favorite' : 'favorites'} and ${result.importedGroups} ${result.importedGroups === 1 ? 'group' : 'groups'}.`,
+    );
+  };
   const clearFavoriteDrag = useCallback(() => {
     favoriteDropPending.current = null;
     favoritePreviewDestination.current = null;
@@ -781,7 +795,20 @@ export function DashboardApp() {
   };
 
   const removeGroup = async (group: Group): Promise<boolean> => {
-    if (!window.confirm(`Delete group “${group.title}”?`)) return false;
+    if (!window.confirm(`Delete group “${group.title}” and all its subgroups?`))
+      return false;
+    const deletedGroupIds = new Set([group.id]);
+    const pending = [group.id];
+    while (pending.length > 0) {
+      const parentId = pending.pop()!;
+      for (const child of groups) {
+        if (child.parentId === parentId && !deletedGroupIds.has(child.id)) {
+          deletedGroupIds.add(child.id);
+          pending.push(child.id);
+        }
+      }
+    }
+
     await deleteGroup(group.id);
     registerHistory({
       label: 'group deleted',
@@ -790,8 +817,9 @@ export function DashboardApp() {
       },
       redo: async () => deleteGroup(group.id),
     });
-    if (selectedGroupId === group.id) selectGroup(group.parentId);
-    if (homePageGroupId === group.id) {
+    if (selectedGroupId && deletedGroupIds.has(selectedGroupId))
+      selectGroup(group.parentId);
+    if (homePageGroupId && deletedGroupIds.has(homePageGroupId)) {
       await setHomePageGroupId();
       setHomePageGroupIdState(undefined);
       if (openBehavior === 'home') setOpenBehaviorState('all');
@@ -967,17 +995,23 @@ export function DashboardApp() {
 
   return (
     <main className="min-h-screen bg-background text-text-primary">
-      <header className="flex min-h-16 items-center justify-between gap-3 border-b border-border px-4 py-2 sm:px-7">
+      <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 sm:px-7">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-light text-primary">
-            <BookmarkIcon aria-hidden="true" className="h-5 w-5" />
-          </div>
+          <picture className="block h-9 w-9 shrink-0">
+            <source srcSet="/icons/icon_dark.jpg" media="(prefers-color-scheme: dark)" />
+            <img
+              alt=""
+              aria-hidden="true"
+              className="h-full w-full rounded-lg object-cover"
+              src="/icons/icon_light.jpg"
+            />
+          </picture>
           <span className="text-lg font-semibold">FavoritePod</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <button
             aria-label="Undo"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canUndo}
             onClick={() => void undo()}
             title="Undo"
@@ -987,7 +1021,7 @@ export function DashboardApp() {
           </button>
           <button
             aria-label="Redo"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canRedo}
             onClick={() => void redo()}
             title="Redo"
@@ -997,7 +1031,7 @@ export function DashboardApp() {
           </button>
           <button
             aria-label="Settings"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
             type="button"
@@ -1451,6 +1485,19 @@ export function DashboardApp() {
           onSaveOpenBehavior={saveOpenBehavior}
           onSaveShowPreview={savePreviewVisibility}
           onSavePathOverrides={saveLocalPathOverrides}
+          onArchiveAction={(mode) => {
+            setSettingsOpen(false);
+            setArchiveDialog(mode);
+          }}
+        />
+      )}
+      {archiveDialog && (
+        <ImportExportDialog
+          key={archiveDialog}
+          groups={groups}
+          mode={archiveDialog}
+          onClose={() => setArchiveDialog(null)}
+          onImported={completeImport}
         />
       )}
       <div

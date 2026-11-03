@@ -102,7 +102,7 @@ function GroupBranch({
   }, [groups]);
 
   return (
-    <ul className="grid gap-0.5" role="group">
+    <ul className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-0.5" role="group">
       {siblings.map((group) => {
         const children = childrenByParent.get(group.id) ?? [];
         const isExpanded = expanded.has(group.id);
@@ -135,7 +135,7 @@ function GroupBranch({
         };
 
         return (
-          <li key={group.id} className="relative">
+          <li key={group.id} className="relative min-w-0">
             {activePlacement && activePlacement !== 'inside' && (
               <div
                 aria-hidden="true"
@@ -146,7 +146,7 @@ function GroupBranch({
               </div>
             )}
             <div
-              className={`group/tree-row flex min-w-0 items-center gap-1 rounded-md border py-1 pr-1 transition-colors ${activePlacement === 'inside' ? 'border-primary bg-primary-light/60' : 'border-transparent'} ${isSelected ? 'bg-primary-light text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
+              className={`group/tree-row flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border py-1 pr-1 transition-colors ${activePlacement === 'inside' ? 'border-primary bg-primary-light/60' : 'border-transparent'} ${isSelected ? 'bg-primary-light text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
               data-group-row="true"
               draggable
               onDragStart={(event) => {
@@ -216,7 +216,9 @@ function GroupBranch({
                 onClick={() => onSelect(group.id)}
                 type="button"
               >
-                <span className="min-w-0 flex-1 truncate">{group.title}</span>
+                <span className="min-w-0 flex-1 truncate" title={group.title}>
+                  {group.title}
+                </span>
                 <span className="shrink-0 text-xs tabular-nums text-text-tertiary">
                   {counts.get(group.id) ?? 0}
                 </span>
@@ -291,7 +293,7 @@ function GroupBranch({
                 className={`grid transition-[grid-template-rows] duration-200 ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
               >
                 <div
-                  className="min-h-0 overflow-hidden border-l border-border"
+                  className="min-h-0 min-w-0 overflow-hidden border-l border-border"
                   style={{ marginLeft: '18px' }}
                 >
                   <GroupBranch
@@ -406,7 +408,10 @@ export function GroupTree(props: GroupTreeProps) {
   );
 
   return (
-    <nav aria-label="Favorite groups" className="grid gap-1">
+    <nav
+      aria-label="Favorite groups"
+      className="grid w-full min-w-0 gap-1 overflow-x-hidden"
+    >
       <div
         className={`flex h-10 min-w-0 items-center rounded-md pr-1 text-sm transition ${props.selectedGroupId === null ? 'bg-primary-light font-medium text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
       >

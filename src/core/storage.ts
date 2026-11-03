@@ -428,19 +428,30 @@ export async function deleteGroup(id: string): Promise<void> {
     const group = await db.groups.get(id);
     if (!group || isGroupDeleted(group)) return;
 
-    const [items, groups] = await Promise.all([
-      db.items.where('groupId').equals(id).toArray(),
-      db.groups.where('parentId').equals(id).toArray(),
-    ]);
-    if (
-      items.some((item) => !isItemDeleted(item)) ||
-      groups.some((child) => !isGroupDeleted(child))
-    ) {
-      throw new Error('Move favorites and child groups before deleting this group.');
+    const groups = await db.groups.toArray();
+    const subtree = new Map([[group.id, group]]);
+    const pending = [group.id];
+    const descendantIds = new Set([group.id]);
+    while (pending.length > 0) {
+      const parentId = pending.pop()!;
+      for (const child of groups) {
+        if (child.parentId === parentId && !descendantIds.has(child.id)) {
+          descendantIds.add(child.id);
+          if (!isGroupDeleted(child)) subtree.set(child.id, child);
+          pending.push(child.id);
+        }
+      }
+    }
+
+    const items = await db.items.toArray();
+    if (items.some((item) => descendantIds.has(item.groupId) && !isItemDeleted(item))) {
+      throw new Error('Move favorites before deleting this group.');
     }
 
     const clock = await nextClock();
-    await db.groups.put({ ...group, deleted: clock });
+    await db.groups.bulkPut(
+      [...subtree.values()].map((candidate) => ({ ...candidate, deleted: clock })),
+    );
   });
 }
 
@@ -736,11 +747,30 @@ export async function restoreGroup(id: string): Promise<Group> {
     const group = await db.groups.get(id);
     if (!group) throw new Error('Group not found.');
     if (!isGroupDeleted(group)) return group;
+
+    const groups = await db.groups.toArray();
+    const restored = new Map([[group.id, group]]);
+    const pending = [group.id];
+    const visited = new Set([group.id]);
+    while (pending.length > 0) {
+      const parentId = pending.pop()!;
+      for (const child of groups) {
+        if (child.parentId === parentId && !visited.has(child.id)) {
+          visited.add(child.id);
+          if (child.deleted === group.deleted) restored.set(child.id, child);
+          pending.push(child.id);
+        }
+      }
+    }
+
     const clock = await nextClock();
-    const next = { ...group, clock: { ...group.clock, title: clock } };
-    delete next.deleted;
-    await db.groups.put(next);
-    return next;
+    const nextGroups = [...restored.values()].map((candidate) => {
+      const next = { ...candidate, clock: { ...candidate.clock, title: clock } };
+      delete next.deleted;
+      return next;
+    });
+    await db.groups.bulkPut(nextGroups);
+    return nextGroups.find((candidate) => candidate.id === id)!;
   });
 }
 

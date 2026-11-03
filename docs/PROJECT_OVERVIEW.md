@@ -20,11 +20,13 @@ FavoritePod/
 └── vite.config.ts
 ```
 
-**Current status**: Phases 2–5 are implemented as milestones. Phase 4 closed on 2026-11-03 and Phase 5 closed the same day at the user's request. Automated storage and thumbnail tests, lint,
-type check, formatting, and production build pass. Manual Chrome checks remain
-open for drag-and-drop, keyboard navigation, screenshot capture, thumbnail
-previews, and local-file opening; see `docs/phase-4-manual-test.md`,
-`docs/phase-5-manual-test.md`, and `NEXT_STEPS.md`.
+**Current status**: Phases 2–7 are implemented. Phases 4 and 5 closed on
+2026-11-03 at the user's request. Automated tests, lint, type check, formatting,
+and production build pass. Manual Chrome checks remain open for drag-and-drop,
+keyboard navigation, screenshot capture, thumbnail previews, local-file opening,
+and ZIP import/export; see `docs/phase-4-manual-test.md`,
+`docs/phase-5-manual-test.md`, `docs/phase-6-manual-test.md`, and
+`docs/phase-7-manual-test.md`.
 
 ## UI Captures
 

@@ -13,6 +13,13 @@ import {
 import { FaviconImage } from '../../components/FaviconImage';
 import { getThumbnail, type BookmarkSize } from '../../core/storage';
 import { getUrlLabel, parseSafeUrl } from '../../core/validation';
+import {
+  checkFileAvailability,
+  FILE_ACCESS_DENIED,
+  openSavedUrl,
+  type FileAvailability,
+  type PathOverride,
+} from '../../core/file-links';
 import type { Item } from '../../core/types';
 import { FavoriteFallback } from './FavoriteFallback';
 import { HoverPreview } from './HoverPreview';
@@ -22,6 +29,8 @@ interface FavoriteCardProps {
   item: Item;
   layout: 'grid' | 'list';
   size: BookmarkSize;
+  showPreview: boolean;
+  pathOverrides: PathOverride[];
   sortOrder?: number;
   isDragging: boolean;
   dragItemIds: string[];
@@ -36,6 +45,7 @@ interface FavoriteCardProps {
   onMoveDown: (item: Item) => void;
   onDelete: (item: Item) => void;
   onOpenError: (message: string) => void;
+  onFileAccessDenied: () => void;
   onDragStart: (itemId: string, height: number) => void;
   onDragEnd: () => void;
 }
@@ -74,6 +84,8 @@ export function FavoriteCard({
   item,
   layout,
   size,
+  showPreview,
+  pathOverrides,
   sortOrder,
   isDragging,
   dragItemIds,
@@ -88,12 +100,14 @@ export function FavoriteCard({
   onMoveDown,
   onDelete,
   onOpenError,
+  onFileAccessDenied,
   onDragStart,
   onDragEnd,
 }: FavoriteCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string>();
   const [fullThumbnailUrl, setFullThumbnailUrl] = useState<string>();
   const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
+  const [fileAvailability, setFileAvailability] = useState<FileAvailability>('unknown');
   const previewTimer = useRef<number>();
   const previewHideTimer = useRef<number>();
   const [dragSize, setDragSize] = useState<{ width: number; height: number }>();
@@ -105,6 +119,21 @@ export function FavoriteCard({
   const previousPosition = useRef<{ left: number; top: number }>();
   const wasDragging = useRef(false);
   const isLocalFile = parseSafeUrl(item.url)?.protocol === 'file:';
+
+  useEffect(() => {
+    if (!isLocalFile) {
+      setFileAvailability('unknown');
+      return;
+    }
+    let active = true;
+    setFileAvailability('unknown');
+    void checkFileAvailability(item.url, pathOverrides).then((availability) => {
+      if (active) setFileAvailability(availability);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isLocalFile, item.url, pathOverrides]);
 
   const removeDragImage = () => {
     dragImageCleanup.current?.();
@@ -123,6 +152,15 @@ export function FavoriteCard({
       if (previewHideTimer.current) window.clearTimeout(previewHideTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (showPreview) return;
+    if (previewTimer.current) window.clearTimeout(previewTimer.current);
+    if (previewHideTimer.current) window.clearTimeout(previewHideTimer.current);
+    previewTimer.current = undefined;
+    previewHideTimer.current = undefined;
+    setHoverPreviewOpen(false);
+  }, [showPreview]);
 
   useLayoutEffect(() => {
     const card = cardRef.current;
@@ -200,7 +238,7 @@ export function FavoriteCard({
   };
 
   const schedulePreview = () => {
-    if (isDragging) return;
+    if (!showPreview || isDragging) return;
     cancelPreviewHide();
     if (hoverPreviewOpen || previewTimer.current) return;
     previewTimer.current = window.setTimeout(() => {
@@ -226,11 +264,16 @@ export function FavoriteCard({
       return;
     }
     try {
-      await chrome.tabs.create({ url: item.url });
-    } catch {
-      onOpenError(
-        'Chrome could not open this address. Check file URL access in extension settings.',
-      );
+      await openSavedUrl(item.url);
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === FILE_ACCESS_DENIED) {
+        onFileAccessDenied();
+        onOpenError(
+          'File access is turned off. Enable "Allow access to file URLs" in Chrome extension settings.',
+        );
+      } else {
+        onOpenError('Chrome could not open this address. Check the URL and try again.');
+      }
     }
   };
 
@@ -526,8 +569,18 @@ export function FavoriteCard({
             />
             <span className="truncate">{item.title}</span>
           </span>
-          <span className="bookmark-domain mt-1 block truncate text-xs text-text-tertiary">
-            {getUrlLabel(item.url)}
+          <span className="bookmark-domain mt-1 flex min-w-0 items-center gap-1.5 truncate text-xs text-text-tertiary">
+            {isLocalFile && (
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${fileAvailability === 'available' ? 'bg-success' : fileAvailability === 'missing' ? 'bg-danger' : 'bg-text-tertiary'}`}
+              />
+            )}
+            <span className="truncate">
+              {isLocalFile
+                ? `Local file: ${fileAvailability[0].toUpperCase()}${fileAvailability.slice(1)}`
+                : getUrlLabel(item.url)}
+            </span>
           </span>
         </button>
       </div>
@@ -549,7 +602,7 @@ export function FavoriteCard({
         }}
         onPanelEnter={cancelPreviewHide}
         onPanelLeave={hidePreview}
-        open={hoverPreviewOpen}
+        open={showPreview && hoverPreviewOpen}
         positionRef={cardRef}
         thumbnailUrl={thumbnailUrl}
       />

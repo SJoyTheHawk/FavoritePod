@@ -4,6 +4,8 @@ import {
   ArrowUturnRightIcon,
   BookmarkIcon,
   CheckCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   Cog6ToothIcon,
   ExclamationCircleIcon,
   ListBulletIcon,
@@ -21,6 +23,11 @@ import {
   deleteItems,
   getDefaultView,
   getBookmarkSize,
+  getHomePageGroupId,
+  getLastSelectedGroupId,
+  getOpenBehavior,
+  getSidebarCollapsed,
+  getShowPreview,
   moveGroup,
   moveItem,
   moveItems,
@@ -29,14 +36,28 @@ import {
   restoreItems,
   restoreItemPositions,
   setDefaultView,
+  setHomePageGroupId,
+  setLastSelectedGroupId,
+  setOpenBehavior,
+  setSidebarCollapsed,
+  setShowPreview,
   setBookmarkSize,
   type BookmarkSize,
+  type OpenBehavior,
   updateGroup,
   updateItem,
   updateItemThumbnail,
   type ItemPosition,
   type LibraryView,
 } from '../core/storage';
+import {
+  getExtensionSettingsUrl,
+  getPathOverrides,
+  hasFileAccess,
+  savePathOverrides as persistPathOverrides,
+  type PathOverride,
+} from '../core/file-links';
+import { parseSafeUrl } from '../core/validation';
 import { useLibrary } from '../core/use-library';
 import type { Group, Item } from '../core/types';
 import { FavoriteCard } from './components/FavoriteCard';
@@ -46,6 +67,7 @@ import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
 import { GroupDialog } from './components/GroupDialog';
 import { GroupTree } from './components/GroupTree';
 import { SettingsDialog } from './components/SettingsDialog';
+import { FileAccessHint } from './components/FileAccessHint';
 import {
   clearLibraryDragData,
   getActiveLibraryDragPayload,
@@ -177,6 +199,16 @@ function errorMessage(cause: unknown): string {
 export function DashboardApp() {
   const { groups, items, loading, error } = useLibrary();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
+  const [homePageGroupId, setHomePageGroupIdState] = useState<string>();
+  const [showPreview, setShowPreviewState] = useState(true);
+  const [openBehavior, setOpenBehaviorState] = useState<OpenBehavior>('all');
+  const [pathOverrides, setPathOverridesState] = useState<PathOverride[]>([]);
+  const [fileAccessAllowed, setFileAccessAllowed] = useState<boolean>();
+  const [fileAccessHintDismissed, setFileAccessHintDismissed] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const startupSelectionApplied = useRef(false);
+  const initialLastGroupId = useRef<string | null | undefined>(undefined);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState('');
   const [layout, setLayout] = useState<LibraryView>('grid');
@@ -210,6 +242,10 @@ export function DashboardApp() {
     [groups],
   );
   const selectedGroup = selectedGroupId ? groupsById.get(selectedGroupId) : undefined;
+  const hasLocalFiles = useMemo(
+    () => items.some((item) => parseSafeUrl(item.url)?.protocol === 'file:'),
+    [items],
+  );
 
   const notify = useCallback((message: string, type: Toast['type'] = 'success') => {
     const id = ++nextToastId.current;
@@ -252,12 +288,62 @@ export function DashboardApp() {
   }, [error, notifyError]);
 
   useEffect(() => {
-    void getDefaultView()
-      .then((view) => {
-        if (view) setLayout(view);
-      })
+    if (!hasLocalFiles) {
+      setFileAccessAllowed(undefined);
+      return;
+    }
+    let active = true;
+    const refreshAccess = () => {
+      void hasFileAccess().then((allowed) => {
+        if (active) setFileAccessAllowed(allowed);
+      });
+    };
+    refreshAccess();
+    window.addEventListener('focus', refreshAccess);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refreshAccess);
+    };
+  }, [hasLocalFiles]);
+
+  useEffect(() => {
+    void Promise.all([
+      getDefaultView(),
+      getOpenBehavior(),
+      getHomePageGroupId(),
+      getLastSelectedGroupId(),
+      getSidebarCollapsed(),
+      getShowPreview(),
+      getPathOverrides(),
+    ])
+      .then(
+        ([view, behavior, homeGroupId, lastGroupId, collapsed, preview, overrides]) => {
+          if (view) setLayout(view);
+          setOpenBehaviorState(behavior);
+          setHomePageGroupIdState(homeGroupId);
+          setSidebarCollapsedState(collapsed);
+          setShowPreviewState(preview);
+          setPathOverridesState(overrides);
+          initialLastGroupId.current = lastGroupId;
+          setSettingsLoaded(true);
+        },
+      )
       .catch((cause: unknown) => notifyError(errorMessage(cause)));
   }, [notifyError]);
+
+  useEffect(() => {
+    if (!settingsLoaded || loading || startupSelectionApplied.current) return;
+    startupSelectionApplied.current = true;
+    let initialGroupId: string | null = null;
+    if (openBehavior === 'home') {
+      initialGroupId =
+        homePageGroupId && groupsById.has(homePageGroupId) ? homePageGroupId : null;
+    } else if (openBehavior === 'last') {
+      const lastGroupId = initialLastGroupId.current;
+      initialGroupId = lastGroupId && groupsById.has(lastGroupId) ? lastGroupId : null;
+    }
+    setSelectedGroupId(initialGroupId);
+  }, [groupsById, homePageGroupId, loading, openBehavior, settingsLoaded]);
 
   useEffect(() => {
     const destination = favoriteDropPending.current;
@@ -348,6 +434,51 @@ export function DashboardApp() {
   const saveDefaultView = async (view: LibraryView) => {
     await setDefaultView(view);
     setLayout(view);
+  };
+
+  const selectGroup = (groupId: string | null) => {
+    setSelectedGroupId(groupId);
+    void setLastSelectedGroupId(groupId).catch((cause: unknown) =>
+      notifyError(errorMessage(cause)),
+    );
+  };
+
+  const savePreviewVisibility = async (show: boolean) => {
+    await setShowPreview(show);
+    setShowPreviewState(show);
+  };
+
+  const saveSidebarCollapsed = async (collapsed: boolean) => {
+    await setSidebarCollapsed(collapsed);
+    setSidebarCollapsedState(collapsed);
+  };
+
+  const saveOpenBehavior = async (behavior: OpenBehavior) => {
+    await setOpenBehavior(behavior);
+    setOpenBehaviorState(behavior);
+  };
+
+  const saveLocalPathOverrides = async (overrides: PathOverride[]) => {
+    await persistPathOverrides(overrides);
+    setPathOverridesState(await getPathOverrides());
+    notify('Local file path overrides saved.');
+  };
+
+  const handleFileAccessDenied = () => {
+    setFileAccessAllowed(false);
+    setFileAccessHintDismissed(false);
+  };
+
+  const selectHomePage = async (groupId?: string) => {
+    await setHomePageGroupId(groupId);
+    setHomePageGroupIdState(groupId);
+    if (groupId) {
+      setOpenBehaviorState('home');
+      notify('Home page group updated.');
+    } else {
+      if (openBehavior === 'home') setOpenBehaviorState('all');
+      notify('Home page group removed.');
+    }
   };
 
   const visibleItems = useMemo(() => {
@@ -659,7 +790,12 @@ export function DashboardApp() {
       },
       redo: async () => deleteGroup(group.id),
     });
-    if (selectedGroupId === group.id) setSelectedGroupId(group.parentId);
+    if (selectedGroupId === group.id) selectGroup(group.parentId);
+    if (homePageGroupId === group.id) {
+      await setHomePageGroupId();
+      setHomePageGroupIdState(undefined);
+      if (openBehavior === 'home') setOpenBehaviorState('all');
+    }
     notify('Group deleted.');
     return true;
   };
@@ -883,17 +1019,62 @@ export function DashboardApp() {
       </header>
 
       <div className="flex min-h-[calc(100vh-4rem)] flex-col md:flex-row">
-        <aside className="border-b border-border px-3 py-3 md:w-64 md:shrink-0 md:border-b-0 md:border-r md:px-4 md:py-6">
-          <div className="max-h-64 overflow-y-auto md:max-h-none">
+        <aside
+          className={`border-b border-border py-3 md:shrink-0 md:border-b-0 md:border-r md:transition-[width] md:duration-200 ${sidebarCollapsed ? 'px-3 md:w-14 md:px-2' : 'px-3 md:w-64 md:px-4 md:py-6'}`}
+        >
+          <div
+            className={`flex min-h-9 items-center ${sidebarCollapsed ? 'justify-center' : 'mb-3 justify-end'}`}
+          >
+            <button
+              aria-controls="favorite-group-sidebar"
+              aria-expanded={!sidebarCollapsed}
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!settingsLoaded}
+              onClick={() =>
+                void saveSidebarCollapsed(!sidebarCollapsed).catch((cause) =>
+                  notifyError(errorMessage(cause)),
+                )
+              }
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              type="button"
+            >
+              {sidebarCollapsed ? (
+                <ChevronRightIcon
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  strokeWidth={2.25}
+                />
+              ) : (
+                <ChevronLeftIcon
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  strokeWidth={2.25}
+                />
+              )}
+            </button>
+          </div>
+          <div
+            className={
+              sidebarCollapsed ? 'hidden' : 'max-h-64 overflow-y-auto md:max-h-none'
+            }
+            id="favorite-group-sidebar"
+          >
             <GroupTree
               groups={groups}
               items={items}
+              homePageGroupId={homePageGroupId}
               onCreateGroup={() => setDialog({ type: 'group', parentId: null })}
               onCreateChild={(parentId) => setDialog({ type: 'group', parentId })}
               onDelete={(group) =>
                 void removeGroup(group).catch((cause) => notifyError(errorMessage(cause)))
               }
               onEdit={(group) => setDialog({ type: 'group', group })}
+              onSetHomePage={(groupId) => {
+                void selectHomePage(groupId).catch((cause: unknown) =>
+                  notifyError(errorMessage(cause)),
+                );
+              }}
               onMoveGroup={(groupId, parentId, beforeId) => {
                 void handleMoveGroup(groupId, parentId, beforeId);
               }}
@@ -908,7 +1089,7 @@ export function DashboardApp() {
                   void handleMoveFavorite(itemId, groupId);
                 }
               }}
-              onSelect={setSelectedGroupId}
+              onSelect={selectGroup}
               selectedGroupId={selectedGroupId}
             />
           </div>
@@ -931,6 +1112,12 @@ export function DashboardApp() {
           }}
         >
           <div className="mx-auto max-w-7xl">
+            {hasLocalFiles && fileAccessAllowed === false && !fileAccessHintDismissed && (
+              <FileAccessHint
+                onDismiss={() => setFileAccessHintDismissed(true)}
+                settingsUrl={getExtensionSettingsUrl()}
+              />
+            )}
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-semibold">
@@ -1120,6 +1307,8 @@ export function DashboardApp() {
                       key={item.id}
                       layout={layout}
                       size={bookmarkSize}
+                      showPreview={showPreview}
+                      pathOverrides={pathOverrides}
                       sortOrder={
                         dragPreviewRank
                           ? (dragPreviewRank.get(item.id) ?? dragPreviewOrder?.length)
@@ -1150,6 +1339,7 @@ export function DashboardApp() {
                       onMoveDown={(selected) => reorderFavorite(selected, 1)}
                       onMoveUp={(selected) => reorderFavorite(selected, -1)}
                       onOpenError={notifyError}
+                      onFileAccessDenied={handleFileAccessDenied}
                       onToggleSelected={toggleSelected}
                       selected={selectedIds.has(item.id)}
                     />
@@ -1252,8 +1442,15 @@ export function DashboardApp() {
       {settingsOpen && (
         <SettingsDialog
           defaultView={layout}
+          homePageAvailable={!!homePageGroupId && groupsById.has(homePageGroupId)}
+          openBehavior={openBehavior}
+          showPreview={showPreview}
+          pathOverrides={pathOverrides}
           onClose={() => setSettingsOpen(false)}
           onSaveDefaultView={saveDefaultView}
+          onSaveOpenBehavior={saveOpenBehavior}
+          onSaveShowPreview={savePreviewVisibility}
+          onSavePathOverrides={saveLocalPathOverrides}
         />
       )}
       <div

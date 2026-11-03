@@ -211,7 +211,9 @@ export default defineConfig({
     "topSites"
   ],
   
-  "host_permissions": []
+  "host_permissions": [
+    "file:///*"
+  ]
 }
 ```
 
@@ -224,9 +226,12 @@ export default defineConfig({
 | `unlimitedStorage` | Protect the IndexedDB library from normal quota eviction | No install warning |
 | `history` (optional) | Visited-site suggestions (planned) | Runtime permission dialog |
 
-**Important**: Do not request `<all_urls>` host permissions. The current
-manifest uses `activeTab` for the popup's active-tab workflow and stores data in
-IndexedDB, which does not require Chrome's separate `storage` permission.
+**Important**: Do not request `<all_urls>` host permissions. The `file:///*`
+host permission is limited to local files and is required for Phase 6 file
+availability checks. Users must still enable “Allow access to file URLs” in
+Chrome's extension details. The extension uses `activeTab` for the popup's
+active-tab workflow and stores data in IndexedDB, which does not require
+Chrome's separate `storage` permission.
 
 ### Extension Architecture
 

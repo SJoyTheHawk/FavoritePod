@@ -433,13 +433,17 @@ production build pass. Browser behavior remains open for the checklist in
 **Goal**: Support local HTML tools with path handling
 
 **Tasks**:
-- [ ] Detect file:// URLs during save
-- [ ] Check `chrome.extension.isAllowedFileSchemeAccess()`
-- [ ] Show permission hint if denied
-- [ ] Open files with `chrome.tabs.create()`
-- [ ] Implement per-device path prefix override
-- [ ] Add file availability check (when allowed)
-- [ ] Show three states: unknown, available, missing
+- [x] Detect file:// URLs during save
+- [x] Check `chrome.extension.isAllowedFileSchemeAccess()`
+- [x] Show permission hint if denied
+- [x] Open files with `chrome.tabs.create()`
+- [x] Implement per-device path prefix override
+- [x] Add file availability check (when allowed)
+- [x] Show three states: unknown, available, missing
+
+Implementation is complete. Real Chrome permission, file presence, and tab
+navigation behavior remain for the manual acceptance steps in
+`docs/phase-6-manual-test.md`.
 
 **Permission Hint**:
 ```

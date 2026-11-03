@@ -11,9 +11,14 @@ import {
   deleteItem,
   deleteItems,
   getDefaultView,
+  getHomePageGroupId,
+  getLastSelectedGroupId,
+  getOpenBehavior,
   getBookmarkSize,
   getLastUsedGroupId,
   getRecentItems,
+  getSidebarCollapsed,
+  getShowPreview,
   listGroups,
   listItems,
   listSnapshots,
@@ -26,7 +31,12 @@ import {
   restoreItemPositions,
   restoreSnapshot,
   setDefaultView,
+  setHomePageGroupId,
+  setLastSelectedGroupId,
+  setOpenBehavior,
+  setSidebarCollapsed,
   setBookmarkSize,
+  setShowPreview,
   updateGroup,
   updateItem,
   updateItemThumbnail,
@@ -42,6 +52,45 @@ afterAll(async () => {
 });
 
 describe('local library storage', () => {
+  it('persists sidebar collapse state across launcher reopen', async () => {
+    expect(await getSidebarCollapsed()).toBe(false);
+    await setSidebarCollapsed(true);
+    db.close();
+    await db.open();
+    expect(await getSidebarCollapsed()).toBe(true);
+    await setSidebarCollapsed(false);
+    expect(await getSidebarCollapsed()).toBe(false);
+  });
+
+  it('persists preview visibility and startup selection preferences', async () => {
+    const group = await createGroup({ title: 'Home' });
+    expect(await getShowPreview()).toBe(true);
+    expect(await getOpenBehavior()).toBe('all');
+
+    await setShowPreview(false);
+    await setOpenBehavior('last');
+    await setHomePageGroupId(group.id);
+    await setLastSelectedGroupId(group.id);
+    db.close();
+    await db.open();
+
+    expect(await getShowPreview()).toBe(false);
+    expect(await getOpenBehavior()).toBe('home');
+    expect(await getHomePageGroupId()).toBe(group.id);
+    expect(await getLastSelectedGroupId()).toBe(group.id);
+
+    await setOpenBehavior('last');
+    await setHomePageGroupId();
+    await setLastSelectedGroupId(null);
+    expect(await getOpenBehavior()).toBe('last');
+    expect(await getHomePageGroupId()).toBeUndefined();
+    expect(await getLastSelectedGroupId()).toBeNull();
+
+    await setHomePageGroupId(group.id);
+    await setHomePageGroupId();
+    expect(await getOpenBehavior()).toBe('all');
+  });
+
   it.each(['compact', 'extra-small'] as const)(
     'persists %s independently for both layouts',
     async (size) => {

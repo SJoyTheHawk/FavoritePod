@@ -19,6 +19,65 @@ const DISMISSED_RECENT_ITEM_IDS = 'dismissedRecentItemIds';
 
 export type LibraryView = 'grid' | 'list';
 export type BookmarkSize = 'compact' | 'extra-small' | 'small' | 'medium' | 'large';
+export type OpenBehavior = 'last' | 'all' | 'home';
+
+export async function getSidebarCollapsed(): Promise<boolean> {
+  const record = await db.settings.get('sidebarCollapsed');
+  return record?.value === true;
+}
+
+export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
+  await db.settings.put({ key: 'sidebarCollapsed', value: collapsed });
+}
+
+export async function getShowPreview(): Promise<boolean> {
+  const record = await db.settings.get('showPreview');
+  return record?.value !== false;
+}
+
+export async function setShowPreview(showPreview: boolean): Promise<void> {
+  await db.settings.put({ key: 'showPreview', value: showPreview });
+}
+
+export async function getOpenBehavior(): Promise<OpenBehavior> {
+  const record = await db.settings.get('openBehavior');
+  return record?.value === 'last' || record?.value === 'home' ? record.value : 'all';
+}
+
+export async function setOpenBehavior(behavior: OpenBehavior): Promise<void> {
+  await db.settings.put({ key: 'openBehavior', value: behavior });
+}
+
+export async function getHomePageGroupId(): Promise<string | undefined> {
+  const record = await db.settings.get('homePageGroupId');
+  return typeof record?.value === 'string' ? record.value : undefined;
+}
+
+export async function setHomePageGroupId(groupId?: string): Promise<void> {
+  await db.transaction('rw', db.settings, async () => {
+    if (groupId) {
+      await db.settings.put({ key: 'homePageGroupId', value: groupId });
+      await db.settings.put({ key: 'openBehavior', value: 'home' });
+      return;
+    }
+
+    await db.settings.delete('homePageGroupId');
+    if ((await getOpenBehavior()) === 'home') {
+      await db.settings.put({ key: 'openBehavior', value: 'all' });
+    }
+  });
+}
+
+export async function getLastSelectedGroupId(): Promise<string | null | undefined> {
+  const record = await db.settings.get('lastSelectedGroupId');
+  return typeof record?.value === 'string' || record?.value === null
+    ? record.value
+    : undefined;
+}
+
+export async function setLastSelectedGroupId(groupId: string | null): Promise<void> {
+  await db.settings.put({ key: 'lastSelectedGroupId', value: groupId });
+}
 
 export async function getBookmarkSize(view: LibraryView): Promise<BookmarkSize> {
   const record = await db.settings.get(`bookmarkSize:${view}`);
@@ -44,17 +103,23 @@ function compareLexically(left: string, right: string): number {
 }
 
 async function nextClock(): Promise<string> {
-  const deviceRecord = await db.syncMeta.get('deviceId');
-  const deviceId =
-    typeof deviceRecord?.value === 'string' ? deviceRecord.value : crypto.randomUUID();
-  if (!deviceRecord) await db.syncMeta.put({ key: 'deviceId', value: deviceId });
-
+  const deviceId = await getDeviceId();
   const previousRecord = await db.syncMeta.get('lastHlc');
   const previous =
     typeof previousRecord?.value === 'string' ? previousRecord.value : undefined;
   const value = tickHLC(previous, deviceId);
   await db.syncMeta.put({ key: 'lastHlc', value });
   return value;
+}
+
+export async function getDeviceId(): Promise<string> {
+  return db.transaction('rw', db.syncMeta, async () => {
+    const deviceRecord = await db.syncMeta.get('deviceId');
+    if (typeof deviceRecord?.value === 'string') return deviceRecord.value;
+    const deviceId = crypto.randomUUID();
+    await db.syncMeta.put({ key: 'deviceId', value: deviceId });
+    return deviceId;
+  });
 }
 
 function ordered<T extends { id: string; orderKey: string }>(records: T[]): T[] {

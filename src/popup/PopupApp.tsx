@@ -9,6 +9,7 @@ import {
 import { dismissRecentItem } from '../core/storage';
 import { useLibrary, useRecentItems } from '../core/use-library';
 import { getUrlLabel, parseSafeUrl } from '../core/validation';
+import { FILE_ACCESS_DENIED, openSavedUrl } from '../core/file-links';
 import { BookmarkDialog } from './BookmarkDialog';
 import { FaviconImage } from '../components/FaviconImage';
 
@@ -45,11 +46,13 @@ export function PopupApp() {
   const openItem = async (url: string) => {
     setError(undefined);
     try {
-      await chrome.tabs.create({ url });
+      await openSavedUrl(url);
       window.close();
-    } catch {
+    } catch (cause) {
       setError(
-        'Chrome could not open this address. Check file URL access in extension settings.',
+        cause instanceof Error && cause.message === FILE_ACCESS_DENIED
+          ? 'File access is turned off. Enable "Allow access to file URLs" in Chrome extension settings.'
+          : 'Chrome could not open this address. Check the URL and try again.',
       );
     }
   };

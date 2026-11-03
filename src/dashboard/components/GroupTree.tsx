@@ -14,6 +14,7 @@ import {
   EllipsisHorizontalIcon,
   FolderIcon,
   FolderPlusIcon,
+  HomeIcon,
   PencilSquareIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
@@ -38,6 +39,8 @@ interface GroupTreeProps {
   onDelete: (group: Group) => void;
   onCreateGroup: () => void;
   onCreateChild: (parentId: string) => void;
+  homePageGroupId?: string;
+  onSetHomePage: (groupId?: string) => void;
   onMoveGroup: (groupId: string, parentId: string | null, beforeId?: string) => void;
   onMoveItem: (itemId: string, groupId: string) => void;
 }
@@ -74,6 +77,8 @@ function GroupBranch({
   onEdit,
   onDelete,
   onCreateChild,
+  homePageGroupId,
+  onSetHomePage,
   onMoveGroup,
   onMoveItem,
   expanded,
@@ -196,7 +201,15 @@ function GroupBranch({
                   <ChevronRightIcon aria-hidden="true" className="h-3.5 w-3.5" />
                 )}
               </button>
-              <FolderIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+              {homePageGroupId === group.id ? (
+                <HomeIcon
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 text-primary"
+                  title="Home page"
+                />
+              ) : (
+                <FolderIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+              )}
               <button
                 aria-current={isSelected ? 'page' : undefined}
                 className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded px-1 text-left text-sm"
@@ -230,6 +243,15 @@ function GroupBranch({
                     icon={<FolderPlusIcon />}
                     label="New sub-group"
                     onClick={() => onCreateChild(group.id)}
+                  />
+                  <GroupAction
+                    icon={<HomeIcon />}
+                    label={
+                      homePageGroupId === group.id ? 'Remove home page' : 'Set home page'
+                    }
+                    onClick={() =>
+                      onSetHomePage(homePageGroupId === group.id ? undefined : group.id)
+                    }
                   />
                   <GroupAction
                     icon={<ChevronUpIcon />}
@@ -281,6 +303,8 @@ function GroupBranch({
                       onEdit,
                       onDelete,
                       onCreateChild,
+                      homePageGroupId,
+                      onSetHomePage,
                       onMoveGroup,
                       onMoveItem,
                       expanded,

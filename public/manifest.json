@@ -23,5 +23,6 @@
     "type": "module"
   },
   "permissions": ["activeTab", "favicon", "unlimitedStorage"],
+  "host_permissions": ["file:///*"],
   "optional_permissions": ["history", "topSites"]
 }

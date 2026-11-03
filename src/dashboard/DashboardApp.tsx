@@ -23,6 +23,8 @@ import {
   deleteItems,
   getDefaultView,
   getBookmarkSize,
+  getCollapsedGroups,
+  getGroupingMode,
   getHomePageGroupId,
   getLastSelectedGroupId,
   getOpenBehavior,
@@ -36,6 +38,8 @@ import {
   restoreItems,
   restoreItemPositions,
   setDefaultView,
+  setCollapsedGroups,
+  setGroupingMode,
   setHomePageGroupId,
   setLastSelectedGroupId,
   setOpenBehavior,
@@ -43,6 +47,7 @@ import {
   setShowPreview,
   setBookmarkSize,
   type BookmarkSize,
+  type GroupingMode,
   type OpenBehavior,
   updateGroup,
   updateItem,
@@ -66,6 +71,7 @@ import { FavoriteDialog } from './components/FavoriteDialog';
 import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
 import { GroupDialog } from './components/GroupDialog';
 import { GroupTree } from './components/GroupTree';
+import { GroupedFavoriteSection } from './components/GroupedFavoriteSection';
 import { SettingsDialog } from './components/SettingsDialog';
 import { ImportExportDialog } from './components/ImportExportDialog';
 import type { ImportMode, ImportResult } from '../core/import';
@@ -80,6 +86,7 @@ import {
   type ItemDropPlacement,
 } from './drag';
 import { getGroupLabels } from './group-labels';
+import { getGroupedFavoriteView, getItemsByGroupAndDescendants } from './grouped-view';
 
 type DialogState =
   | { type: 'favorite'; item?: Item; groupId?: string }
@@ -216,6 +223,8 @@ export function DashboardApp() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState('');
   const [layout, setLayout] = useState<LibraryView>('grid');
+  const [groupingMode, setGroupingModeState] = useState<GroupingMode>('hierarchical');
+  const [collapsedGroups, setCollapsedGroupsState] = useState(getCollapsedGroups);
   const [bookmarkSizes, setBookmarkSizes] = useState<Record<LibraryView, BookmarkSize>>({
     grid: 'medium',
     list: 'medium',
@@ -329,15 +338,26 @@ export function DashboardApp() {
       getSidebarCollapsed(),
       getShowPreview(),
       getPathOverrides(),
+      getGroupingMode(),
     ])
       .then(
-        ([view, behavior, homeGroupId, lastGroupId, collapsed, preview, overrides]) => {
+        ([
+          view,
+          behavior,
+          homeGroupId,
+          lastGroupId,
+          collapsed,
+          preview,
+          overrides,
+          grouping,
+        ]) => {
           if (view) setLayout(view);
           setOpenBehaviorState(behavior);
           setHomePageGroupIdState(homeGroupId);
           setSidebarCollapsedState(collapsed);
           setShowPreviewState(preview);
           setPathOverridesState(overrides);
+          setGroupingModeState(grouping);
           initialLastGroupId.current = lastGroupId;
           setSettingsLoaded(true);
         },
@@ -450,6 +470,20 @@ export function DashboardApp() {
     setLayout(view);
   };
 
+  const saveGroupingMode = async (mode: GroupingMode) => {
+    await setGroupingMode(mode);
+    setGroupingModeState(mode);
+    clearFavoriteDrag();
+  };
+
+  const toggleGroupCollapse = (groupId: string) => {
+    const next = new Set(collapsedGroups);
+    if (next.has(groupId)) next.delete(groupId);
+    else next.add(groupId);
+    setCollapsedGroupsState(next);
+    setCollapsedGroups(next);
+  };
+
   const selectGroup = (groupId: string | null) => {
     setSelectedGroupId(groupId);
     void setLastSelectedGroupId(groupId).catch((cause: unknown) =>
@@ -518,6 +552,36 @@ export function DashboardApp() {
     });
   }, [groups, items, search, selectedGroupId]);
 
+  const groupedView = useMemo(
+    () => getGroupedFavoriteView(groups, visibleItems, selectedGroupId, groupingMode),
+    [groups, visibleItems, selectedGroupId, groupingMode],
+  );
+  const itemsByGroup = useMemo(
+    () => getItemsByGroupAndDescendants(groups, visibleItems),
+    [groups, visibleItems],
+  );
+  const searching = search.trim().length > 0;
+  const sectionGroups =
+    groupedView.mode === 'hierarchical'
+      ? groupedView.groups.filter(
+          (group) => !searching || (itemsByGroup.get(group.id)?.length ?? 0) > 0,
+        )
+      : [];
+  const orderedVisibleItems =
+    groupedView.mode === 'labeled' ? groupedView.items : visibleItems;
+  const dragOrderItems = useMemo(
+    () =>
+      groupedView.mode === 'labeled'
+        ? [...items].sort(
+            (left, right) =>
+              (groupLabels.get(left.groupId) ?? '').localeCompare(
+                groupLabels.get(right.groupId) ?? '',
+              ) || compareOrder(left, right),
+          )
+        : items,
+    [groupLabels, groupedView.mode, items],
+  );
+
   const dragPreviewRank = useMemo(() => {
     if (!dragPreviewOrder) return null;
     return new Map(dragPreviewOrder.map((id, index) => [id, index]));
@@ -529,7 +593,7 @@ export function DashboardApp() {
     placement: ItemDropPlacement,
   ) => {
     const next = previewItemOrder(
-      items.map((item) => item.id),
+      dragOrderItems.map((item) => item.id),
       itemId,
       targetItemId,
       placement,
@@ -562,7 +626,7 @@ export function DashboardApp() {
   };
 
   const startFavoriteDrag = (itemId: string, height: number) => {
-    const ids = visibleItems
+    const ids = orderedVisibleItems
       .filter((item) =>
         selectedIds.has(itemId) ? selectedIds.has(item.id) : item.id === itemId,
       )
@@ -572,9 +636,11 @@ export function DashboardApp() {
     setDropOrigin(null);
     favoriteDropPending.current = null;
     const first = items.find((item) => item.id === ids[0])!;
-    const originalIndex = items.findIndex((item) => item.id === first.id);
-    const remaining = items.filter((item) => !ids.includes(item.id));
-    const next = items.slice(originalIndex).find((item) => !ids.includes(item.id));
+    const originalIndex = dragOrderItems.findIndex((item) => item.id === first.id);
+    const remaining = dragOrderItems.filter((item) => !ids.includes(item.id));
+    const next = dragOrderItems
+      .slice(originalIndex)
+      .find((item) => !ids.includes(item.id));
     const index = next
       ? remaining.findIndex((item) => item.id === next.id)
       : remaining.length;
@@ -584,7 +650,7 @@ export function DashboardApp() {
       itemId,
       itemIds: ids,
       groupId: first.groupId,
-      beforeItemId: items
+      beforeItemId: dragOrderItems
         .slice(originalIndex)
         .find((item) => item.groupId === first.groupId && !ids.includes(item.id))?.id,
     };
@@ -635,6 +701,21 @@ export function DashboardApp() {
       clearFavoriteDrag();
       notifyError(errorMessage(cause));
     }
+  };
+
+  const dropIntoGroup = (groupId: string) => {
+    const payload = getActiveLibraryDragPayload();
+    if (payload?.type !== 'item') return;
+    const ids = dragIdsRef.current.length ? [...dragIdsRef.current] : [payload.id];
+    clearFavoriteDrag();
+    clearLibraryDragData();
+    void moveDraggedFavorites(ids, groupId)
+      .then(() =>
+        notify(
+          `Moved ${ids.length} ${ids.length === 1 ? 'favorite' : 'favorites'} to ${groupLabels.get(groupId) ?? 'the selected group'}.`,
+        ),
+      )
+      .catch((cause) => notifyError(errorMessage(cause)));
   };
 
   const selectedVisibleItems = visibleItems.filter((item) => selectedIds.has(item.id));
@@ -993,6 +1074,107 @@ export function DashboardApp() {
     );
   };
 
+  const renderFavoriteCollection = (collectionItems: readonly Item[]) => (
+    <div
+      className="bookmark-collection relative"
+      data-layout={layout}
+      data-size={bookmarkSize}
+      onDragOver={(event) => {
+        const payload = getActiveLibraryDragPayload();
+        if (payload?.type !== 'item') return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        const collection = event.currentTarget;
+        const rect = collection.getBoundingClientRect();
+        const slots = Array.from(
+          collection.querySelectorAll<HTMLElement>('[data-favorite-id]'),
+        )
+          .filter((card) => !dragIdsRef.current.includes(card.dataset.favoriteId!))
+          .map((card) => ({
+            id: card.dataset.favoriteId!,
+            left: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetLeft,
+            top: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetTop,
+            width: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetWidth,
+            height: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetHeight,
+          }));
+        const target = getItemDropTarget(
+          event.clientX - rect.left + collection.scrollLeft,
+          event.clientY - rect.top + collection.scrollTop,
+          slots,
+          layout,
+        );
+        // Keep the previous destination over a gap or the stack placeholder.
+        if (target) previewFavoriteDrop(payload.id, target.targetId, target.placement);
+      }}
+    >
+      {collectionItems.map((item) => {
+        const siblings = items
+          .filter((candidate) => candidate.groupId === item.groupId)
+          .sort(compareOrder);
+        const index = siblings.findIndex((candidate) => candidate.id === item.id);
+        return (
+          <FavoriteCard
+            canMoveDown={index >= 0 && index < siblings.length - 1}
+            canMoveUp={index > 0}
+            item={item}
+            key={item.id}
+            groupLabel={
+              groupedView.mode === 'labeled' ? groupLabels.get(item.groupId) : undefined
+            }
+            layout={layout}
+            size={bookmarkSize}
+            showPreview={showPreview}
+            pathOverrides={pathOverrides}
+            sortOrder={
+              dragPreviewRank
+                ? (dragPreviewRank.get(item.id) ?? dragPreviewOrder?.length)
+                : undefined
+            }
+            isDragging={!!draggingFavoriteId && draggedIds.includes(item.id)}
+            dropOrigin={dropOrigin}
+            dragItemIds={
+              selectedIds.has(item.id)
+                ? visibleItems
+                    .filter((candidate) => selectedIds.has(candidate.id))
+                    .map((candidate) => candidate.id)
+                : [item.id]
+            }
+            onDragStart={startFavoriteDrag}
+            onDragEnd={finishFavoriteDrag}
+            onDelete={(selected) =>
+              void deleteFavorite(selected).catch((cause) =>
+                notifyError(errorMessage(cause)),
+              )
+            }
+            onEdit={(selected) => setDialog({ type: 'favorite', item: selected })}
+            onMove={(selected) => setDialog({ type: 'move-favorite', item: selected })}
+            onMoveDown={(selected) => reorderFavorite(selected, 1)}
+            onMoveUp={(selected) => reorderFavorite(selected, -1)}
+            onOpenError={notifyError}
+            onFileAccessDenied={handleFileAccessDenied}
+            onToggleSelected={toggleSelected}
+            selected={selectedIds.has(item.id)}
+          />
+        );
+      })}
+      {draggingFavoriteId &&
+        dragPreviewRank?.has(draggedIds[0]) &&
+        (groupedView.mode !== 'hierarchical' ||
+          favoritePreviewDestination.current?.groupId ===
+            collectionItems[0]?.groupId) && (
+          <div
+            ref={slotRef}
+            aria-hidden="true"
+            className="pointer-events-none min-w-0 rounded-lg border border-dashed border-primary/50 bg-primary-light/20"
+            style={{
+              order: dragPreviewRank.get(draggedIds[0]),
+              height: dragPlaceholderHeight,
+            }}
+          />
+        )}
+    </div>
+  );
+
   return (
     <main className="min-h-screen bg-background text-text-primary">
       <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 sm:px-7">
@@ -1287,107 +1469,29 @@ export function DashboardApp() {
                   </div>
                 ))}
               </div>
-            ) : visibleItems.length > 0 ? (
-              <div
-                className="bookmark-collection relative"
-                data-layout={layout}
-                data-size={bookmarkSize}
-                onDragOver={(event) => {
-                  const payload = getActiveLibraryDragPayload();
-                  if (payload?.type !== 'item') return;
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = 'move';
-                  const collection = event.currentTarget;
-                  const rect = collection.getBoundingClientRect();
-                  const slots = Array.from(
-                    collection.querySelectorAll<HTMLElement>('[data-favorite-id]'),
-                  )
-                    .filter(
-                      (card) => !dragIdsRef.current.includes(card.dataset.favoriteId!),
-                    )
-                    .map((card) => ({
-                      id: card.dataset.favoriteId!,
-                      left: card.offsetLeft,
-                      top: card.offsetTop,
-                      width: card.offsetWidth,
-                      height: card.offsetHeight,
-                    }));
-                  const target = getItemDropTarget(
-                    event.clientX - rect.left + collection.scrollLeft,
-                    event.clientY - rect.top + collection.scrollTop,
-                    slots,
-                    layout,
-                  );
-                  // Keep the previous destination over a gap or the stack placeholder.
-                  if (target)
-                    previewFavoriteDrop(payload.id, target.targetId, target.placement);
-                }}
-              >
-                {visibleItems.map((item) => {
-                  const siblings = items
-                    .filter((candidate) => candidate.groupId === item.groupId)
-                    .sort(compareOrder);
-                  const index = siblings.findIndex(
-                    (candidate) => candidate.id === item.id,
-                  );
-                  return (
-                    <FavoriteCard
-                      canMoveDown={index >= 0 && index < siblings.length - 1}
-                      canMoveUp={index > 0}
-                      item={item}
-                      key={item.id}
-                      layout={layout}
-                      size={bookmarkSize}
-                      showPreview={showPreview}
-                      pathOverrides={pathOverrides}
-                      sortOrder={
-                        dragPreviewRank
-                          ? (dragPreviewRank.get(item.id) ?? dragPreviewOrder?.length)
-                          : undefined
-                      }
-                      isDragging={!!draggingFavoriteId && draggedIds.includes(item.id)}
-                      dropOrigin={dropOrigin}
-                      dragItemIds={
-                        selectedIds.has(item.id)
-                          ? visibleItems
-                              .filter((candidate) => selectedIds.has(candidate.id))
-                              .map((candidate) => candidate.id)
-                          : [item.id]
-                      }
-                      onDragStart={startFavoriteDrag}
-                      onDragEnd={finishFavoriteDrag}
-                      onDelete={(selected) =>
-                        void deleteFavorite(selected).catch((cause) =>
-                          notifyError(errorMessage(cause)),
-                        )
-                      }
-                      onEdit={(selected) =>
-                        setDialog({ type: 'favorite', item: selected })
-                      }
-                      onMove={(selected) =>
-                        setDialog({ type: 'move-favorite', item: selected })
-                      }
-                      onMoveDown={(selected) => reorderFavorite(selected, 1)}
-                      onMoveUp={(selected) => reorderFavorite(selected, -1)}
-                      onOpenError={notifyError}
-                      onFileAccessDenied={handleFileAccessDenied}
-                      onToggleSelected={toggleSelected}
-                      selected={selectedIds.has(item.id)}
-                    />
-                  );
-                })}
-                {draggingFavoriteId && dragPreviewRank?.has(draggedIds[0]) && (
-                  <div
-                    ref={slotRef}
-                    aria-hidden="true"
-                    className="pointer-events-none min-w-0 rounded-lg border border-dashed border-primary/50 bg-primary-light/20"
-                    style={{
-                      order: dragPreviewRank.get(draggedIds[0]),
-                      height: dragPlaceholderHeight,
-                    }}
+            ) : groupedView.mode === 'hierarchical' &&
+              (sectionGroups.length > 0 || groupedView.directItems.length > 0) ? (
+              <div className="space-y-8">
+                {groupedView.directItems.length > 0 &&
+                  renderFavoriteCollection(groupedView.directItems)}
+                {sectionGroups.map((group) => (
+                  <GroupedFavoriteSection
+                    collapsedGroups={collapsedGroups}
+                    group={group}
+                    groups={groups}
+                    itemsByGroup={itemsByGroup}
+                    key={group.id}
+                    onDropIntoGroup={dropIntoGroup}
+                    onToggleCollapse={toggleGroupCollapse}
+                    renderItems={renderFavoriteCollection}
+                    searching={searching}
                   />
-                )}
+                ))}
               </div>
+            ) : visibleItems.length > 0 ? (
+              renderFavoriteCollection(
+                groupedView.mode === 'hierarchical' ? visibleItems : groupedView.items,
+              )
             ) : (
               <div className="flex min-h-[min(60vh,32rem)] flex-col items-center justify-center px-6 text-center">
                 <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-surface text-text-tertiary">
@@ -1473,12 +1577,14 @@ export function DashboardApp() {
       {settingsOpen && (
         <SettingsDialog
           defaultView={layout}
+          groupingMode={groupingMode}
           homePageAvailable={!!homePageGroupId && groupsById.has(homePageGroupId)}
           openBehavior={openBehavior}
           showPreview={showPreview}
           pathOverrides={pathOverrides}
           onClose={() => setSettingsOpen(false)}
           onSaveDefaultView={saveDefaultView}
+          onSaveGroupingMode={saveGroupingMode}
           onSaveOpenBehavior={saveOpenBehavior}
           onSaveShowPreview={savePreviewVisibility}
           onSavePathOverrides={saveLocalPathOverrides}

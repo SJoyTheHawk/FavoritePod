@@ -20,6 +20,41 @@ const DISMISSED_RECENT_ITEM_IDS = 'dismissedRecentItemIds';
 export type LibraryView = 'grid' | 'list';
 export type BookmarkSize = 'compact' | 'extra-small' | 'small' | 'medium' | 'large';
 export type OpenBehavior = 'last' | 'all' | 'home';
+export type GroupingMode = 'hierarchical' | 'labeled' | 'flat';
+
+const COLLAPSED_GROUPS_KEY = 'favoritepod:collapsedGroups';
+
+export async function getGroupingMode(): Promise<GroupingMode> {
+  const record = await db.settings.get('groupingMode');
+  return record?.value === 'labeled' || record?.value === 'flat'
+    ? record.value
+    : 'hierarchical';
+}
+
+export async function setGroupingMode(mode: GroupingMode): Promise<void> {
+  await db.settings.put({ key: 'groupingMode', value: mode });
+}
+
+export function getCollapsedGroups(): Set<string> {
+  try {
+    const stored = localStorage.getItem(COLLAPSED_GROUPS_KEY);
+    if (!stored) return new Set();
+    const value: unknown = JSON.parse(stored);
+    return Array.isArray(value)
+      ? new Set(value.filter((groupId): groupId is string => typeof groupId === 'string'))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export function setCollapsedGroups(groupIds: Set<string>): void {
+  try {
+    localStorage.setItem(COLLAPSED_GROUPS_KEY, JSON.stringify([...groupIds]));
+  } catch {
+    // Collapsed sections are a convenience and should not block dashboard use.
+  }
+}
 
 export async function getSidebarCollapsed(): Promise<boolean> {
   const record = await db.settings.get('sidebarCollapsed');

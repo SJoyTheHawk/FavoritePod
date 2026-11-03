@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 import manifest from './public/manifest.json';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
-const devPort = 5173;
+const devPort = Number(process.env.FAVORITEPOD_DEV_PORT || 5173);
 const liveReload = true;
 
 export default defineConfig({

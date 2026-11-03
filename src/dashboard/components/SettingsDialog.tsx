@@ -11,17 +11,19 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { normalizePathOverrides, type PathOverride } from '../../core/file-links';
-import type { LibraryView, OpenBehavior } from '../../core/storage';
+import type { GroupingMode, LibraryView, OpenBehavior } from '../../core/storage';
 import type { ArchiveDialogMode } from './ImportExportDialog';
 
 interface SettingsDialogProps {
   defaultView: LibraryView;
+  groupingMode: GroupingMode;
   showPreview: boolean;
   openBehavior: OpenBehavior;
   homePageAvailable: boolean;
   pathOverrides: PathOverride[];
   onClose: () => void;
   onSaveDefaultView: (view: LibraryView) => Promise<void>;
+  onSaveGroupingMode: (mode: GroupingMode) => Promise<void>;
   onSaveShowPreview: (showPreview: boolean) => Promise<void>;
   onSaveOpenBehavior: (behavior: OpenBehavior) => Promise<void>;
   onSavePathOverrides: (overrides: PathOverride[]) => Promise<void>;
@@ -30,12 +32,14 @@ interface SettingsDialogProps {
 
 export function SettingsDialog({
   defaultView,
+  groupingMode,
   showPreview,
   openBehavior,
   homePageAvailable,
   pathOverrides,
   onClose,
   onSaveDefaultView,
+  onSaveGroupingMode,
   onSaveShowPreview,
   onSaveOpenBehavior,
   onSavePathOverrides,
@@ -57,6 +61,15 @@ export function SettingsDialog({
     setError(undefined);
     try {
       await onSaveShowPreview(value);
+    } catch {
+      setError('Could not save this preference.');
+    }
+  };
+
+  const saveGroupingMode = async (mode: GroupingMode) => {
+    setError(undefined);
+    try {
+      await onSaveGroupingMode(mode);
     } catch {
       setError('Could not save this preference.');
     }
@@ -146,6 +159,39 @@ export function SettingsDialog({
                 </label>
               ))}
             </div>
+          </fieldset>
+
+          <fieldset className="mt-6">
+            <legend className="text-sm font-medium text-text-primary">
+              Favorites grouping
+            </legend>
+            <div className="mt-2 grid gap-1">
+              {(
+                [
+                  { value: 'hierarchical', label: 'Grouped' },
+                  { value: 'labeled', label: 'Flat with labels' },
+                  { value: 'flat', label: 'Flat' },
+                ] as const
+              ).map(({ value, label }) => (
+                <label
+                  className="flex min-h-9 cursor-pointer items-center gap-2 rounded px-2 text-sm text-text-primary hover:bg-surface-hover"
+                  key={value}
+                >
+                  <input
+                    checked={groupingMode === value}
+                    className="h-4 w-4 accent-[var(--color-primary)]"
+                    name="groupingMode"
+                    onChange={() => void saveGroupingMode(value)}
+                    type="radio"
+                    value={value}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-text-tertiary">
+              Applies to All favorites and groups with sub-groups.
+            </p>
           </fieldset>
 
           <fieldset className="mt-6">

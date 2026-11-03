@@ -11,6 +11,8 @@ import {
   deleteItem,
   deleteItems,
   getDefaultView,
+  getCollapsedGroups,
+  getGroupingMode,
   getHomePageGroupId,
   getLastSelectedGroupId,
   getOpenBehavior,
@@ -31,6 +33,8 @@ import {
   restoreItemPositions,
   restoreSnapshot,
   setDefaultView,
+  setCollapsedGroups,
+  setGroupingMode,
   setHomePageGroupId,
   setLastSelectedGroupId,
   setOpenBehavior,
@@ -52,6 +56,42 @@ afterAll(async () => {
 });
 
 describe('local library storage', () => {
+  it('defaults grouping to hierarchical and persists the selected mode', async () => {
+    expect(await getGroupingMode()).toBe('hierarchical');
+    await setGroupingMode('labeled');
+    db.close();
+    await db.open();
+    expect(await getGroupingMode()).toBe('labeled');
+    await db.settings.put({ key: 'groupingMode', value: 'unknown' });
+    expect(await getGroupingMode()).toBe('hierarchical');
+  });
+
+  it('persists collapsed group ids in local storage and ignores malformed data', () => {
+    const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    const values = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    });
+
+    try {
+      expect(getCollapsedGroups()).toEqual(new Set());
+      setCollapsedGroups(new Set(['work', 'personal']));
+      expect(getCollapsedGroups()).toEqual(new Set(['work', 'personal']));
+      values.set('favoritepod:collapsedGroups', '{');
+      expect(getCollapsedGroups()).toEqual(new Set());
+    } finally {
+      if (originalStorage) {
+        Object.defineProperty(globalThis, 'localStorage', originalStorage);
+      } else {
+        Reflect.deleteProperty(globalThis, 'localStorage');
+      }
+    }
+  });
+
   it('persists sidebar collapse state across launcher reopen', async () => {
     expect(await getSidebarCollapsed()).toBe(false);
     await setSidebarCollapsed(true);

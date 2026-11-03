@@ -31,6 +31,7 @@ interface FavoriteCardProps {
   size: BookmarkSize;
   showPreview: boolean;
   pathOverrides: PathOverride[];
+  groupLabel?: string;
   sortOrder?: number;
   isDragging: boolean;
   dragItemIds: string[];
@@ -86,6 +87,7 @@ export function FavoriteCard({
   size,
   showPreview,
   pathOverrides,
+  groupLabel,
   sortOrder,
   isDragging,
   dragItemIds,
@@ -111,6 +113,10 @@ export function FavoriteCard({
   const previewTimer = useRef<number>();
   const previewHideTimer = useRef<number>();
   const [dragSize, setDragSize] = useState<{ width: number; height: number }>();
+  const [dragEntrySize, setDragEntrySize] = useState<{
+    width: number;
+    height: number;
+  }>();
   const cardRef = useRef<HTMLElement>(null);
   const previewTriggerRef = useRef<HTMLButtonElement>(null);
   const dragImageRef = useRef<HTMLElement | null>(null);
@@ -172,7 +178,8 @@ export function FavoriteCard({
     if (!card) return;
     card.inert = isDragging;
 
-    const position = { left: card.offsetLeft, top: card.offsetTop };
+    const entry = card.closest<HTMLElement>('.favorite-entry') ?? card;
+    const position = { left: entry.offsetLeft, top: entry.offsetTop };
     const previous = previousPosition.current;
     previousPosition.current = position;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -294,7 +301,7 @@ export function FavoriteCard({
     <FavoriteFallback item={item} compact={layout === 'list' || size !== 'large'} />
   );
 
-  return (
+  const card = (
     <article
       ref={cardRef}
       data-favorite-id={item.id}
@@ -324,13 +331,16 @@ export function FavoriteCard({
         setHoverPreviewOpen(false);
         if (previewTimer.current) window.clearTimeout(previewTimer.current);
         const { width, height, left, top } = event.currentTarget.getBoundingClientRect();
+        const entry = event.currentTarget.closest<HTMLElement>('.favorite-entry');
+        const entryBounds = entry?.getBoundingClientRect();
         removeDragImage();
         // A live overlay can animate; the native drag image is a static snapshot.
         const dragImage = document.createElement('div');
+        const collection = event.currentTarget.closest('.bookmark-collection');
         const cards = Array.from(
-          event.currentTarget.parentElement!.querySelectorAll<HTMLElement>(
-            '[data-favorite-id]',
-          ),
+          (
+            collection ?? event.currentTarget.parentElement!
+          ).querySelectorAll<HTMLElement>('[data-favorite-id]'),
         );
         dragItemIds.slice(0, 3).forEach((id, index) => {
           const source = cards.find((card) => card.dataset.favoriteId === id);
@@ -395,7 +405,7 @@ export function FavoriteCard({
           pointerEvents: 'none',
           zIndex: '9999',
         });
-        event.currentTarget.parentElement?.appendChild(dragImage);
+        (collection ?? event.currentTarget.parentElement)?.appendChild(dragImage);
         dragImageRef.current = dragImage;
         if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
           dragImage.animate(
@@ -430,6 +440,9 @@ export function FavoriteCard({
           window.removeEventListener('keydown', cancelPreview, true);
         };
         setDragSize({ width, height });
+        if (groupLabel && entryBounds) {
+          setDragEntrySize({ width: entryBounds.width, height: entryBounds.height });
+        }
         setLibraryDragData(event.dataTransfer, { type: 'item', id: item.id });
         const emptyImage = document.createElement('canvas');
         emptyImage.width = emptyImage.height = 1;
@@ -447,21 +460,22 @@ export function FavoriteCard({
         document.body.appendChild(emptyImage);
         nativeDragImageRef.current = emptyImage;
         event.dataTransfer.setDragImage(emptyImage, 0, 0);
-        onDragStart(item.id, height);
+        onDragStart(item.id, entryBounds?.height ?? height);
       }}
       onDragEnd={() => {
         removeDragImage();
         clearLibraryDragData();
         setDragSize(undefined);
+        setDragEntrySize(undefined);
         onDragEnd();
       }}
       data-layout={layout}
       data-size={size}
-      className={`bookmark-card group relative flex min-w-0 self-start overflow-hidden rounded-lg border bg-background transition-shadow duration-200 hover:shadow-md ${selected ? 'border-primary ring-1 ring-primary/40' : 'border-border'}`}
+      className={`bookmark-card group relative flex min-w-0 self-start overflow-hidden rounded-lg border bg-background transition-shadow duration-200 hover:shadow-md ${groupLabel ? 'w-full' : ''} ${selected ? 'border-primary ring-1 ring-primary/40' : 'border-border'}`}
       aria-hidden={isDragging || undefined}
       style={{
-        ...(sortOrder === undefined ? {} : { order: sortOrder }),
-        ...(isDragging
+        ...(!groupLabel && sortOrder !== undefined ? { order: sortOrder } : {}),
+        ...(isDragging && !groupLabel
           ? {
               position: 'absolute',
               left: '-10000px',
@@ -622,5 +636,34 @@ export function FavoriteCard({
         thumbnailUrl={thumbnailUrl}
       />
     </article>
+  );
+
+  if (!groupLabel) return card;
+
+  return (
+    <div
+      className="favorite-entry flex min-w-0 flex-col gap-1"
+      style={{
+        ...(sortOrder === undefined ? {} : { order: sortOrder }),
+        ...(isDragging
+          ? {
+              position: 'absolute' as const,
+              left: '-10000px',
+              top: 0,
+              visibility: 'hidden' as const,
+              width: dragEntrySize?.width,
+              height: dragEntrySize?.height,
+            }
+          : {}),
+      }}
+    >
+      <span
+        className="block max-w-full truncate rounded bg-surface-hover/90 px-2 py-1 text-xs font-medium text-text-secondary"
+        title={groupLabel}
+      >
+        {groupLabel}
+      </span>
+      {card}
+    </div>
   );
 }

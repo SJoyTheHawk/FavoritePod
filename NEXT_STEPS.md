@@ -1,8 +1,8 @@
 # FavoritePod Next Steps
 
-**Status**: Phases 2–7 are implemented as milestones. Phases 4 and 5 closed on 2026-11-03 at the user's request.
+**Status**: Phases 2–7 are implemented as milestones. Phases 4 and 5 closed on 2026-11-03; Phase 7 closed on 2026-11-04 after automated and manual Chrome checks.
 
-**Pending validation**: Manual Chrome checks for loading the unpacked extension, HMR, screenshot capture, favicon persistence, hover previews, local-file access, and ZIP import/export.
+**Pending validation**: Manual Chrome checks for loading the unpacked extension, HMR, screenshot capture, favicon persistence, hover previews, and local-file access.
 
 ## Completed
 
@@ -13,8 +13,8 @@
 - Phase 4: nested groups, direct dragging with placement indicators, group management, bulk actions, and undo/redo
 - Phase 5: two-size thumbnail pipeline, SHA-256 deduplication, fallback cards, hover previews, and saved previews for sites that block embedding
 - Phase 6: local file handling, permission hints, availability states, and per-device path overrides
-- Phase 7: schema-versioned ZIP export/import, group selection, archive validation, three import modes, snapshots, and rollback
-- Latest checks: 73 tests across 9 suites, lint, formatting, type check, and production build passed.
+- Phase 7: schema-versioned ZIP export/import, group selection, archive validation, three import modes, snapshots, rollback, and clean exports without soft-deleted records
+- Latest checks: 76 tests across 9 suites, lint, formatting, type check, and production build passed. Phase 7's manual Chrome checklist was completed on 2026-11-04 per user report; no other browser is included in that acceptance.
 
 ## Next: Verify in Chrome
 
@@ -29,12 +29,12 @@ Chrome Web Store registration is not needed for local testing. To test the curre
 7. Check screenshot capture and opening a `file://` favorite after enabling file URL access for the extension.
 8. Confirm popup updates through HMR while the development server is running.
 9. Export all groups and a selected nested group. Confirm ZIP contents and preview hashes.
-10. Import with copy, update, and replace modes. Confirm the snapshot and malformed-archive handling; follow `docs/phase-7-manual-test.md`.
+10. Import with copy, update, and replace modes. Confirm the snapshot and malformed-archive handling; Phase 7 browser acceptance is recorded in `docs/phase-7-manual-test.md`.
 11. Stop the development server, run `npm run build`, then reload the unpacked extension to check the production build.
 
 The local key is ignored by Git at `.local/favoritepod-local.pem`. Keep a secure backup if the same local extension ID will be needed later.
 
-Record browser-specific results in `docs/PROJECT_OVERVIEW.md` or a dedicated validation note, including the commit, Chrome version, development or production build, steps, and outcome. Phases 2–7 are implementation milestones; browser acceptance remains open. Existing UI captures are visual references, not proof of Chrome API behavior.
+Record browser-specific results in `docs/PROJECT_OVERVIEW.md` or a dedicated validation note, including the commit, Chrome version, development or production build, steps, and outcome. Phase 7 browser acceptance is complete; acceptance for other phases remains open. Existing UI captures are visual references, not proof of Chrome API behavior.
 
 ### Browser Acceptance Checklist
 
@@ -54,7 +54,7 @@ These boxes track checks that still need recorded results, not features that sti
 - [ ] Verify at most five recent favorites appear; dismiss one and confirm it remains in the dashboard and stays dismissed after reopening.
 - [ ] Check search, group filtering, favorite editing/deletion, responsive layouts, and saved default-view preference.
 - [ ] Check file URL access with permission enabled and disabled; record actual behavior and any missing guidance.
-- [ ] Complete ZIP import/export browser checks in `docs/phase-7-manual-test.md`.
+- [x] Complete ZIP import/export browser checks in `docs/phase-7-manual-test.md` (reported complete 2026-11-04).
 - [ ] Repeat the main save/open flows with the production build.
 
 ### Phase 1 Follow-up
@@ -70,7 +70,7 @@ The original Phase 1.2 list also includes Drive authentication and upload/downlo
 
 ## After Browser Validation
 
-Phases 4 and 5 (Thumbnail System) are closed. Record browser acceptance using the phase 4-7 checklists, including [phase-6-manual-test.md](docs/phase-6-manual-test.md) and [phase-7-manual-test.md](docs/phase-7-manual-test.md). Phase 7 implementation is complete; Google Drive Sync is the next planned implementation phase.
+Phases 4 and 5 (Thumbnail System) closed on 2026-11-03. Phase 7 closed on 2026-11-04 after automated checks and user-reported manual validation in Chrome. Browser acceptance for other phases remains open in their checklists. Google Drive Sync is the next planned implementation phase.
 
 Nested groups are implemented under the user-approved Phase 4 scope, superseding earlier flat-group-only guidance. Drive sync remains deferred. Long group-path shortening is deferred at the user's request; retain full paths with » separators. Use numbered phase sections for task references; the historical revised-timeline table uses different numbering.
 
@@ -86,7 +86,7 @@ Work on one agreed subphase at a time. Finish its implementation, checks, docume
 | Local-file support      | Implementation complete                  | Validate permissions/opening in Chrome                                       |
 | Phase 4 organization    | Closed on 2026-11-03                      | Record browser acceptance; long-path display changes deferred                    |
 | Phase 5 thumbnails      | Closed on 2026-11-03                      | Record browser acceptance for capture and previews                                |
-| Portability             | Implementation complete                  | Validate ZIP export/import and round-trip behavior in Chrome                   |
+| Portability             | Closed on 2026-11-04                     | Phase 7 browser checks completed; Chrome version/build not recorded             |
 | Polish                  | Planned                                   | Theme preferences, accessibility/error-state review, and release testing         |
 | Public release          | Deferred by user decision                 | Evaluate extension readiness before Store registration and submission            |
 

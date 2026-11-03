@@ -21,12 +21,13 @@ FavoritePod/
 ```
 
 **Current status**: Phases 2–7 are implemented. Phases 4 and 5 closed on
-2026-11-03 at the user's request. Automated tests, lint, type check, formatting,
-and production build pass. Manual Chrome checks remain open for drag-and-drop,
-keyboard navigation, screenshot capture, thumbnail previews, local-file opening,
-and ZIP import/export; see `docs/phase-4-manual-test.md`,
-`docs/phase-5-manual-test.md`, `docs/phase-6-manual-test.md`, and
-`docs/phase-7-manual-test.md`.
+2026-11-03; Phase 7 closed on 2026-11-04 after automated checks and
+user-reported manual Chrome checks. No other browser is included in that
+acceptance.
+Automated tests, lint, type check, formatting, and production build pass. Manual
+Chrome checks remain open for drag-and-drop, keyboard navigation, screenshot
+capture, thumbnail previews, and local-file opening; see the phase 4-6 manual
+test checklists.
 
 ## UI Captures
 

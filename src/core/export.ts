@@ -11,7 +11,7 @@ import { db } from './db';
 import { getDeviceId } from './storage';
 import type { Group, Item } from './types';
 import { hashBlob } from './thumbnail';
-import { isGroupDeleted } from './merge';
+import { isGroupDeleted, isItemDeleted } from './merge';
 
 export interface ExportOptions {
   groupIds?: readonly string[];
@@ -84,7 +84,20 @@ export async function exportToZip(options: ExportOptions = {}): Promise<Blob> {
     db.groups.toArray(),
     db.items.toArray(),
   ]);
-  const selected = selectExportRecords(allGroups, allItems, options.groupIds);
+  const activeGroups = new Map(
+    allGroups.filter((group) => !isGroupDeleted(group)).map((group) => [group.id, group]),
+  );
+  const exportableGroups = [...activeGroups.values()].map((group) =>
+    group.parentId && !activeGroups.has(group.parentId)
+      ? { ...group, parentId: null }
+      : group,
+  );
+  const exportableItems = allItems.filter((item) => !isItemDeleted(item));
+  const selected = selectExportRecords(
+    exportableGroups,
+    exportableItems,
+    options.groupIds,
+  );
   const groups = selected.groups;
   const items = selected.items;
   if (groups.length > MAX_RECORDS || items.length > MAX_RECORDS)

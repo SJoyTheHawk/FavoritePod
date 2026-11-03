@@ -5,11 +5,11 @@
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
 **Current status**: Phases 2-7 are implemented and covered by automated checks.
-Phases 4 and 5 closed on 2026-11-03 at the user's request. Manual Chrome
-validation for extension loading, HMR, screenshots, nested drag-and-drop,
-keyboard navigation, thumbnail previews, `file://` access, and ZIP
-import/export remains open; see `NEXT_STEPS.md` and the phase 4-7 manual test
-checklists.
+Phases 4 and 5 closed on 2026-11-03; Phase 7 closed on 2026-11-04 after
+automated and user-reported manual Chrome validation. Manual Chrome validation
+for extension loading, HMR, screenshots, nested drag-and-drop, keyboard
+navigation, thumbnail previews, and `file://` access remains open; see
+`NEXT_STEPS.md` and the phase 4-6 manual test checklists.
 
 ## Architecture Overview
 
@@ -479,8 +479,9 @@ navigation behavior remain for the manual acceptance steps in
 
 ## Phase 7: Import/Export (Week 8-9)
 
-Implementation complete; manual Chrome acceptance remains open in
-`docs/phase-7-manual-test.md`.
+Closed on 2026-11-04 as an implementation milestone after automated checks and
+user-reported manual acceptance in Chrome. Closure does not claim acceptance in
+other browsers or close browser acceptance for other phases.
 
 ### 7.1 ZIP Export
 **Goal**: Share libraries with colleagues
@@ -525,6 +526,10 @@ interface LauncherExport {
   - [x] Replace (with snapshot)
 - [x] Show progress during import
 - [x] Rollback on error
+
+**Export behavior**: Soft-deleted groups and favorites are omitted from new
+archives. Deleted records remain in the local database for the later cleanup
+phase.
 
 **Validation Rules**:
 - Max archive size: 100 MB

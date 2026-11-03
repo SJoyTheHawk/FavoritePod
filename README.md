@@ -8,9 +8,9 @@ A Chrome extension for organizing favorite web pages and local HTML tools in a v
 
 ## 🎯 Project Status
 
-**Current status**: Phases 2–7 are implemented. Phases 4 and 5 closed on November 3, 2026 at the user's request.
+**Current status**: Phases 2–7 are implemented. Phases 4 and 5 closed on November 3, 2026; Phase 7 closed on November 4, 2026 after automated and manual Chrome checks.
 
-**Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, hover previews, `file://` access, and ZIP import/export.
+**Pending validation**: Manual Chrome checks for extension loading, HMR, screenshot capture, favicon persistence, hover previews, and `file://` access.
 
 **Target**: v1.0 (Simplified scope with file:// priority)
 
@@ -51,6 +51,7 @@ Start with [NEXT_STEPS.md](NEXT_STEPS.md) for the validation checklist, developm
 ### Phase 7: ZIP Import/Export
 
 - Export all groups or selected group trees with preview images
+- Omit soft-deleted groups and favorites from new archives
 - Validate ZIP contents and preview imports before writing
 - Merge as copy, update matching IDs, or replace after saving a snapshot
 
@@ -59,7 +60,7 @@ Start with [NEXT_STEPS.md](NEXT_STEPS.md) for the validation checklist, developm
 - Theme preferences and accessibility polish
 - Google Drive sync (Phase 8)
 
-Manual browser acceptance remains tracked in the [Phase 4](docs/phase-4-manual-test.md), [Phase 5](docs/phase-5-manual-test.md), [Phase 6](docs/phase-6-manual-test.md), and [Phase 7](docs/phase-7-manual-test.md) checklists.
+Manual browser acceptance remains tracked in the [Phase 4](docs/phase-4-manual-test.md), [Phase 5](docs/phase-5-manual-test.md), and [Phase 6](docs/phase-6-manual-test.md) checklists. Phase 7 acceptance is recorded in the [Phase 7 checklist](docs/phase-7-manual-test.md).
 
 ## Interface Preview
 

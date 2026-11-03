@@ -5,12 +5,14 @@ import { createHLC, tickHLC } from '../hlc';
 import {
   createGroup,
   createItem,
+  deleteGroup,
+  deleteItem,
   listGroups,
   listItems,
   listSnapshots,
 } from '../storage';
 import { exportToZip } from '../export';
-import { importArchive, parseImportFile } from '../import';
+import { getImportImpact, importArchive, parseImportFile } from '../import';
 import { hashBlob } from '../thumbnail';
 import type { ExportDataV1, ImportArchive } from '../archive';
 import type { Group, Item } from '../types';
@@ -65,6 +67,22 @@ function asImportArchive(data: ExportDataV1, filename = 'library.zip'): ImportAr
 }
 
 describe('FavoritePod ZIP archives', () => {
+  it('reports an archive without launcher.json as invalid before unsupported entries', async () => {
+    const file = new File(
+      [
+        zipSync({
+          'favoritepod-2026-11-03/previews/._preview.jpg': new Uint8Array([1]),
+        }),
+      ],
+      'missing-manifest.zip',
+      { type: 'application/zip' },
+    );
+
+    await expect(parseImportFile(file)).rejects.toThrow(
+      'Invalid FavoritePod archive: missing launcher.json.',
+    );
+  });
+
   it('exports selected group contents with ancestor structure and preview bytes', async () => {
     const parent = await createGroup({ title: 'Work' });
     const child = await createGroup({ title: 'Tools', parentId: parent.id });
@@ -91,6 +109,32 @@ describe('FavoritePod ZIP archives', () => {
       new Uint8Array(await preview.arrayBuffer()),
     );
     expect(data.schemaVersion).toBe(1);
+  });
+
+  it('excludes deleted groups and favorites from exports', async () => {
+    const activeGroup = await createGroup({ title: 'Active' });
+    const activeItem = await createItem({
+      url: 'https://active.example',
+      groupId: activeGroup.id,
+    });
+    const deletedGroup = await createGroup({ title: 'Deleted' });
+    const deletedItem = await createItem({
+      url: 'https://deleted.example',
+      groupId: deletedGroup.id,
+    });
+    await deleteItem(deletedItem.id);
+    await deleteGroup(deletedGroup.id);
+
+    const blob = await exportToZip();
+    const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const data = JSON.parse(
+      new TextDecoder().decode(files['launcher.json']),
+    ) as ExportDataV1;
+
+    expect(data.groups.map((group) => group.id)).toEqual([activeGroup.id]);
+    expect(data.items.map((item) => item.id)).toEqual([activeItem.id]);
+    expect(data.groups.every((group) => !group.deleted)).toBe(true);
+    expect(data.items.every((item) => !item.deleted)).toBe(true);
   });
 
   it('rejects unsafe URLs before presenting an import preview', async () => {
@@ -226,6 +270,19 @@ describe('FavoritePod ZIP archives', () => {
       },
     };
 
+    const impact = getImportImpact(
+      asImportArchive(exportData([updatedGroup], [updatedItem])),
+      'update',
+      await listGroups(),
+      await listItems(),
+    );
+    expect(impact.groupsToReplace.map(({ current }) => current.id)).toEqual([
+      sourceGroup.id,
+    ]);
+    expect(impact.itemsToReplace.map(({ current }) => current.id)).toEqual([
+      sourceItem.id,
+    ]);
+
     await importArchive(
       asImportArchive(exportData([updatedGroup], [updatedItem])),
       'update',
@@ -252,6 +309,18 @@ describe('FavoritePod ZIP archives', () => {
       groupId: replacementGroup.id,
     });
     const archive = asImportArchive(exportData([replacementGroup], [replacementItem]));
+    const impact = getImportImpact(
+      archive,
+      'replace',
+      await listGroups(),
+      await listItems(),
+    );
+    expect(impact.groupsToRemove.map((group) => group.id).sort()).toEqual(
+      [originalGroup.id, replacementGroup.id].sort(),
+    );
+    expect(impact.itemsToRemove.map((item) => item.id).sort()).toEqual(
+      [originalItem.id, replacementItem.id].sort(),
+    );
 
     await importArchive(archive, 'replace');
     expect((await listItems()).map((item) => item.id)).toEqual([replacementItem.id]);

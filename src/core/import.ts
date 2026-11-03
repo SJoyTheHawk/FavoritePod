@@ -26,6 +26,80 @@ const MAX_IMAGE_DIMENSION = 8192;
 const MAX_IMAGE_PIXELS = 40_000_000;
 const BATCH_SIZE = 100;
 
+export interface ImportImpact {
+  groupsToReplace: Array<{ current: Group; incoming: Group }>;
+  itemsToReplace: Array<{ current: Item; incoming: Item }>;
+  groupsToRemove: Group[];
+  itemsToRemove: Item[];
+}
+
+export function getImportImpact(
+  archive: ImportArchive,
+  mode: ImportMode,
+  currentGroups: Group[],
+  currentItems: Item[],
+): ImportImpact {
+  if (mode === 'copy')
+    return {
+      groupsToReplace: [],
+      itemsToReplace: [],
+      groupsToRemove: [],
+      itemsToRemove: [],
+    };
+
+  if (mode === 'replace')
+    return {
+      groupsToReplace: [],
+      itemsToReplace: [],
+      groupsToRemove: currentGroups,
+      itemsToRemove: currentItems,
+    };
+
+  const incomingGroups = new Map(archive.data.groups.map((group) => [group.id, group]));
+  const incomingItems = new Map(archive.data.items.map((item) => [item.id, item]));
+  return {
+    groupsToReplace: currentGroups.flatMap((current) => {
+      const incoming = incomingGroups.get(current.id);
+      if (
+        !incoming ||
+        (current.parentId === incoming.parentId &&
+          current.orderKey === incoming.orderKey &&
+          current.title === incoming.title &&
+          current.deleted === incoming.deleted &&
+          Object.keys(current.clock).every(
+            (field) =>
+              current.clock[field as keyof Group['clock']] ===
+              incoming.clock[field as keyof Group['clock']],
+          ))
+      )
+        return [];
+      return [{ current, incoming }];
+    }),
+    itemsToReplace: currentItems.flatMap((current) => {
+      const incoming = incomingItems.get(current.id);
+      if (
+        !incoming ||
+        (current.groupId === incoming.groupId &&
+          current.orderKey === incoming.orderKey &&
+          current.url === incoming.url &&
+          current.title === incoming.title &&
+          current.previewHash === incoming.previewHash &&
+          current.faviconUrl === incoming.faviconUrl &&
+          current.deleted === incoming.deleted &&
+          Object.keys(current.clock).every(
+            (field) =>
+              current.clock[field as keyof Item['clock']] ===
+              incoming.clock[field as keyof Item['clock']],
+          ))
+      )
+        return [];
+      return [{ current, incoming }];
+    }),
+    groupsToRemove: [],
+    itemsToRemove: [],
+  };
+}
+
 function assertSafeFavicon(value: string | undefined): void {
   if (!value) return;
   if (/^data:image\/(?:png|jpeg|gif|webp);base64,/i.test(value)) return;
@@ -129,10 +203,12 @@ export async function parseImportFile(
       return !invalidEntry;
     },
   });
+  if (!manifestCount)
+    throw new Error('Invalid FavoritePod archive: missing launcher.json.');
   if (invalidEntry) throw new Error(invalidEntry);
 
   const manifest = unzipped['launcher.json'];
-  if (!manifest) throw new Error('Missing launcher.json in ZIP.');
+  if (!manifest) throw new Error('Invalid FavoritePod archive: missing launcher.json.');
   let rawData: unknown;
   try {
     rawData = JSON.parse(strFromU8(manifest));

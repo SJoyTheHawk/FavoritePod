@@ -1495,6 +1495,7 @@ export function DashboardApp() {
         <ImportExportDialog
           key={archiveDialog}
           groups={groups}
+          items={items}
           mode={archiveDialog}
           onClose={() => setArchiveDialog(null)}
           onImported={completeImport}

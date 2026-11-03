@@ -17,7 +17,7 @@
 ```
 favoritepod/
 ├── src/
-│   ├── popup/                    # Toolbar popup (320x480px)
+│   ├── popup/                    # Toolbar popup (320px wide, content height)
 │   │   ├── PopupApp.tsx          # Main popup component
 │   │   ├── popup.html            # Popup HTML entry
 │   │   ├── popup.tsx             # React mount point

@@ -924,12 +924,11 @@ xl: 1280px  /* Desktops */
 </div>
 ```
 
-### Popup Fixed Size
+### Popup Size
 
 ```tsx
-// Popup should always be 320x480
-// Don't make it responsive (browser enforces popup size)
-<div className="w-80 h-[480px] bg-background">
+// Keep the popup width fixed and let it fit its content vertically
+<div className="w-80 bg-background">
   {/* Popup content */}
 </div>
 ```

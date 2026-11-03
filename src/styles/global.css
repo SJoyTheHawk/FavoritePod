@@ -24,6 +24,10 @@ body {
   color: var(--color-text-primary);
 }
 
+body.popup-page {
+  min-height: 0;
+}
+
 button,
 input {
   font: inherit;

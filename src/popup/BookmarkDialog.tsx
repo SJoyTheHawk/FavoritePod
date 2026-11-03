@@ -181,7 +181,7 @@ export function BookmarkDialog({
     <Dialog className="relative z-50" onClose={onClose} open>
       <DialogBackdrop className="fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center p-3">
-        <DialogPanel className="flex max-h-[calc(100vh-24px)] w-full max-w-72 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
+        <DialogPanel className="flex max-h-[calc(100vh-24px)] w-full min-w-0 max-w-72 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
           <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
             <DialogTitle className="text-sm font-semibold text-text-primary">
               Add bookmark
@@ -249,20 +249,20 @@ export function BookmarkDialog({
                   </div>
                 </div>
 
-                <label className="grid shrink-0 gap-1 text-xs font-medium text-text-secondary">
+                <label className="grid min-w-0 shrink-0 gap-1 text-xs font-medium text-text-secondary">
                   Name
                   <input
                     autoFocus
-                    className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-sm font-normal text-text-primary outline-none transition focus:border-primary"
+                    className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2.5 text-sm font-normal text-text-primary outline-none transition focus:border-primary"
                     onChange={(event) => setName(event.target.value)}
                     value={name}
                   />
                 </label>
 
-                <label className="grid shrink-0 gap-1 text-xs font-medium text-text-secondary">
+                <label className="grid min-w-0 shrink-0 gap-1 text-xs font-medium text-text-secondary">
                   Folder
                   <select
-                    className="h-9 min-w-0 rounded-md border border-border bg-background px-2.5 text-sm font-normal text-text-primary outline-none transition focus:border-primary disabled:opacity-60"
+                    className="h-9 w-full min-w-0 max-w-full truncate rounded-md border border-border bg-background px-2.5 text-sm font-normal text-text-primary outline-none transition focus:border-primary disabled:opacity-60"
                     disabled={groups.length === 0}
                     onChange={(event) => setGroupId(event.target.value)}
                     value={groupId}
@@ -279,7 +279,7 @@ export function BookmarkDialog({
                   <p className="text-xs text-text-tertiary">Page preview unavailable.</p>
                 )}
                 {error && (
-                  <p className="text-xs text-danger" role="alert">
+                  <p className="min-w-0 break-words text-xs text-danger" role="alert">
                     {error}
                   </p>
                 )}
@@ -330,7 +330,7 @@ export function BookmarkDialog({
               ) : (
                 <>
                   <p className="text-sm font-medium">Could not add this page.</p>
-                  <p className="text-xs text-danger" role="alert">
+                  <p className="max-w-full break-words text-xs text-danger" role="alert">
                     {error}
                   </p>
                   <button

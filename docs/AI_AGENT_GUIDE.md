@@ -240,7 +240,7 @@ When implementing a feature, provide a manual test checklist:
 
 ### Test Steps
 1. Click extension icon in toolbar
-2. Popup should open (320x480px)
+2. Popup should fit the recent pages without scrolling
 3. Confirm the popup home screen shows "Add bookmark" and recent pages
 4. Click "Add bookmark"
 5. The review dialog should add the current page and show its preview

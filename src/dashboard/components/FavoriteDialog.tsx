@@ -126,13 +126,16 @@ export function FavoriteDialog({
     <Dialog className="relative z-50" onClose={onClose} open>
       <DialogBackdrop className="fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="w-full max-w-md rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6">
+        <DialogPanel className="w-full min-w-0 max-w-md overflow-x-hidden rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6">
           <DialogTitle className="text-lg font-semibold text-text-primary">
             {item ? 'Edit favorite' : 'Add favorite'}
           </DialogTitle>
-          <form className="mt-5 grid gap-4" onSubmit={(event) => void submit(event)}>
+          <form
+            className="mt-5 grid min-w-0 gap-4"
+            onSubmit={(event) => void submit(event)}
+          >
             {item && (
-              <div className="grid gap-2">
+              <div className="grid min-w-0 gap-2">
                 <div className="aspect-[16/7] overflow-hidden rounded-md border border-border bg-surface">
                   {thumbnailUrl ? (
                     <img
@@ -182,21 +185,21 @@ export function FavoriteDialog({
                 </button>
               </div>
             )}
-            <label className="grid gap-1.5 text-sm font-medium text-text-primary">
+            <label className="grid min-w-0 gap-1.5 text-sm font-medium text-text-primary">
               Title
               <input
                 autoFocus={!item}
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary"
+                className="h-10 w-full min-w-0 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary"
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Favorite title"
                 value={title}
               />
             </label>
-            <label className="grid gap-1.5 text-sm font-medium text-text-primary">
+            <label className="grid min-w-0 gap-1.5 text-sm font-medium text-text-primary">
               Web or file address
               <input
                 autoComplete="url"
-                className="h-10 rounded-md border border-border bg-background px-3 font-mono text-xs font-normal outline-none transition focus:border-primary"
+                className="h-10 w-full min-w-0 rounded-md border border-border bg-background px-3 font-mono text-xs font-normal outline-none transition focus:border-primary"
                 onChange={(event) => setUrl(event.target.value)}
                 placeholder="https://example.com or file:///…"
                 required
@@ -205,10 +208,10 @@ export function FavoriteDialog({
               />
             </label>
             {!item && (
-              <label className="grid gap-1.5 text-sm font-medium text-text-primary">
+              <label className="grid min-w-0 gap-1.5 text-sm font-medium text-text-primary">
                 Group
                 <select
-                  className="h-10 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary"
+                  className="h-10 w-full min-w-0 truncate rounded-md border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary"
                   onChange={(event) => setGroupId(event.target.value)}
                   value={groupId}
                 >
@@ -222,11 +225,11 @@ export function FavoriteDialog({
               </label>
             )}
             {error && (
-              <p className="text-sm text-danger" role="alert">
+              <p className="min-w-0 break-words text-sm text-danger" role="alert">
                 {error}
               </p>
             )}
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+            <div className="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-2">
               {item && onDelete ? (
                 <button
                   className="inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-sm font-medium text-danger transition hover:bg-danger-light disabled:opacity-50"
@@ -240,7 +243,7 @@ export function FavoriteDialog({
               ) : (
                 <span />
               )}
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap justify-end gap-2">
                 <button
                   className="min-h-10 rounded-md border border-border px-4 text-sm font-medium text-text-primary transition hover:bg-surface-hover"
                   onClick={onClose}

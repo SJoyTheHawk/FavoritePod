@@ -82,17 +82,14 @@ export function PopupApp() {
   };
 
   return (
-    <main className="flex h-[480px] w-80 flex-col overflow-hidden bg-background text-text-primary">
+    <main className="flex h-fit w-80 flex-col bg-background text-text-primary">
       <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
-        <picture className="block h-8 w-8 shrink-0">
-          <source srcSet="/icons/icon_dark.jpg" media="(prefers-color-scheme: dark)" />
-          <img
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full rounded-md object-cover"
-            src="/icons/icon_light.jpg"
-          />
-        </picture>
+        <img
+          alt=""
+          aria-hidden="true"
+          className="h-8 w-8 rounded-md object-cover"
+          src="/icons/icon_light.jpg"
+        />
         <h1 className="text-sm font-semibold">FavoritePod</h1>
       </header>
 
@@ -113,7 +110,7 @@ export function PopupApp() {
         )}
       </section>
 
-      <section className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <section className="shrink-0 px-4 py-3">
         <div className="mb-2 flex h-5 items-center justify-between">
           <h2 className="text-xs font-semibold uppercase text-text-tertiary">
             Recent pages (up to 5)
@@ -128,9 +125,9 @@ export function PopupApp() {
               const isLocal = parseSafeUrl(item.url)?.protocol === 'file:';
               return (
                 <li key={item.id}>
-                  <div className="flex min-h-12 items-center gap-2">
+                  <div className="flex min-h-10 items-center gap-2">
                     <button
-                      className="flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left transition hover:bg-surface-hover"
+                      className="flex min-w-0 flex-1 items-center gap-3 py-0.5 text-left transition hover:bg-surface-hover"
                       onClick={() => void openItem(item.url)}
                       type="button"
                     >

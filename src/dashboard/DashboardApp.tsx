@@ -997,15 +997,12 @@ export function DashboardApp() {
     <main className="min-h-screen bg-background text-text-primary">
       <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 sm:px-7">
         <div className="flex items-center gap-3">
-          <picture className="block h-9 w-9 shrink-0">
-            <source srcSet="/icons/icon_dark.jpg" media="(prefers-color-scheme: dark)" />
-            <img
-              alt=""
-              aria-hidden="true"
-              className="h-full w-full rounded-lg object-cover"
-              src="/icons/icon_light.jpg"
-            />
-          </picture>
+          <img
+            alt=""
+            aria-hidden="true"
+            className="h-9 w-9 rounded-lg object-cover"
+            src="/icons/icon_light.jpg"
+          />
           <span className="text-lg font-semibold">FavoritePod</span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">

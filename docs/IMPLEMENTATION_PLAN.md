@@ -629,8 +629,8 @@ interface DriveDeviceState {
 - Listing is paginated and downloads skip files with cached matching `modifiedTime`
 
 Automated verification: `npm test -- --run src/core/__tests__/drive-files.test.ts`.
-Chrome end-to-end verification is deferred until Phase 8.4 adds a sync trigger; the
-current phase has no user-facing action that invokes these file operations.
+Chrome end-to-end verification now uses the manual multi-profile flow in
+[Phase 8.4 manual verification](phase-8.4-manual-test.md).
 
 ### 8.3 Asset Sync
 **Goal**: Deduplicated thumbnail sync
@@ -662,22 +662,21 @@ be safely downloaded and verified. Uploads use the existing 5 MB image limit.
 - Quota failures explain that Drive storage is full
 
 Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-assets.test.ts`.
-Chrome end-to-end verification is deferred until Phase 8.4 adds a sync trigger;
-this phase provides the tested asset operations and progress callbacks, but no
-user-facing action invokes them yet.
+Chrome end-to-end verification now uses the manual multi-profile flow in
+[Phase 8.4 manual verification](phase-8.4-manual-test.md).
 
 ### 8.4 Sync Engine & Merge
 **Goal**: Conflict-free multi-device sync
 
 **Tasks**:
-- [ ] Implement sync lock (navigator.locks)
-- [ ] Build sync orchestrator (download → merge → upload)
-- [ ] Implement per-field merge with HLC
-- [ ] Add group cycle detection and repair
-- [ ] Handle tombstone propagation
-- [ ] Implement first-connect flow (merge/replace options)
-- [ ] Add account-switch confirmation
-- [ ] Build sync retry with exponential backoff
+- [x] Implement sync lock (navigator.locks)
+- [x] Build sync orchestrator (download → merge → upload)
+- [x] Implement per-field merge with HLC
+- [x] Add group cycle detection and repair
+- [x] Handle tombstone propagation
+- [x] Implement first-connect flow (merge/replace options)
+- [x] Add account-switch confirmation (already implemented in Phase 8.1)
+- [x] Build sync retry with exponential backoff
 
 **Sync Triggers**:
 - On dashboard open
@@ -708,6 +707,20 @@ user-facing action invokes them yet.
 - Deletions propagate
 - Cycles are repaired
 - Offline changes sync when online
+
+**Implementation notes**:
+- The existing field-clock merge and group-tree repair are reused by the sync
+  orchestrator. Downloaded device-file metadata is cached only after its records
+  have been applied locally.
+- Sync, account switching, and disconnect share one browser lock so account
+  credentials and Drive cache records cannot change during a sync.
+- Dashboard changes debounce for 10 seconds. Chrome Manifest V3 alarms have a
+  30-second minimum delay, so a debounced alarm preserves changes after the
+  popup closes; the repeating alarm runs every 15 minutes.
+- See [Phase 8.4 manual verification](phase-8.4-manual-test.md) for the Chrome
+  multi-profile and offline test sequence.
+
+Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-sync.test.ts src/core/__tests__/drive-files.test.ts`, followed by `npm run type-check`, `npm run lint`, and `npm run build`.
 
 ### 8.5 Error Handling & UI
 **Goal**: Clear sync status and error messages

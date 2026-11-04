@@ -24,7 +24,7 @@
     "service_worker": "src/background/service-worker.ts",
     "type": "module"
   },
-  "permissions": ["activeTab", "favicon", "unlimitedStorage", "identity"],
+  "permissions": ["activeTab", "favicon", "unlimitedStorage", "identity", "alarms"],
   "host_permissions": [
     "file:///*",
     "https://www.googleapis.com/*",

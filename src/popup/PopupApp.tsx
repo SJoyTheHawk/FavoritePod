@@ -11,6 +11,9 @@ import { getUrlLabel, parseSafeUrl } from '../core/validation';
 import { FILE_ACCESS_DENIED, openSavedUrl } from '../core/file-links';
 import { BookmarkDialog } from './BookmarkDialog';
 import { FaviconImage } from '../components/FaviconImage';
+import { installDriveSyncChangeHooks } from '../core/drive-sync-triggers';
+
+installDriveSyncChangeHooks();
 
 export function PopupApp() {
   const { groups, items, loading: libraryLoading, error: libraryError } = useLibrary();

@@ -51,7 +51,10 @@ export interface CompactDriveAssetsResult {
 }
 
 export class DriveAssetError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly retryable = false,
+  ) {
     super(message);
     this.name = 'DriveAssetError';
   }
@@ -141,6 +144,22 @@ async function ensureDriveAssetSuccess(
   if (response.status === 429 || response.status >= 500) {
     throw new DriveAssetError(
       `Google Drive is temporarily unavailable while trying to ${action}.`,
+      true,
+    );
+  }
+  if (response.status >= 400 && response.status < 500) {
+    let detail = '';
+    try {
+      const payload: unknown = await response.clone().json();
+      const error = (payload as { error?: { message?: unknown } })?.error;
+      if (typeof error?.message === 'string' && error.message) {
+        detail = `: ${error.message}`;
+      }
+    } catch {
+      // Keep the status-based message when Drive does not return JSON details.
+    }
+    throw new DriveAssetError(
+      `Could not ${action} (Google Drive HTTP ${response.status})${detail}.`,
     );
   }
   throw new DriveAssetError(
@@ -187,7 +206,10 @@ export async function listDriveAssets(): Promise<DriveAssetMetadata[]> {
     try {
       response = await driveFetch(url);
     } catch {
-      throw new DriveAssetError('Could not reach Google Drive to list preview files.');
+      throw new DriveAssetError(
+        'Could not reach Google Drive to list preview files.',
+        true,
+      );
     }
     await ensureDriveAssetSuccess(response, 'list preview files');
 
@@ -260,19 +282,22 @@ async function uploadAsset(
     mimeType: 'image/jpeg',
     parents: ['appDataFolder'],
   };
-  const prefix = [
-    `--${boundary}`,
-    'Content-Type: application/json; charset=UTF-8',
-    '',
-    JSON.stringify(metadata),
-    `--${boundary}`,
-    'Content-Type: image/jpeg',
-    '',
-  ].join('\r\n');
-  const suffix = `\r\n--${boundary}--\r\n`;
-  const body = new Blob([prefix, thumbnail.blob, suffix], {
-    type: `multipart/related; boundary=${boundary}`,
-  });
+  const delimiter = `\r\n--${boundary}\r\n`;
+  const closeDelimiter = `\r\n--${boundary}--`;
+  const body = new Blob(
+    [
+      `--${boundary}\r\n`,
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+      JSON.stringify(metadata),
+      delimiter,
+      'Content-Type: image/jpeg\r\n\r\n',
+      thumbnail.blob,
+      closeDelimiter,
+    ],
+    {
+      type: `multipart/related; boundary=${boundary}`,
+    },
+  );
   const url = new URL('/upload/drive/v3/files', DRIVE_API);
   url.searchParams.set('uploadType', 'multipart');
   url.searchParams.set('fields', 'id,name,modifiedTime,mimeType,size');
@@ -281,7 +306,7 @@ async function uploadAsset(
   try {
     response = await driveFetch(url, { method: 'POST', body });
   } catch {
-    throw new DriveAssetError('Could not upload the preview to Google Drive.');
+    throw new DriveAssetError('Could not upload the preview to Google Drive.', true);
   }
   await ensureDriveAssetSuccess(response, 'upload preview');
 
@@ -371,6 +396,7 @@ async function downloadAsset(metadata: DriveAssetMetadata): Promise<Thumbnail> {
   } catch {
     throw new DriveAssetError(
       `Could not download preview ${metadata.hash} from Google Drive.`,
+      true,
     );
   }
   await ensureDriveAssetSuccess(response, 'download preview');
@@ -385,6 +411,7 @@ async function downloadAsset(metadata: DriveAssetMetadata): Promise<Thumbnail> {
   } catch {
     throw new DriveAssetError(
       `Google Drive returned unreadable bytes for preview ${metadata.hash}.`,
+      true,
     );
   }
   if (data.byteLength > MAX_IMAGE_SIZE) {
@@ -520,6 +547,7 @@ export async function compactOrphanDriveAssets(
     } catch {
       throw new DriveAssetError(
         `Could not reach Google Drive to delete orphan preview ${candidate.hash}.`,
+        true,
       );
     }
     if (response.status !== 404) {

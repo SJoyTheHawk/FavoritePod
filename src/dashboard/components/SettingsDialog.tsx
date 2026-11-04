@@ -25,6 +25,9 @@ interface SettingsDialogProps {
   showPreview: boolean;
   openBehavior: OpenBehavior;
   driveAccount: DriveAccount | null;
+  driveSyncing: boolean;
+  driveSyncError?: string;
+  driveSyncMessage?: string;
   homePageAvailable: boolean;
   pathOverrides: PathOverride[];
   onClose: () => void;
@@ -37,6 +40,7 @@ interface SettingsDialogProps {
   onCheckDriveAccount: () => Promise<DriveConnectionResult>;
   onSwitchDriveAccount: (account: DriveAccount) => Promise<void>;
   onDisconnectDrive: () => Promise<DriveDisconnectResult>;
+  onSyncDrive: () => Promise<void>;
   onArchiveAction: (mode: ArchiveDialogMode) => void;
 }
 
@@ -46,6 +50,9 @@ export function SettingsDialog({
   showPreview,
   openBehavior,
   driveAccount,
+  driveSyncing,
+  driveSyncError,
+  driveSyncMessage,
   homePageAvailable,
   pathOverrides,
   onClose,
@@ -58,6 +65,7 @@ export function SettingsDialog({
   onCheckDriveAccount,
   onSwitchDriveAccount,
   onDisconnectDrive,
+  onSyncDrive,
   onArchiveAction,
 }: SettingsDialogProps) {
   const [error, setError] = useState<string>();
@@ -341,9 +349,9 @@ export function SettingsDialog({
               )}
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-              Connect your Google account to authorize FavoritePod. Your library is not
-              syncing yet; when sync is available, data will use Google Drive’s private
-              app folder.
+              {driveAccount
+                ? 'Sync your favorites across devices using Google Drive’s private app folder.'
+                : 'Connect your Google account to sync favorites using Drive’s private app folder.'}
             </p>
             <div className="mt-3 rounded-md border border-border bg-surface px-3 py-3">
               {driveAccount ? (
@@ -357,8 +365,16 @@ export function SettingsDialog({
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
+                      className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
+                      disabled={driveBusy || driveSyncing}
+                      onClick={() => void onSyncDrive()}
+                      type="button"
+                    >
+                      {driveSyncing ? 'Syncing…' : 'Sync now'}
+                    </button>
+                    <button
                       className="min-h-9 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy}
+                      disabled={driveBusy || driveSyncing}
                       onClick={() => void checkOrConnectDrive(true)}
                       type="button"
                     >
@@ -366,7 +382,7 @@ export function SettingsDialog({
                     </button>
                     <button
                       className="min-h-9 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy}
+                      disabled={driveBusy || driveSyncing}
                       onClick={() => void checkOrConnectDrive(false)}
                       type="button"
                     >
@@ -374,7 +390,7 @@ export function SettingsDialog({
                     </button>
                     <button
                       className="min-h-9 rounded-md px-3 text-sm font-medium text-danger transition hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy}
+                      disabled={driveBusy || driveSyncing}
                       onClick={() => {
                         setDriveError(undefined);
                         setConfirmDisconnect(true);
@@ -463,6 +479,16 @@ export function SettingsDialog({
               {driveMessage && (
                 <p className="mt-3 text-sm text-text-secondary" role="status">
                   {driveMessage}
+                </p>
+              )}
+              {driveSyncError && (
+                <p className="mt-3 text-sm text-danger" role="alert">
+                  {driveSyncError}
+                </p>
+              )}
+              {driveSyncMessage && (
+                <p className="mt-3 text-sm text-text-secondary" role="status">
+                  {driveSyncMessage}
                 </p>
               )}
             </div>

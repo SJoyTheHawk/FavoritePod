@@ -73,6 +73,18 @@ import {
   switchGoogleDriveAccount,
   type DriveAccount,
 } from '../core/drive-auth';
+import {
+  DriveSyncChoiceRequired,
+  syncGoogleDrive,
+  type DriveSyncChoice,
+  type DriveSyncPreview,
+  withGoogleDriveSyncLock,
+} from '../core/drive-sync';
+import {
+  DRIVE_LIBRARY_CHANGED_EVENT,
+  DRIVE_LIBRARY_CHANGED_MESSAGE,
+  installDriveSyncChangeHooks,
+} from '../core/drive-sync-triggers';
 import { FavoriteCard } from './components/FavoriteCard';
 import { BookmarkSizeControl } from './components/BookmarkSizeControl';
 import { FavoriteDialog } from './components/FavoriteDialog';
@@ -81,6 +93,7 @@ import { GroupDialog } from './components/GroupDialog';
 import { GroupTree } from './components/GroupTree';
 import { GroupedFavoriteSection } from './components/GroupedFavoriteSection';
 import { SettingsDialog } from './components/SettingsDialog';
+import { DriveSyncChoiceDialog } from './components/DriveSyncChoiceDialog';
 import { ImportExportDialog } from './components/ImportExportDialog';
 import type { ImportMode, ImportResult } from '../core/import';
 import { FileAccessHint } from './components/FileAccessHint';
@@ -95,6 +108,8 @@ import {
 } from './drag';
 import { getGroupLabels } from './group-labels';
 import { getGroupedFavoriteView, getItemsByGroupAndDescendants } from './grouped-view';
+
+installDriveSyncChangeHooks();
 
 type DialogState =
   | { type: 'favorite'; item?: Item; groupId?: string }
@@ -227,8 +242,15 @@ export function DashboardApp() {
   const [fileAccessHintDismissed, setFileAccessHintDismissed] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [driveAccount, setDriveAccount] = useState<DriveAccount | null>(null);
+  const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveSyncError, setDriveSyncError] = useState<string>();
+  const [driveSyncMessage, setDriveSyncMessage] = useState<string>();
+  const [driveSyncChoicePreview, setDriveSyncChoicePreview] =
+    useState<DriveSyncPreview>();
+  const [driveSyncChoiceError, setDriveSyncChoiceError] = useState<string>();
   const startupSelectionApplied = useRef(false);
   const initialLastGroupId = useRef<string | null | undefined>(undefined);
+  const initialDriveSyncAccount = useRef<string>();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState('');
   const [layout, setLayout] = useState<LibraryView>('grid');
@@ -277,6 +299,36 @@ export function DashboardApp() {
   const notifyError = useCallback(
     (message: string) => notify(message, 'error'),
     [notify],
+  );
+  const runDriveSync = useCallback(
+    async (choice?: DriveSyncChoice) => {
+      if (!driveAccount) return;
+      setDriveSyncing(true);
+      setDriveSyncError(undefined);
+      setDriveSyncChoiceError(undefined);
+      try {
+        const result = await syncGoogleDrive(choice);
+        setDriveSyncChoicePreview(undefined);
+        setDriveSyncMessage(
+          result.status === 'skipped'
+            ? 'Another FavoritePod window is already syncing.'
+            : `Last synced at ${new Date(result.syncedAt).toLocaleTimeString()}.`,
+        );
+      } catch (cause) {
+        const message = errorMessage(cause);
+        if (cause instanceof DriveSyncChoiceRequired) {
+          setDriveSyncChoicePreview(cause.preview);
+          setDriveSyncChoiceError(undefined);
+        } else if (choice) {
+          setDriveSyncChoiceError(message);
+        } else {
+          setDriveSyncError(message);
+        }
+      } finally {
+        setDriveSyncing(false);
+      }
+    },
+    [driveAccount],
   );
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
@@ -376,6 +428,64 @@ export function DashboardApp() {
       )
       .catch((cause: unknown) => notifyError(errorMessage(cause)));
   }, [notifyError]);
+
+  useEffect(() => {
+    if (!driveAccount) {
+      initialDriveSyncAccount.current = undefined;
+      return;
+    }
+    if (!settingsLoaded || loading) return;
+    if (initialDriveSyncAccount.current === driveAccount.emailAddress) return;
+    initialDriveSyncAccount.current = driveAccount.emailAddress;
+    void runDriveSync();
+  }, [driveAccount, loading, runDriveSync, settingsLoaded]);
+
+  useEffect(() => {
+    if (!driveAccount) return;
+    let debounce: number | undefined;
+    const scheduleSync = () => {
+      if (debounce !== undefined) window.clearTimeout(debounce);
+      debounce = window.setTimeout(() => {
+        debounce = undefined;
+        void runDriveSync();
+      }, 10_000);
+    };
+    const handleOnline = () => void runDriveSync();
+    const handleRuntimeMessage = (message: unknown) => {
+      if (typeof message !== 'object' || message === null || !('type' in message)) {
+        return;
+      }
+      if (message.type === DRIVE_LIBRARY_CHANGED_MESSAGE) scheduleSync();
+      if (
+        message.type === 'favoritepod.sync.choice-required' &&
+        'preview' in message &&
+        typeof message.preview === 'object' &&
+        message.preview !== null
+      ) {
+        setDriveSyncChoicePreview(message.preview as DriveSyncPreview);
+      }
+      if (message.type === 'favoritepod.sync.completed') {
+        setDriveSyncError(undefined);
+        setDriveSyncMessage(`Last synced at ${new Date().toLocaleTimeString()}.`);
+      }
+      if (
+        message.type === 'favoritepod.sync.failed' &&
+        'message' in message &&
+        typeof message.message === 'string'
+      ) {
+        setDriveSyncError(message.message);
+      }
+    };
+    window.addEventListener(DRIVE_LIBRARY_CHANGED_EVENT, scheduleSync);
+    window.addEventListener('online', handleOnline);
+    chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+    return () => {
+      if (debounce !== undefined) window.clearTimeout(debounce);
+      window.removeEventListener(DRIVE_LIBRARY_CHANGED_EVENT, scheduleSync);
+      window.removeEventListener('online', handleOnline);
+      chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+    };
+  }, [driveAccount, runDriveSync]);
 
   useEffect(() => {
     if (!settingsLoaded || loading || startupSelectionApplied.current) return;
@@ -525,24 +635,44 @@ export function DashboardApp() {
   };
 
   const handleConnectDrive = async () => {
-    const result = await connectGoogleDrive();
+    const result = await withGoogleDriveSyncLock(() => connectGoogleDrive());
+    if (result === null) {
+      throw new Error('Google Drive is syncing. Wait for sync to finish, then connect.');
+    }
     if (result.status === 'connected') setDriveAccount(result.account);
     return result;
   };
 
   const handleCheckDriveAccount = async () => {
-    const result = await checkGoogleDriveAccount();
+    const result = await withGoogleDriveSyncLock(() => checkGoogleDriveAccount());
+    if (result === null) {
+      throw new Error(
+        'Google Drive is syncing. Wait for sync to finish, then check the account.',
+      );
+    }
     if (result.status === 'connected') setDriveAccount(result.account);
     return result;
   };
 
   const handleSwitchDriveAccount = async (account: DriveAccount) => {
-    await switchGoogleDriveAccount(account);
+    const switched = await withGoogleDriveSyncLock(() =>
+      switchGoogleDriveAccount(account),
+    );
+    if (switched === null) {
+      throw new Error(
+        'Google Drive is syncing. Wait for sync to finish, then switch accounts.',
+      );
+    }
     setDriveAccount(account);
   };
 
   const handleDisconnectDrive = async () => {
-    const result = await disconnectGoogleDrive();
+    const result = await withGoogleDriveSyncLock(() => disconnectGoogleDrive());
+    if (result === null) {
+      throw new Error(
+        'Google Drive is syncing. Wait for sync to finish, then disconnect.',
+      );
+    }
     setDriveAccount(null);
     return result;
   };
@@ -1613,6 +1743,9 @@ export function DashboardApp() {
         <SettingsDialog
           defaultView={layout}
           driveAccount={driveAccount}
+          driveSyncing={driveSyncing}
+          driveSyncError={driveSyncError}
+          driveSyncMessage={driveSyncMessage}
           groupingMode={groupingMode}
           homePageAvailable={!!homePageGroupId && groupsById.has(homePageGroupId)}
           openBehavior={openBehavior}
@@ -1628,10 +1761,23 @@ export function DashboardApp() {
           onCheckDriveAccount={handleCheckDriveAccount}
           onSwitchDriveAccount={handleSwitchDriveAccount}
           onDisconnectDrive={handleDisconnectDrive}
+          onSyncDrive={() => runDriveSync()}
           onArchiveAction={(mode) => {
             setSettingsOpen(false);
             setArchiveDialog(mode);
           }}
+        />
+      )}
+      {driveSyncChoicePreview && (
+        <DriveSyncChoiceDialog
+          busy={driveSyncing}
+          error={driveSyncChoiceError}
+          onCancel={() => {
+            setDriveSyncChoicePreview(undefined);
+            setDriveSyncChoiceError(undefined);
+          }}
+          onContinue={(choice) => runDriveSync(choice)}
+          preview={driveSyncChoicePreview}
         />
       )}
       {archiveDialog && (

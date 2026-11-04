@@ -141,7 +141,26 @@ describe('Google Drive preview assets', () => {
     expect(multipart).toContain('"parents":["appDataFolder"]');
     expect(multipart).toContain('jpeg-preview-bytes');
     expect((init?.body as Blob).type).toContain('multipart/related');
+    const boundary = (init?.body as Blob).type.match(/boundary=([^;]+)/)?.[1];
+    expect(boundary).toBeTruthy();
+    expect(multipart.startsWith(`--${boundary}\r\n`)).toBe(true);
+    expect(multipart.endsWith(`\r\n--${boundary}--`)).toBe(true);
     expect(await db.driveAssets.get(hash)).toMatchObject({ fileId: 'uploaded-asset' });
+  });
+
+  it('includes Google error details for a rejected asset upload', async () => {
+    const blob = new Blob(['jpeg-preview-bytes'], { type: 'image/jpeg' });
+    const hash = await hashBlob(blob);
+    await db.thumbnails.put(thumbnail(hash, blob));
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(listResponse([]))
+      .mockResolvedValueOnce(
+        jsonResponse({ error: { message: 'Invalid multipart request' } }, 400),
+      );
+
+    await expect(uploadMissingDriveAssets([hash])).rejects.toThrow(
+      'Could not upload preview (Google Drive HTTP 400): Invalid multipart request.',
+    );
   });
 
   it('reports a missing local preview without failing the other asset uploads', async () => {

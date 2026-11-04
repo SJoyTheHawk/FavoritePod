@@ -2,8 +2,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../db';
 import {
   compactStaleDriveDeviceFiles,
+  cacheDownloadedDriveDeviceFiles,
   createLocalDriveDeviceState,
   downloadChangedDriveDeviceFiles,
+  downloadAllDriveDeviceFiles,
   getDeviceStateFileName,
   listDriveDeviceFiles,
   uploadDriveDeviceState,
@@ -182,6 +184,25 @@ describe('Google Drive device files', () => {
     expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
       '/files/file-b?alt=media',
     );
+  });
+
+  it('can defer modified-time cache updates until downloaded records are applied', async () => {
+    const metadata = remoteMetadata('device-b', 'file-b');
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(makeState('device-b', 4, [makeGroup('remote-group', 'device-b')])),
+    );
+
+    const result = await downloadAllDriveDeviceFiles([metadata], {
+      deferCacheUpdate: true,
+    });
+
+    expect(result.downloaded).toHaveLength(1);
+    expect(await db.deviceFiles.get('device-b')).toBeUndefined();
+    await cacheDownloadedDriveDeviceFiles(result.downloaded);
+    expect(await db.deviceFiles.get('device-b')).toMatchObject({
+      fileId: 'file-b',
+      revision: 4,
+    });
   });
 
   it('rejects invalid device contents and does not cache them', async () => {

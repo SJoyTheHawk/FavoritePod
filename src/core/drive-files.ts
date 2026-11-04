@@ -4,7 +4,16 @@ import { db } from './db';
 import { driveFetch } from './drive-auth';
 import { mergeLibrary } from './merge';
 import { getDeviceId } from './storage';
-import type { DeviceFile, DriveDeviceState, Group, Item, LibraryState } from './types';
+import { tickHLC } from './hlc';
+import { withoutDriveChangeNotification } from './drive-sync-triggers';
+import type {
+  DeviceFile,
+  DriveDeviceState,
+  Group,
+  HLC,
+  Item,
+  LibraryState,
+} from './types';
 
 const DRIVE_API = 'https://www.googleapis.com';
 const DEVICE_FILE_PREFIX = 'launcher-state-device-';
@@ -48,6 +57,11 @@ export interface DownloadChangedDeviceFilesResult {
   unchanged: DriveDeviceFileMetadata[];
 }
 
+export interface DownloadDriveDeviceFilesOptions {
+  /** Let the caller commit metadata only after the downloaded state is applied. */
+  deferCacheUpdate?: boolean;
+}
+
 export interface CompactionResult {
   state: DriveDeviceState;
   deletedDeviceIds: string[];
@@ -55,7 +69,10 @@ export interface CompactionResult {
 }
 
 export class DriveFileError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly retryable = false,
+  ) {
     super(message);
     this.name = 'DriveFileError';
   }
@@ -119,6 +136,7 @@ async function ensureDriveSuccess(response: Response, action: string): Promise<v
   if (response.status === 429 || response.status >= 500) {
     throw new DriveFileError(
       `Google Drive is temporarily unavailable while trying to ${action}.`,
+      true,
     );
   }
   throw new DriveFileError(`Could not ${action} (Google Drive HTTP ${response.status}).`);
@@ -222,7 +240,10 @@ export async function listDriveDeviceFiles(): Promise<DriveDeviceFileMetadata[]>
     try {
       response = await driveFetch(url);
     } catch {
-      throw new DriveFileError('Could not reach Google Drive to list device files.');
+      throw new DriveFileError(
+        'Could not reach Google Drive to list device files.',
+        true,
+      );
     }
     await ensureDriveSuccess(response, 'list device files');
 
@@ -283,7 +304,10 @@ async function downloadDeviceFile(
       `${DRIVE_API}/drive/v3/files/${encodeURIComponent(metadata.fileId)}?alt=media`,
     );
   } catch {
-    throw new DriveFileError(`Could not download ${metadata.name} from Google Drive.`);
+    throw new DriveFileError(
+      `Could not download ${metadata.name} from Google Drive.`,
+      true,
+    );
   }
   await ensureDriveSuccess(response, `download ${metadata.name}`);
 
@@ -291,7 +315,12 @@ async function downloadDeviceFile(
   if (Number.isFinite(contentLength) && contentLength > MAX_DEVICE_FILE_BYTES) {
     throw new DriveFileError(`${metadata.name} exceeds the 20 MB device-file limit.`);
   }
-  const text = await response.text();
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw new DriveFileError(`Could not read ${metadata.name} from Google Drive.`, true);
+  }
   if (new TextEncoder().encode(text).byteLength > MAX_DEVICE_FILE_BYTES) {
     throw new DriveFileError(`${metadata.name} exceeds the 20 MB device-file limit.`);
   }
@@ -306,13 +335,13 @@ async function downloadDeviceFile(
   if (state.deviceId !== metadata.deviceId) {
     throw new DriveFileError(`${metadata.name} contains a different device ID.`);
   }
-  await updateLocalFileRecord(metadata, state.revision);
   return state;
 }
 
 async function downloadDriveDeviceFiles(
   files: DriveDeviceFileMetadata[],
   force: boolean,
+  deferCacheUpdate = false,
 ): Promise<DownloadChangedDeviceFilesResult> {
   const downloaded: DownloadedDriveDeviceFile[] = [];
   const unchanged: DriveDeviceFileMetadata[] = [];
@@ -330,15 +359,37 @@ async function downloadDriveDeviceFiles(
     downloaded.push({ metadata, state: await downloadDeviceFile(metadata) });
   }
 
+  if (!deferCacheUpdate) await cacheDownloadedDriveDeviceFiles(downloaded);
   return { downloaded, unchanged };
 }
 
 /** Download new or changed device files, skipping matching cached modified times. */
 export async function downloadChangedDriveDeviceFiles(
   files?: DriveDeviceFileMetadata[],
+  options: DownloadDriveDeviceFilesOptions = {},
 ): Promise<DownloadChangedDeviceFilesResult> {
   const metadata = files ?? (await listDriveDeviceFiles());
-  return downloadDriveDeviceFiles(metadata, false);
+  return downloadDriveDeviceFiles(metadata, false, options.deferCacheUpdate);
+}
+
+/** Download every listed device state, bypassing the modified-time cache. */
+export async function downloadAllDriveDeviceFiles(
+  files?: DriveDeviceFileMetadata[],
+  options: DownloadDriveDeviceFilesOptions = {},
+): Promise<DownloadChangedDeviceFilesResult> {
+  const metadata = files ?? (await listDriveDeviceFiles());
+  return downloadDriveDeviceFiles(metadata, true, options.deferCacheUpdate);
+}
+
+/** Persist cache entries only after the caller has applied every downloaded state. */
+export async function cacheDownloadedDriveDeviceFiles(
+  downloaded: readonly DownloadedDriveDeviceFile[],
+): Promise<void> {
+  await db.transaction('rw', db.deviceFiles, async () => {
+    for (const { metadata, state } of downloaded) {
+      await updateLocalFileRecord(metadata, state.revision);
+    }
+  });
 }
 
 async function uploadMedia(
@@ -355,7 +406,7 @@ async function uploadMedia(
       body,
     });
   } catch {
-    throw new DriveFileError('Could not upload the device state to Google Drive.');
+    throw new DriveFileError('Could not upload the device state to Google Drive.', true);
   }
   await ensureDriveSuccess(response, 'upload device state');
 
@@ -487,7 +538,20 @@ export async function compactStaleDriveDeviceFiles(
   }
   const currentDeviceId = await getDeviceId();
   const listedBeforeMerge = await listDriveDeviceFiles();
-  const allRemote = await downloadDriveDeviceFiles(listedBeforeMerge, true);
+  const cutoff = now.getTime() - STALE_DEVICE_FILE_AGE_MS;
+  const staleCandidates = listedBeforeMerge.filter(
+    (file) => file.deviceId !== currentDeviceId && Date.parse(file.modifiedTime) < cutoff,
+  );
+  if (staleCandidates.length === 0) {
+    const cached = await db.deviceFiles.get(currentDeviceId);
+    return {
+      state: await createLocalDriveDeviceState(Math.max(1, cached?.revision ?? 1), now),
+      deletedDeviceIds: [],
+      retainedDeviceIds: [],
+    };
+  }
+
+  const allRemote = await downloadDriveDeviceFiles(listedBeforeMerge, true, true);
   const localRecords = await db.transaction('r', db.groups, db.items, async () => ({
     groups: await db.groups.toArray(),
     items: await db.items.toArray(),
@@ -497,6 +561,42 @@ export async function compactStaleDriveDeviceFiles(
     merged = mergeLibrary(merged, remote.state);
   }
 
+  await withoutDriveChangeNotification(() =>
+    db.transaction('rw', db.groups, db.items, db.syncMeta, async () => {
+      const current: LibraryState = {
+        groups: await db.groups.toArray(),
+        items: await db.items.toArray(),
+      };
+      const next = mergeLibrary(current, merged);
+      await db.groups.clear();
+      await db.items.clear();
+      if (next.groups.length) await db.groups.bulkPut(next.groups);
+      if (next.items.length) await db.items.bulkPut(next.items);
+      const clocks = [
+        ...next.groups.flatMap((group) => [
+          ...Object.values(group.clock),
+          ...(group.deleted ? [group.deleted] : []),
+        ]),
+        ...next.items.flatMap((item) => [
+          ...Object.values(item.clock),
+          ...(item.deleted ? [item.deleted] : []),
+        ]),
+      ];
+      if (clocks.length) {
+        let latest = clocks[0]!;
+        for (const clock of clocks.slice(1)) if (clock > latest) latest = clock;
+        const stored = await db.syncMeta.get('lastHlc');
+        const previous = typeof stored?.value === 'string' ? stored.value : undefined;
+        const base: HLC = previous && previous > latest ? previous : latest;
+        await db.syncMeta.put({
+          key: 'lastHlc',
+          value: tickHLC(base, currentDeviceId, now.getTime()),
+        });
+      }
+    }),
+  );
+  await cacheDownloadedDriveDeviceFiles(allRemote.downloaded);
+
   const localCache = await db.deviceFiles.get(currentDeviceId);
   const latestRevision = Math.max(
     localCache?.revision ?? 0,
@@ -504,13 +604,18 @@ export async function compactStaleDriveDeviceFiles(
       .filter((file) => file.state.deviceId === currentDeviceId)
       .map((file) => file.state.revision),
   );
-  const state = stateFromRecords(currentDeviceId, latestRevision + 1, now, merged);
+  const currentRecords = await db.transaction('r', db.groups, db.items, async () => ({
+    groups: await db.groups.toArray(),
+    items: await db.items.toArray(),
+  }));
+  const state = stateFromRecords(
+    currentDeviceId,
+    latestRevision + 1,
+    now,
+    currentRecords,
+  );
   const uploadedState = await uploadDriveDeviceState(state, now);
 
-  const cutoff = now.getTime() - STALE_DEVICE_FILE_AGE_MS;
-  const staleCandidates = listedBeforeMerge.filter(
-    (file) => file.deviceId !== currentDeviceId && Date.parse(file.modifiedTime) < cutoff,
-  );
   const latestFiles = await listDriveDeviceFiles();
   const remainingFiles = new Map(latestFiles.map((file) => [file.fileId, file]));
   const deletedDeviceIds: string[] = [];

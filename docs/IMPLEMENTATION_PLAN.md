@@ -556,7 +556,8 @@ phase.
 - [x] Add test users
 - [x] Implement `chrome.identity.getAuthToken()`
 - [x] Build token refresh on 401
-- [x] Implement disconnect with token revoke
+- [x] Implement profile-only disconnect with local credential cleanup (supersedes token revocation)
+- [x] Persist authorization recovery and show contextual Connect; remove Check account and Reconnect or switch account
 - [x] Detect account switches via permissionId
 
 **Settings UI**:
@@ -590,7 +591,10 @@ phase.
 **Acceptance**:
 - OAuth flow completes
 - Tokens refresh automatically
-- Disconnect works cleanly
+- Disconnect works offline and affects only this Chrome profile; other devices remain authorized
+- Auth-required state pauses background sync and survives dashboard reload
+- User-initiated Connect restores same-account sync without resetting its bookkeeping
+- From a disconnected profile, identify and confirm the Google account before persisting the connection or starting first sync; cancel keeps the profile disconnected
 - Account switch detected
 
 Browser verification steps: [`phase-8.1-manual-test.md`](./phase-8.1-manual-test.md).

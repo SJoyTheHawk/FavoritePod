@@ -25,11 +25,7 @@
     "type": "module"
   },
   "permissions": ["activeTab", "favicon", "unlimitedStorage", "identity", "alarms"],
-  "host_permissions": [
-    "file:///*",
-    "https://www.googleapis.com/*",
-    "https://oauth2.googleapis.com/*"
-  ],
+  "host_permissions": ["file:///*", "https://www.googleapis.com/*"],
   "oauth2": {
     "client_id": "301335487475-rpips565ff5gqc6s8dhp3buhpkroqb7h.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/drive.appdata"]

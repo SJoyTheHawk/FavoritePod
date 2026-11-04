@@ -4,7 +4,7 @@ import {
   downloadMissingDriveAssets,
   uploadMissingDriveAssets,
 } from './drive-assets';
-import { getConnectedDriveAccount } from './drive-auth';
+import { requireDriveConnection, verifyGoogleDriveAccount } from './drive-auth';
 import {
   cacheDownloadedDriveDeviceFiles,
   compactStaleDriveDeviceFiles,
@@ -332,9 +332,8 @@ async function performSync(
   setResolvedChoice: (choice: DriveSyncChoice) => void,
   onProgress?: DriveSyncProgressCallback,
 ): Promise<DriveSyncResult> {
-  if (!(await getConnectedDriveAccount())) {
-    throw new DriveSyncError('Connect Google Drive before syncing your library.');
-  }
+  await requireDriveConnection();
+  await verifyGoogleDriveAccount();
   const deviceId = await getDeviceId();
   const firstSync = (await db.syncMeta.get(INITIAL_SYNC_KEY))?.value !== true;
   onProgress?.({ stage: 'checking' });

@@ -9,8 +9,9 @@ import { isItemDeleted } from '../merge';
 import * as storage from '../storage';
 import type { DriveDeviceState, Group, Item, LibraryState } from '../types';
 
-vi.mock('../drive-auth', () => ({
-  getConnectedDriveAccount: vi.fn(),
+vi.mock('../drive-auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof driveAuth>()),
+  verifyGoogleDriveAccount: vi.fn(),
 }));
 
 vi.mock('../storage', () => ({
@@ -132,7 +133,8 @@ beforeEach(async () => {
   await db.delete();
   await db.open();
   vi.clearAllMocks();
-  vi.mocked(driveAuth.getConnectedDriveAccount).mockResolvedValue(account);
+  await db.syncMeta.put({ key: 'drive.account', value: account });
+  vi.mocked(driveAuth.verifyGoogleDriveAccount).mockReset().mockResolvedValue(undefined);
   vi.mocked(storage.getDeviceId).mockResolvedValue('device-local');
   vi.mocked(storage.createSnapshot).mockResolvedValue({
     createdAt: Date.now(),
@@ -311,6 +313,48 @@ describe('Google Drive sync orchestration', () => {
       status: 'skipped',
       reason: 'already-running',
     });
+  });
+
+  it.each(['disconnected', 'authorization-required'] as const)(
+    'blocks %s before network access',
+    async (status) => {
+      if (status === 'disconnected') await db.syncMeta.delete('drive.account');
+      else await db.syncMeta.put({ key: 'drive.authorizationRequired', value: true });
+      await expect(syncGoogleDrive()).rejects.toMatchObject({ code: status });
+      expect(driveAuth.verifyGoogleDriveAccount).not.toHaveBeenCalled();
+      expect(driveFiles.listDriveDeviceFiles).not.toHaveBeenCalled();
+      expect(driveFiles.uploadDriveDeviceState).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not retry failed authorization as a network failure', async () => {
+    vi.mocked(driveAuth.verifyGoogleDriveAccount).mockRejectedValue(
+      new driveAuth.DriveAuthorizationRequiredError(),
+    );
+    await expect(syncGoogleDrive()).rejects.toMatchObject({
+      code: 'authorization-required',
+    });
+    expect(driveAuth.verifyGoogleDriveAccount).toHaveBeenCalledOnce();
+    expect(driveFiles.listDriveDeviceFiles).not.toHaveBeenCalled();
+  });
+
+  it('resumes sync after same-account authorization without resetting initial sync', async () => {
+    await db.syncMeta.bulkPut([
+      { key: 'drive.authorizationRequired', value: true },
+      { key: 'drive.initialSyncCompleted', value: true },
+    ]);
+    configureRemote(state('remote', { groups: [], items: [] }));
+    vi.stubGlobal('chrome', {
+      identity: { getAuthToken: vi.fn().mockResolvedValue({ token: 'new-token' }) },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ user: account }))),
+    );
+    await driveAuth.connectGoogleDrive();
+    await expect(syncGoogleDrive()).resolves.toMatchObject({ status: 'synced' });
+    expect(driveFiles.downloadChangedDriveDeviceFiles).toHaveBeenCalledOnce();
+    expect(driveFiles.downloadAllDriveDeviceFiles).not.toHaveBeenCalled();
   });
 
   it('retries only explicitly transient failures with exponential jitter', async () => {

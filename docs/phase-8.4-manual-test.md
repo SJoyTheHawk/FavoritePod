@@ -47,8 +47,11 @@ format. Each profile has its own local library and device ID.
 4. Open two dashboards and start sync in both. The second context should skip
    while the first holds the sync lock; after the first completes, Sync now
    should succeed.
-5. Confirm Drive account switching still asks before changing accounts and that
-   the new account receives a first-sync flow.
+5. Verify the device-only disconnect and contextual authorization recovery flow in
+   [Phase 8.1 manual verification](phase-8.1-manual-test.md). Disconnect B while A
+   and C remain connected: A/C must still sync without consent, B must stay
+   disconnected, and all B dashboard tabs must update. Recovery to a different
+   Google account must require confirmation and a first-sync choice.
 
 Automated coverage for the merge orchestration, retry policy, sync lock, and
 deferred device-file cache is in `drive-sync.test.ts` and `drive-files.test.ts`.

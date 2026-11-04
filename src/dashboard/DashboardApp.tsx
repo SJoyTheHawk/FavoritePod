@@ -1,3 +1,4 @@
+import { liveQuery } from 'dexie';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUturnLeftIcon,
@@ -66,10 +67,15 @@ import { parseSafeUrl } from '../core/validation';
 import { useLibrary } from '../core/use-library';
 import type { Group, Item } from '../core/types';
 import {
-  checkGoogleDriveAccount,
+  DriveAuthError,
+  cancelGoogleDriveConnection,
+  confirmGoogleDriveConnection,
   connectGoogleDrive,
   disconnectGoogleDrive,
-  getConnectedDriveAccount,
+  getDriveConnectionState,
+  prepareGoogleDriveConnection,
+  type DriveConnectionResult,
+  type DriveConnectionState,
   switchGoogleDriveAccount,
   type DriveAccount,
 } from '../core/drive-auth';
@@ -241,7 +247,12 @@ export function DashboardApp() {
   const [fileAccessAllowed, setFileAccessAllowed] = useState<boolean>();
   const [fileAccessHintDismissed, setFileAccessHintDismissed] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [driveAccount, setDriveAccount] = useState<DriveAccount | null>(null);
+  const [driveConnection, setDriveConnection] = useState<DriveConnectionState>({
+    status: 'disconnected',
+    account: null,
+  });
+  const driveAccount = driveConnection.account;
+  const syncInProgress = useRef(false);
   const [driveSyncing, setDriveSyncing] = useState(false);
   const [driveSyncError, setDriveSyncError] = useState<string>();
   const [driveSyncMessage, setDriveSyncMessage] = useState<string>();
@@ -300,36 +311,43 @@ export function DashboardApp() {
     (message: string) => notify(message, 'error'),
     [notify],
   );
-  const runDriveSync = useCallback(
-    async (choice?: DriveSyncChoice) => {
-      if (!driveAccount) return;
-      setDriveSyncing(true);
-      setDriveSyncError(undefined);
-      setDriveSyncChoiceError(undefined);
-      try {
-        const result = await syncGoogleDrive(choice);
+  const runDriveSync = useCallback(async (choice?: DriveSyncChoice) => {
+    if (syncInProgress.current) return;
+    syncInProgress.current = true;
+    setDriveSyncing(true);
+    setDriveSyncError(undefined);
+    setDriveSyncChoiceError(undefined);
+    try {
+      const result = await syncGoogleDrive(choice);
+      setDriveSyncChoicePreview(undefined);
+      setDriveSyncMessage(
+        result.status === 'skipped'
+          ? 'Another FavoritePod window is already syncing.'
+          : `Last synced at ${new Date(result.syncedAt).toLocaleTimeString()}.`,
+      );
+    } catch (cause) {
+      const message = errorMessage(cause);
+      if (
+        cause instanceof DriveAuthError &&
+        (cause.code === 'disconnected' || cause.code === 'authorization-required')
+      ) {
+        setDriveConnection(await getDriveConnectionState());
         setDriveSyncChoicePreview(undefined);
-        setDriveSyncMessage(
-          result.status === 'skipped'
-            ? 'Another FavoritePod window is already syncing.'
-            : `Last synced at ${new Date(result.syncedAt).toLocaleTimeString()}.`,
-        );
-      } catch (cause) {
-        const message = errorMessage(cause);
-        if (cause instanceof DriveSyncChoiceRequired) {
-          setDriveSyncChoicePreview(cause.preview);
-          setDriveSyncChoiceError(undefined);
-        } else if (choice) {
-          setDriveSyncChoiceError(message);
-        } else {
-          setDriveSyncError(message);
-        }
-      } finally {
-        setDriveSyncing(false);
+        setDriveSyncChoiceError(undefined);
+        setDriveSyncMessage(undefined);
+      } else if (cause instanceof DriveSyncChoiceRequired) {
+        setDriveSyncChoicePreview(cause.preview);
+        setDriveSyncChoiceError(undefined);
+      } else if (choice) {
+        setDriveSyncChoiceError(message);
+      } else {
+        setDriveSyncError(message);
       }
-    },
-    [driveAccount],
-  );
+    } finally {
+      syncInProgress.current = false;
+      setDriveSyncing(false);
+    }
+  }, []);
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
@@ -400,7 +418,6 @@ export function DashboardApp() {
       getShowPreview(),
       getPathOverrides(),
       getGroupingMode(),
-      getConnectedDriveAccount(),
     ])
       .then(
         ([
@@ -412,7 +429,6 @@ export function DashboardApp() {
           preview,
           overrides,
           grouping,
-          connectedDriveAccount,
         ]) => {
           if (view) setLayout(view);
           setOpenBehaviorState(behavior);
@@ -421,7 +437,6 @@ export function DashboardApp() {
           setShowPreviewState(preview);
           setPathOverridesState(overrides);
           setGroupingModeState(grouping);
-          setDriveAccount(connectedDriveAccount);
           initialLastGroupId.current = lastGroupId;
           setSettingsLoaded(true);
         },
@@ -430,7 +445,25 @@ export function DashboardApp() {
   }, [notifyError]);
 
   useEffect(() => {
-    if (!driveAccount) {
+    const subscription = liveQuery(getDriveConnectionState).subscribe({
+      next: (connection) => {
+        setDriveConnection((previous) =>
+          JSON.stringify(previous) === JSON.stringify(connection) ? previous : connection,
+        );
+        if (connection.status !== 'connected') {
+          setDriveSyncChoicePreview(undefined);
+          setDriveSyncChoiceError(undefined);
+          setDriveSyncMessage(undefined);
+          setDriveSyncError(undefined);
+        }
+      },
+      error: (cause: unknown) => notifyError(errorMessage(cause)),
+    });
+    return () => subscription.unsubscribe();
+  }, [notifyError]);
+
+  useEffect(() => {
+    if (driveConnection.status !== 'connected' || !driveAccount) {
       initialDriveSyncAccount.current = undefined;
       return;
     }
@@ -438,10 +471,10 @@ export function DashboardApp() {
     if (initialDriveSyncAccount.current === driveAccount.emailAddress) return;
     initialDriveSyncAccount.current = driveAccount.emailAddress;
     void runDriveSync();
-  }, [driveAccount, loading, runDriveSync, settingsLoaded]);
+  }, [driveAccount, driveConnection.status, loading, runDriveSync, settingsLoaded]);
 
   useEffect(() => {
-    if (!driveAccount) return;
+    if (driveConnection.status !== 'connected') return;
     let debounce: number | undefined;
     const scheduleSync = () => {
       if (debounce !== undefined) window.clearTimeout(debounce);
@@ -485,7 +518,7 @@ export function DashboardApp() {
       window.removeEventListener('online', handleOnline);
       chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
     };
-  }, [driveAccount, runDriveSync]);
+  }, [driveConnection.status, runDriveSync]);
 
   useEffect(() => {
     if (!settingsLoaded || loading || startupSelectionApplied.current) return;
@@ -634,25 +667,36 @@ export function DashboardApp() {
     notify('File locations saved for this device.');
   };
 
+  const applyDriveConnectionResult = async (result: DriveConnectionResult) => {
+    if (result.status === 'connected') {
+      initialDriveSyncAccount.current = result.account.emailAddress;
+      setDriveConnection({ status: 'connected', account: result.account });
+      await runDriveSync();
+    }
+    return result;
+  };
+
   const handleConnectDrive = async () => {
     const result = await withGoogleDriveSyncLock(() => connectGoogleDrive());
     if (result === null) {
       throw new Error('Google Drive is syncing. Wait for sync to finish, then connect.');
     }
-    if (result.status === 'connected') setDriveAccount(result.account);
-    return result;
+    return applyDriveConnectionResult(result);
   };
 
-  const handleCheckDriveAccount = async () => {
-    const result = await withGoogleDriveSyncLock(() => checkGoogleDriveAccount());
+  const handlePrepareDriveConnection = () => prepareGoogleDriveConnection();
+
+  const handleConfirmDriveConnection = async (account: DriveAccount) => {
+    const result = await withGoogleDriveSyncLock(() =>
+      confirmGoogleDriveConnection(account),
+    );
     if (result === null) {
-      throw new Error(
-        'Google Drive is syncing. Wait for sync to finish, then check the account.',
-      );
+      throw new Error('Google Drive is syncing. Wait for sync to finish, then connect.');
     }
-    if (result.status === 'connected') setDriveAccount(result.account);
-    return result;
+    return applyDriveConnectionResult(result);
   };
+
+  const handleCancelDriveConnection = () => cancelGoogleDriveConnection();
 
   const handleSwitchDriveAccount = async (account: DriveAccount) => {
     const switched = await withGoogleDriveSyncLock(() =>
@@ -663,7 +707,9 @@ export function DashboardApp() {
         'Google Drive is syncing. Wait for sync to finish, then switch accounts.',
       );
     }
-    setDriveAccount(account);
+    initialDriveSyncAccount.current = account.emailAddress;
+    setDriveConnection({ status: 'connected', account });
+    await runDriveSync();
   };
 
   const handleDisconnectDrive = async () => {
@@ -673,8 +719,7 @@ export function DashboardApp() {
         'Google Drive is syncing. Wait for sync to finish, then disconnect.',
       );
     }
-    setDriveAccount(null);
-    return result;
+    setDriveConnection({ status: 'disconnected', account: null });
   };
 
   const handleFileAccessDenied = () => {
@@ -1743,6 +1788,7 @@ export function DashboardApp() {
         <SettingsDialog
           defaultView={layout}
           driveAccount={driveAccount}
+          driveConnectionStatus={driveConnection.status}
           driveSyncing={driveSyncing}
           driveSyncError={driveSyncError}
           driveSyncMessage={driveSyncMessage}
@@ -1758,7 +1804,9 @@ export function DashboardApp() {
           onSaveShowPreview={savePreviewVisibility}
           onSavePathOverrides={saveLocalPathOverrides}
           onConnectDrive={handleConnectDrive}
-          onCheckDriveAccount={handleCheckDriveAccount}
+          onPrepareDriveConnection={handlePrepareDriveConnection}
+          onConfirmDriveConnection={handleConfirmDriveConnection}
+          onCancelDriveConnection={handleCancelDriveConnection}
           onSwitchDriveAccount={handleSwitchDriveAccount}
           onDisconnectDrive={handleDisconnectDrive}
           onSyncDrive={() => runDriveSync()}

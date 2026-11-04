@@ -1,16 +1,25 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../db';
+import { liveQuery } from 'dexie';
 import {
-  checkGoogleDriveAccount,
+  verifyGoogleDriveAccount,
+  getDriveConnectionState,
+  markDriveAuthorizationRequired,
+  driveFetch,
+  DRIVE_CONNECTION_CHANGED,
+  cancelGoogleDriveConnection,
   connectGoogleDrive,
+  confirmGoogleDriveConnection,
   disconnectGoogleDrive,
   getConnectedDriveAccount,
+  prepareGoogleDriveConnection,
   switchGoogleDriveAccount,
 } from '../drive-auth';
 
 const identity = {
   getAuthToken: vi.fn(),
   removeCachedAuthToken: vi.fn(),
+  clearAllCachedAuthTokens: vi.fn(),
 };
 
 const alice = {
@@ -30,8 +39,12 @@ beforeEach(async () => {
   await db.delete();
   await db.open();
   identity.getAuthToken.mockReset();
+  identity.clearAllCachedAuthTokens.mockReset().mockResolvedValue(undefined);
   identity.removeCachedAuthToken.mockReset().mockResolvedValue(undefined);
-  vi.stubGlobal('chrome', { identity });
+  vi.stubGlobal('chrome', {
+    identity,
+    runtime: { sendMessage: vi.fn().mockResolvedValue(undefined) },
+  });
   vi.stubGlobal('fetch', vi.fn());
 });
 
@@ -41,16 +54,26 @@ afterAll(async () => {
 });
 
 describe('Google Drive authorization', () => {
-  it('connects interactively, identifies the account, and stores no token', async () => {
+  it('requires confirmation before saving a newly authorized profile', async () => {
     identity.getAuthToken.mockResolvedValue({ token: 'temporary-access-token' });
-    vi.mocked(fetch).mockResolvedValue(aboutResponse(alice));
+    vi.mocked(fetch).mockImplementation(async () => aboutResponse(alice));
 
-    await expect(connectGoogleDrive()).resolves.toEqual({
+    await expect(prepareGoogleDriveConnection()).resolves.toEqual(alice);
+    expect(await getDriveConnectionState()).toEqual({
+      status: 'disconnected',
+      account: null,
+    });
+    expect(await db.syncMeta.get('drive.initialSyncCompleted')).toBeUndefined();
+    expect(identity.getAuthToken).toHaveBeenNthCalledWith(1, { interactive: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    await expect(confirmGoogleDriveConnection(alice)).resolves.toEqual({
       status: 'connected',
       account: alice,
     });
 
-    expect(identity.getAuthToken).toHaveBeenCalledWith({ interactive: true });
+    expect(identity.getAuthToken).toHaveBeenNthCalledWith(2, { interactive: false });
+    expect(fetch).toHaveBeenCalledTimes(2);
     const [url, init] = vi.mocked(fetch).mock.calls[0] ?? [];
     expect(url).toContain('/drive/v3/about?fields=user(emailAddress,permissionId)');
     expect(init?.method).toBe('GET');
@@ -63,6 +86,46 @@ describe('Google Drive authorization', () => {
         (record) => record.value === 'temporary-access-token',
       ),
     ).toBe(false);
+  });
+
+  it('keeps a disconnected profile disconnected when the account confirmation is cancelled', async () => {
+    identity.getAuthToken.mockResolvedValue({ token: 'temporary-access-token' });
+    vi.mocked(fetch).mockImplementation(async () => aboutResponse(alice));
+    await prepareGoogleDriveConnection();
+    const requestCount = vi.mocked(fetch).mock.calls.length;
+
+    await cancelGoogleDriveConnection();
+
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(requestCount);
+    expect(identity.clearAllCachedAuthTokens).toHaveBeenCalledOnce();
+    expect(await getDriveConnectionState()).toEqual({
+      status: 'disconnected',
+      account: null,
+    });
+    expect(await db.syncMeta.get('drive.account')).toBeUndefined();
+  });
+
+  it('does not let a disconnected profile bypass account confirmation', async () => {
+    await expect(connectGoogleDrive()).rejects.toMatchObject({ code: 'disconnected' });
+    expect(identity.getAuthToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not connect if the signed-in account changes before confirmation', async () => {
+    identity.getAuthToken.mockResolvedValue({ token: 'temporary-access-token' });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(aboutResponse(alice))
+      .mockResolvedValueOnce(aboutResponse(bob));
+    const candidate = await prepareGoogleDriveConnection();
+
+    await expect(confirmGoogleDriveConnection(candidate)).rejects.toThrow(
+      'Google returned a different account',
+    );
+
+    expect(await getDriveConnectionState()).toEqual({
+      status: 'disconnected',
+      account: null,
+    });
   });
 
   it('detects account switches and only clears Drive records after confirmation', async () => {
@@ -88,7 +151,7 @@ describe('Google Drive authorization', () => {
       size: 100,
     });
     identity.getAuthToken.mockResolvedValue({ token: 'bob-token' });
-    vi.mocked(fetch).mockResolvedValue(aboutResponse(bob));
+    vi.mocked(fetch).mockImplementation(async () => aboutResponse(bob));
 
     await expect(connectGoogleDrive()).resolves.toEqual({
       status: 'account-switch-required',
@@ -111,6 +174,7 @@ describe('Google Drive authorization', () => {
   });
 
   it('evicts a 401 token and retries the Drive request once', async () => {
+    await db.syncMeta.put({ key: 'drive.account', value: alice });
     identity.getAuthToken
       .mockResolvedValueOnce({ token: 'expired-token' })
       .mockResolvedValueOnce({ token: 'fresh-token' });
@@ -118,10 +182,7 @@ describe('Google Drive authorization', () => {
       .mockResolvedValueOnce(new Response('', { status: 401 }))
       .mockResolvedValueOnce(aboutResponse(alice));
 
-    await expect(checkGoogleDriveAccount()).resolves.toEqual({
-      status: 'connected',
-      account: alice,
-    });
+    await expect(verifyGoogleDriveAccount()).resolves.toBeUndefined();
 
     expect(identity.getAuthToken).toHaveBeenNthCalledWith(1, { interactive: false });
     expect(identity.getAuthToken).toHaveBeenNthCalledWith(2, { interactive: false });
@@ -133,6 +194,7 @@ describe('Google Drive authorization', () => {
   });
 
   it('does not retry more than once when the refreshed token also gets a 401', async () => {
+    await db.syncMeta.put({ key: 'drive.account', value: alice });
     identity.getAuthToken
       .mockResolvedValueOnce({ token: 'expired-token' })
       .mockResolvedValueOnce({ token: 'still-invalid-token' });
@@ -140,8 +202,8 @@ describe('Google Drive authorization', () => {
       .mockResolvedValueOnce(new Response('', { status: 401 }))
       .mockResolvedValueOnce(new Response('', { status: 401 }));
 
-    await expect(checkGoogleDriveAccount()).rejects.toThrow(
-      'Google rejected the refreshed token',
+    await expect(verifyGoogleDriveAccount()).rejects.toThrow(
+      'Google Drive needs authorization',
     );
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(identity.removeCachedAuthToken).toHaveBeenNthCalledWith(1, {
@@ -152,10 +214,10 @@ describe('Google Drive authorization', () => {
     });
   });
 
-  it('revokes the access token and clears Drive data while keeping local identity metadata', async () => {
+  it('disconnects only locally without tokens or requests while preserving local data', async () => {
     await db.syncMeta.bulkPut([
       { key: 'deviceId', value: 'device-local' },
-      { key: 'lastHlc', value: 'local-clock' },
+      { key: 'lastHlc', value: '2026-11-04T12:00:00.000Z-0000-device-local' },
       { key: 'drive.account', value: alice },
     ]);
     await db.deviceFiles.put({
@@ -172,35 +234,166 @@ describe('Google Drive authorization', () => {
       lastSync: 10,
       size: 100,
     });
-    identity.getAuthToken.mockResolvedValue({ token: 'revoke-me' });
-    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
-
-    await expect(disconnectGoogleDrive()).resolves.toEqual({ revocationConfirmed: true });
-
-    expect(fetch).toHaveBeenCalledWith(
-      'https://oauth2.googleapis.com/revoke',
-      expect.objectContaining({
-        method: 'POST',
-        body: new URLSearchParams({ token: 'revoke-me' }),
-      }),
-    );
-    expect(identity.removeCachedAuthToken).toHaveBeenCalledWith({ token: 'revoke-me' });
+    const { createItem, createSnapshot } = await import('../storage');
+    await createItem({ url: 'https://example.com', title: 'Keep me' });
+    await createSnapshot();
+    const before = await Promise.all([
+      db.groups.toArray(),
+      db.items.toArray(),
+      db.thumbnails.toArray(),
+      db.snapshots.toArray(),
+    ]);
+    const lastClock = await db.syncMeta.get('lastHlc');
+    await expect(disconnectGoogleDrive()).resolves.toBeUndefined();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(identity.getAuthToken).not.toHaveBeenCalled();
+    expect(identity.clearAllCachedAuthTokens).toHaveBeenCalledOnce();
+    expect(
+      await Promise.all([
+        db.groups.toArray(),
+        db.items.toArray(),
+        db.thumbnails.toArray(),
+        db.snapshots.toArray(),
+      ]),
+    ).toEqual(before);
+    expect(await db.syncMeta.get('lastHlc')).toEqual(lastClock);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: DRIVE_CONNECTION_CHANGED,
+      status: 'disconnected',
+    });
     expect(await getConnectedDriveAccount()).toBeNull();
     expect(await db.deviceFiles.count()).toBe(0);
     expect(await db.driveAssets.count()).toBe(0);
     expect(await db.syncMeta.get('deviceId')).toMatchObject({ value: 'device-local' });
-    expect(await db.syncMeta.get('lastHlc')).toMatchObject({ value: 'local-clock' });
   });
 
-  it('still disconnects locally when Google cannot confirm revocation', async () => {
+  it('commits disconnection even when local credential cleanup fails', async () => {
     await db.syncMeta.put({ key: 'drive.account', value: alice });
-    identity.getAuthToken.mockResolvedValue({ token: 'revoke-me' });
-    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 503 }));
-
-    await expect(disconnectGoogleDrive()).resolves.toEqual({
-      revocationConfirmed: false,
+    identity.clearAllCachedAuthTokens.mockRejectedValue(new Error('cache unavailable'));
+    await expect(disconnectGoogleDrive()).resolves.toBeUndefined();
+    expect(await getDriveConnectionState()).toEqual({
+      status: 'disconnected',
+      account: null,
     });
-    expect(await getConnectedDriveAccount()).toBeNull();
-    expect(identity.removeCachedAuthToken).toHaveBeenCalledWith({ token: 'revoke-me' });
+    await expect(
+      driveFetch('https://www.googleapis.com/drive/v3/files'),
+    ).rejects.toMatchObject({ code: 'disconnected' });
+    expect(identity.getAuthToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('notifies open state observers and preserves recovery across database reopen', async () => {
+    await db.syncMeta.put({ key: 'drive.account', value: alice });
+    const observed = vi.fn();
+    const subscription = liveQuery(getDriveConnectionState).subscribe(observed);
+    try {
+      await vi.waitFor(() =>
+        expect(observed).toHaveBeenLastCalledWith({
+          status: 'connected',
+          account: alice,
+        }),
+      );
+      await markDriveAuthorizationRequired();
+      await vi.waitFor(() =>
+        expect(observed).toHaveBeenLastCalledWith({
+          status: 'authorization-required',
+          account: alice,
+        }),
+      );
+      db.close();
+      await db.open();
+      expect((await getDriveConnectionState()).status).toBe('authorization-required');
+      await disconnectGoogleDrive();
+      await vi.waitFor(() =>
+        expect(observed).toHaveBeenLastCalledWith({
+          status: 'disconnected',
+          account: null,
+        }),
+      );
+    } finally {
+      subscription.unsubscribe();
+    }
+  });
+
+  it('rejects stale switch confirmation after another dashboard disconnects', async () => {
+    await db.syncMeta.put({ key: 'drive.account', value: alice });
+    await disconnectGoogleDrive();
+    await expect(switchGoogleDriveAccount(bob)).rejects.toMatchObject({
+      code: 'disconnected',
+    });
+    expect(identity.getAuthToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('persists failed silent consent and blocks subsequent Drive requests', async () => {
+    await db.syncMeta.put({ key: 'drive.account', value: alice });
+    identity.getAuthToken.mockRejectedValue(new Error('OAuth2 not granted or revoked.'));
+    await expect(
+      driveFetch('https://www.googleapis.com/drive/v3/files'),
+    ).rejects.toMatchObject({ code: 'authorization-required', retryable: false });
+    expect(await getDriveConnectionState()).toEqual({
+      status: 'authorization-required',
+      account: alice,
+    });
+    await expect(verifyGoogleDriveAccount()).rejects.toMatchObject({
+      code: 'authorization-required',
+    });
+    expect(identity.getAuthToken).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('recovers the same account without resetting sync bookkeeping', async () => {
+    await db.syncMeta.bulkPut([
+      { key: 'drive.account', value: alice },
+      { key: 'drive.initialSyncCompleted', value: true },
+    ]);
+    await markDriveAuthorizationRequired();
+    identity.getAuthToken.mockResolvedValue({ token: 'new-token' });
+    vi.mocked(fetch).mockResolvedValue(aboutResponse(alice));
+    await connectGoogleDrive();
+    expect(await getDriveConnectionState()).toEqual({
+      status: 'connected',
+      account: alice,
+    });
+    expect((await db.syncMeta.get('drive.initialSyncCompleted'))?.value).toBe(true);
+    expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
+      type: DRIVE_CONNECTION_CHANGED,
+      status: 'connected',
+    });
+  });
+
+  it('keeps recovery state and pending changes if consent is cancelled', async () => {
+    await db.syncMeta.bulkPut([
+      { key: 'drive.account', value: alice },
+      { key: 'drive.lastSync', value: 'keep' },
+    ]);
+    await markDriveAuthorizationRequired();
+    identity.getAuthToken.mockRejectedValue(
+      new Error('The user did not approve access.'),
+    );
+    await expect(connectGoogleDrive()).rejects.toThrow('not completed');
+    expect((await getDriveConnectionState()).status).toBe('authorization-required');
+    expect((await db.syncMeta.get('drive.lastSync'))?.value).toBe('keep');
+  });
+
+  it('treats Identity network failures as retryable without requiring consent', async () => {
+    await db.syncMeta.put({ key: 'drive.account', value: alice });
+    identity.getAuthToken.mockRejectedValue(
+      new Error('OAuth2 request failed: Connection failed (-2).'),
+    );
+    await expect(
+      driveFetch('https://www.googleapis.com/drive/v3/files'),
+    ).rejects.toMatchObject({ code: 'network-error', retryable: true });
+    expect((await getDriveConnectionState()).status).toBe('connected');
+  });
+
+  it('blocks sync when Chrome silently returns a different account', async () => {
+    await db.syncMeta.put({ key: 'drive.account', value: alice });
+    identity.getAuthToken.mockResolvedValue({ token: 'bob-token' });
+    vi.mocked(fetch).mockImplementation(async () => aboutResponse(bob));
+    await expect(verifyGoogleDriveAccount()).rejects.toMatchObject({
+      code: 'authorization-required',
+    });
+    expect(await getConnectedDriveAccount()).toEqual(alice);
   });
 });

@@ -85,6 +85,10 @@ function listResponse(files: unknown[], nextPageToken?: string): Response {
 beforeEach(async () => {
   await db.delete();
   await db.open();
+  await db.syncMeta.put({
+    key: 'drive.account',
+    value: { emailAddress: 'test@example.com', permissionId: 'test-user' },
+  });
   identity.getAuthToken.mockReset().mockResolvedValue({ token: 'drive-test-token' });
   identity.removeCachedAuthToken.mockReset().mockResolvedValue(undefined);
   vi.stubGlobal('chrome', { identity });
@@ -97,6 +101,25 @@ afterAll(async () => {
 });
 
 describe('Google Drive device files', () => {
+  it('preserves authorization failures while listing device files', async () => {
+    identity.getAuthToken.mockRejectedValue(new Error('OAuth2 not granted or revoked.'));
+    await expect(listDriveDeviceFiles()).rejects.toMatchObject({
+      code: 'authorization-required',
+      retryable: false,
+    });
+    expect((await db.syncMeta.get('drive.authorizationRequired'))?.value).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves genuine network errors without setting recovery state', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(listDriveDeviceFiles()).rejects.toMatchObject({
+      code: 'network-error',
+      retryable: true,
+    });
+    expect(await db.syncMeta.get('drive.authorizationRequired')).toBeUndefined();
+  });
+
   it('generates and keeps one stable device ID', async () => {
     const first = await createLocalDriveDeviceState();
     const second = await createLocalDriveDeviceState();

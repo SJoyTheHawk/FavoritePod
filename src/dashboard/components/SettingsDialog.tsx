@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { useEffect, useState } from 'react';
+import {
+  Description,
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+} from '@headlessui/react';
 import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
@@ -14,7 +20,7 @@ import { normalizePathOverrides, type PathOverride } from '../../core/file-links
 import type {
   DriveAccount,
   DriveConnectionResult,
-  DriveDisconnectResult,
+  DriveConnectionState,
 } from '../../core/drive-auth';
 import type { GroupingMode, LibraryView, OpenBehavior } from '../../core/storage';
 import type { ArchiveDialogMode } from './ImportExportDialog';
@@ -25,6 +31,7 @@ interface SettingsDialogProps {
   showPreview: boolean;
   openBehavior: OpenBehavior;
   driveAccount: DriveAccount | null;
+  driveConnectionStatus: DriveConnectionState['status'];
   driveSyncing: boolean;
   driveSyncError?: string;
   driveSyncMessage?: string;
@@ -37,9 +44,11 @@ interface SettingsDialogProps {
   onSaveOpenBehavior: (behavior: OpenBehavior) => Promise<void>;
   onSavePathOverrides: (overrides: PathOverride[]) => Promise<void>;
   onConnectDrive: () => Promise<DriveConnectionResult>;
-  onCheckDriveAccount: () => Promise<DriveConnectionResult>;
+  onPrepareDriveConnection: () => Promise<DriveAccount>;
+  onConfirmDriveConnection: (account: DriveAccount) => Promise<DriveConnectionResult>;
+  onCancelDriveConnection: () => Promise<void>;
   onSwitchDriveAccount: (account: DriveAccount) => Promise<void>;
-  onDisconnectDrive: () => Promise<DriveDisconnectResult>;
+  onDisconnectDrive: () => Promise<void>;
   onSyncDrive: () => Promise<void>;
   onArchiveAction: (mode: ArchiveDialogMode) => void;
 }
@@ -50,6 +59,7 @@ export function SettingsDialog({
   showPreview,
   openBehavior,
   driveAccount,
+  driveConnectionStatus,
   driveSyncing,
   driveSyncError,
   driveSyncMessage,
@@ -62,7 +72,9 @@ export function SettingsDialog({
   onSaveOpenBehavior,
   onSavePathOverrides,
   onConnectDrive,
-  onCheckDriveAccount,
+  onPrepareDriveConnection,
+  onConfirmDriveConnection,
+  onCancelDriveConnection,
   onSwitchDriveAccount,
   onDisconnectDrive,
   onSyncDrive,
@@ -73,31 +85,91 @@ export function SettingsDialog({
   const [driveError, setDriveError] = useState<string>();
   const [driveMessage, setDriveMessage] = useState<string>();
   const [driveBusy, setDriveBusy] = useState(false);
+  const [connectCandidate, setConnectCandidate] = useState<DriveAccount>();
   const [pendingDriveAccount, setPendingDriveAccount] = useState<DriveAccount>();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
-  const checkOrConnectDrive = async (silent: boolean) => {
+  useEffect(() => {
+    if (driveConnectionStatus === 'disconnected') {
+      setPendingDriveAccount(undefined);
+      setConfirmDisconnect(false);
+      setDriveError(undefined);
+      setDriveMessage(undefined);
+    }
+  }, [driveConnectionStatus]);
+
+  useEffect(() => {
+    if (driveConnectionStatus !== 'disconnected') setConnectCandidate(undefined);
+  }, [driveConnectionStatus]);
+
+  const connectDrive = async () => {
     setDriveBusy(true);
     setDriveError(undefined);
     setDriveMessage(undefined);
     setPendingDriveAccount(undefined);
     try {
-      const result = await (silent ? onCheckDriveAccount() : onConnectDrive());
+      const result = await onConnectDrive();
       if (result.status === 'account-switch-required') {
         setPendingDriveAccount(result.nextAccount);
       } else {
         setPendingDriveAccount(undefined);
-        setDriveMessage(
-          silent
-            ? `Google account verified: ${result.account.emailAddress}.`
-            : `Connected as ${result.account.emailAddress}.`,
-        );
       }
     } catch (cause) {
       setDriveError(
         cause instanceof Error ? cause.message : 'Could not connect to Google Drive.',
       );
     } finally {
+      setDriveBusy(false);
+    }
+  };
+
+  const prepareDriveConnection = async () => {
+    setDriveBusy(true);
+    setDriveError(undefined);
+    setDriveMessage(undefined);
+    setConnectCandidate(undefined);
+    try {
+      setConnectCandidate(await onPrepareDriveConnection());
+    } catch (cause) {
+      setDriveError(
+        cause instanceof Error ? cause.message : 'Could not connect to Google Drive.',
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  };
+
+  const confirmDriveConnection = async () => {
+    if (!connectCandidate) return;
+    setDriveBusy(true);
+    setDriveError(undefined);
+    try {
+      const result = await onConfirmDriveConnection(connectCandidate);
+      setConnectCandidate(undefined);
+      if (result.status === 'account-switch-required') {
+        setPendingDriveAccount(result.nextAccount);
+      }
+    } catch (cause) {
+      setConnectCandidate(undefined);
+      setDriveError(
+        cause instanceof Error ? cause.message : 'Could not connect to Google Drive.',
+      );
+    } finally {
+      setDriveBusy(false);
+    }
+  };
+
+  const cancelPreparedDriveConnection = async () => {
+    setDriveBusy(true);
+    setDriveError(undefined);
+    try {
+      await onCancelDriveConnection();
+    } catch (cause) {
+      setDriveError(
+        cause instanceof Error ? cause.message : 'Could not cancel the connection.',
+      );
+    } finally {
+      setConnectCandidate(undefined);
       setDriveBusy(false);
     }
   };
@@ -119,19 +191,20 @@ export function SettingsDialog({
     }
   };
 
+  const dismissDisconnect = () => {
+    if (driveBusy) return;
+    setConfirmDisconnect(false);
+    setDriveError(undefined);
+  };
+
   const disconnectDrive = async () => {
     setDriveBusy(true);
     setDriveError(undefined);
     setDriveMessage(undefined);
     try {
-      const result = await onDisconnectDrive();
+      await onDisconnectDrive();
       setConfirmDisconnect(false);
       setPendingDriveAccount(undefined);
-      setDriveMessage(
-        result.revocationConfirmed
-          ? undefined
-          : 'FavoritePod disconnected locally, but Google did not confirm access revocation.',
-      );
     } catch (cause) {
       setDriveError(
         cause instanceof Error ? cause.message : 'Could not disconnect Google Drive.',
@@ -347,46 +420,49 @@ export function SettingsDialog({
                   Not connected
                 </span>
               )}
+              {driveConnectionStatus === 'authorization-required' && (
+                <span className="ml-2 font-normal text-warning">
+                  Connection needs attention
+                </span>
+              )}
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-              {driveAccount
-                ? 'Sync your favorites across devices using Google Drive’s private app folder.'
-                : 'Connect your Google account to sync favorites using Drive’s private app folder.'}
+              {driveConnectionStatus === 'authorization-required'
+                ? 'Select Connect Google Drive to authorize this profile and resume syncing. Your local changes are saved.'
+                : driveAccount
+                  ? 'Sync your favorites across devices using Google Drive’s private app folder.'
+                  : 'Connect your Google account to sync favorites using Drive’s private app folder.'}
             </p>
             <div className="mt-3 rounded-md border border-border bg-surface px-3 py-3">
               {driveAccount ? (
                 <>
                   <p className="text-sm text-text-primary">
-                    <span aria-hidden="true" className="mr-1 text-success">
-                      ✓
-                    </span>
-                    Connected as{' '}
+                    {driveConnectionStatus === 'connected' && (
+                      <span aria-hidden="true" className="mr-1 text-success">
+                        ✓
+                      </span>
+                    )}
+                    {driveConnectionStatus === 'authorization-required'
+                      ? 'Account: '
+                      : 'Connected as '}
                     <span className="font-medium">{driveAccount.emailAddress}</span>
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
                     <button
                       className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
                       disabled={driveBusy || driveSyncing}
-                      onClick={() => void onSyncDrive()}
+                      onClick={() =>
+                        void (driveConnectionStatus === 'authorization-required'
+                          ? connectDrive()
+                          : onSyncDrive())
+                      }
                       type="button"
                     >
-                      {driveSyncing ? 'Syncing…' : 'Sync now'}
-                    </button>
-                    <button
-                      className="min-h-9 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy || driveSyncing}
-                      onClick={() => void checkOrConnectDrive(true)}
-                      type="button"
-                    >
-                      Check account
-                    </button>
-                    <button
-                      className="min-h-9 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy || driveSyncing}
-                      onClick={() => void checkOrConnectDrive(false)}
-                      type="button"
-                    >
-                      Reconnect or switch account
+                      {driveSyncing
+                        ? 'Syncing…'
+                        : driveConnectionStatus === 'authorization-required'
+                          ? 'Connect Google Drive'
+                          : 'Sync now'}
                     </button>
                     <button
                       className="min-h-9 rounded-md px-3 text-sm font-medium text-danger transition hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
@@ -401,12 +477,49 @@ export function SettingsDialog({
                     </button>
                   </div>
                 </>
+              ) : connectCandidate ? (
+                <div
+                  aria-labelledby="drive-connect-confirm-title"
+                  className="rounded-md border border-border bg-background p-3"
+                  role="group"
+                >
+                  <p
+                    className="text-sm font-medium text-text-primary"
+                    id="drive-connect-confirm-title"
+                  >
+                    Connect Google Drive as {connectCandidate.emailAddress}?
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+                    FavoritePod uses the Google account signed in to this Chrome profile.
+                    To use a different account, change this Chrome profile’s account
+                    first.
+                  </p>
+                  <div className="mt-3 flex justify-center gap-2">
+                    <button
+                      className="min-h-9 rounded-md border border-border px-3 text-sm text-text-primary transition hover:bg-surface-hover disabled:opacity-60"
+                      disabled={driveBusy}
+                      onClick={() => void cancelPreparedDriveConnection()}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      autoFocus
+                      className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
+                      disabled={driveBusy}
+                      onClick={() => void confirmDriveConnection()}
+                      type="button"
+                    >
+                      Connect
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="flex justify-center">
                   <button
                     className="min-h-10 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
                     disabled={driveBusy}
-                    onClick={() => void checkOrConnectDrive(false)}
+                    onClick={() => void prepareDriveConnection()}
                     type="button"
                   >
                     Connect Google Drive
@@ -443,35 +556,7 @@ export function SettingsDialog({
                 </div>
               )}
 
-              {confirmDisconnect && (
-                <div className="mt-3 rounded-md border border-danger/30 bg-background p-3">
-                  <p className="text-sm text-text-primary" role="alert">
-                    Disconnecting revokes FavoritePod’s Google access and clears this
-                    device’s Drive connection records. Your saved favorites stay here.
-                    Google may also revoke access for other FavoritePod builds using this
-                    Cloud project.
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      className="min-h-9 rounded-md border border-border px-3 text-sm text-text-primary hover:bg-surface-hover disabled:opacity-60"
-                      disabled={driveBusy}
-                      onClick={() => setConfirmDisconnect(false)}
-                      type="button"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="min-h-9 rounded-md bg-danger px-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
-                      disabled={driveBusy}
-                      onClick={() => void disconnectDrive()}
-                      type="button"
-                    >
-                      Disconnect Google Drive
-                    </button>
-                  </div>
-                </div>
-              )}
-              {driveError && (
+              {driveError && !confirmDisconnect && (
                 <p className="mt-3 text-sm text-danger" role="alert">
                   {driveError}
                 </p>
@@ -612,6 +697,49 @@ export function SettingsDialog({
           )}
         </DialogPanel>
       </div>
+      {confirmDisconnect && (
+        <Dialog className="relative z-[60]" onClose={dismissDisconnect} open>
+          <DialogBackdrop className="fixed inset-0 bg-black/35" />
+          <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
+            <DialogPanel
+              aria-busy={driveBusy}
+              className="w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl"
+            >
+              <DialogTitle className="text-lg font-semibold text-text-primary">
+                Disconnect Google Drive?
+              </DialogTitle>
+              <Description className="mt-2 text-sm text-text-secondary">
+                Disconnecting from Google Drive will stop syncing your favorites. Your
+                saved favorites will remain available locally.
+              </Description>
+              {driveError && (
+                <p className="mt-3 text-sm text-danger" role="alert">
+                  {driveError}
+                </p>
+              )}
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  className="min-h-10 rounded-md border border-border px-4 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:opacity-60"
+                  data-autofocus
+                  disabled={driveBusy}
+                  onClick={dismissDisconnect}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="min-h-10 rounded-md bg-danger px-4 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+                  disabled={driveBusy}
+                  onClick={() => void disconnectDrive()}
+                  type="button"
+                >
+                  {driveBusy ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+              </div>
+            </DialogPanel>
+          </div>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

@@ -51,6 +51,10 @@ function thumbnail(hash: string, blob: Blob): Thumbnail {
 beforeEach(async () => {
   await db.delete();
   await db.open();
+  await db.syncMeta.put({
+    key: 'drive.account',
+    value: { emailAddress: 'test@example.com', permissionId: 'test-user' },
+  });
   identity.getAuthToken.mockReset().mockResolvedValue({ token: 'drive-test-token' });
   identity.removeCachedAuthToken.mockReset().mockResolvedValue(undefined);
   vi.stubGlobal('chrome', { identity });
@@ -71,6 +75,25 @@ afterAll(async () => {
 });
 
 describe('Google Drive preview assets', () => {
+  it('preserves authorization failures while listing preview assets', async () => {
+    identity.getAuthToken.mockRejectedValue(new Error('OAuth2 not granted or revoked.'));
+    await expect(listDriveAssets()).rejects.toMatchObject({
+      code: 'authorization-required',
+      retryable: false,
+    });
+    expect((await db.syncMeta.get('drive.authorizationRequired'))?.value).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves genuine network errors without setting recovery state', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(listDriveAssets()).rejects.toMatchObject({
+      code: 'network-error',
+      retryable: true,
+    });
+    expect(await db.syncMeta.get('drive.authorizationRequired')).toBeUndefined();
+  });
+
   it('lists paginated JPEG assets and ignores unrelated files', async () => {
     const firstHash = 'a'.repeat(64);
     const secondHash = 'b'.repeat(64);

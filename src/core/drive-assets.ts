@@ -1,5 +1,5 @@
 import { db } from './db';
-import { driveFetch } from './drive-auth';
+import { DriveAuthError, driveFetch } from './drive-auth';
 import { MAX_IMAGE_SIZE } from './archive';
 import { hashBlob } from './thumbnail';
 import type { DriveAssetFile, Thumbnail } from './types';
@@ -205,7 +205,8 @@ export async function listDriveAssets(): Promise<DriveAssetMetadata[]> {
     let response: Response;
     try {
       response = await driveFetch(url);
-    } catch {
+    } catch (cause) {
+      if (cause instanceof DriveAuthError) throw cause;
       throw new DriveAssetError(
         'Could not reach Google Drive to list preview files.',
         true,
@@ -305,7 +306,8 @@ async function uploadAsset(
   let response: Response;
   try {
     response = await driveFetch(url, { method: 'POST', body });
-  } catch {
+  } catch (cause) {
+    if (cause instanceof DriveAuthError) throw cause;
     throw new DriveAssetError('Could not upload the preview to Google Drive.', true);
   }
   await ensureDriveAssetSuccess(response, 'upload preview');
@@ -393,7 +395,8 @@ async function downloadAsset(metadata: DriveAssetMetadata): Promise<Thumbnail> {
     response = await driveFetch(
       `${DRIVE_API}/drive/v3/files/${encodeURIComponent(metadata.fileId)}?alt=media`,
     );
-  } catch {
+  } catch (cause) {
+    if (cause instanceof DriveAuthError) throw cause;
     throw new DriveAssetError(
       `Could not download preview ${metadata.hash} from Google Drive.`,
       true,
@@ -544,7 +547,8 @@ export async function compactOrphanDriveAssets(
         `${DRIVE_API}/drive/v3/files/${encodeURIComponent(candidate.fileId)}`,
         { method: 'DELETE' },
       );
-    } catch {
+    } catch (cause) {
+      if (cause instanceof DriveAuthError) throw cause;
       throw new DriveAssetError(
         `Could not reach Google Drive to delete orphan preview ${candidate.hash}.`,
         true,

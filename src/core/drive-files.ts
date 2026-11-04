@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ClockSchema, GroupSchema, ItemSchema, MAX_RECORDS } from './archive';
 import { db } from './db';
-import { driveFetch } from './drive-auth';
+import { DriveAuthError, driveFetch } from './drive-auth';
 import { mergeLibrary } from './merge';
 import { getDeviceId } from './storage';
 import { tickHLC } from './hlc';
@@ -239,7 +239,8 @@ export async function listDriveDeviceFiles(): Promise<DriveDeviceFileMetadata[]>
     let response: Response;
     try {
       response = await driveFetch(url);
-    } catch {
+    } catch (cause) {
+      if (cause instanceof DriveAuthError) throw cause;
       throw new DriveFileError(
         'Could not reach Google Drive to list device files.',
         true,
@@ -303,7 +304,8 @@ async function downloadDeviceFile(
     response = await driveFetch(
       `${DRIVE_API}/drive/v3/files/${encodeURIComponent(metadata.fileId)}?alt=media`,
     );
-  } catch {
+  } catch (cause) {
+    if (cause instanceof DriveAuthError) throw cause;
     throw new DriveFileError(
       `Could not download ${metadata.name} from Google Drive.`,
       true,
@@ -405,7 +407,8 @@ async function uploadMedia(
       headers: { 'Content-Type': contentType },
       body,
     });
-  } catch {
+  } catch (cause) {
+    if (cause instanceof DriveAuthError) throw cause;
     throw new DriveFileError('Could not upload the device state to Google Drive.', true);
   }
   await ensureDriveSuccess(response, 'upload device state');
@@ -646,7 +649,8 @@ export async function compactStaleDriveDeviceFiles(
         `${DRIVE_API}/drive/v3/files/${encodeURIComponent(candidate.fileId)}`,
         { method: 'DELETE' },
       );
-    } catch {
+    } catch (cause) {
+      if (cause instanceof DriveAuthError) throw cause;
       retainedDeviceIds.push(candidate.deviceId);
       continue;
     }

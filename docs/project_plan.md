@@ -22,7 +22,7 @@ Second review pass:
 - `chrome.topSites` exposes Chrome's own most-visited list, so the frequency ranking does not need to be guessed.
 - `file://` links cannot be opened with plain anchors from an extension page and their existence cannot be checked reliably. Open through `chrome.tabs.create` and gate on file-scheme access.
 - Only the public key goes into the manifest. The private `.pem` stays out of git.
-- Disconnect must revoke the token, not only clear Chrome's cache.
+- Disconnect stops sync only in the current Chrome profile and clears local Identity credentials; it must never revoke the account-wide Google grant.
 - ZIP merge should upsert by ID so re-importing a colleague's updated export updates instead of duplicating.
 - Reject non-`http`/`https`/`file` URL schemes everywhere (`javascript:` in particular), including imports.
 - Add a de-risking spike before building UI.
@@ -84,7 +84,7 @@ Permission notes:
 - `contextMenus` is only needed if "Save to launcher" appears in Chrome's page/link right-click menu. In-dashboard context menus need no permission.
 - `alarms` drives periodic background sync; MV3 service workers cannot hold timers.
 - `unlimitedStorage` keeps IndexedDB thumbnails from being evicted.
-- Chrome extension cross-origin requests from extension pages and the service worker require host permissions. Keep these limited to the Google API origins used by the Drive client and token revocation (`https://www.googleapis.com/*` and `https://oauth2.googleapis.com/*`); the `drive.appdata` OAuth scope still limits which Drive files the app can access. See [Chrome's cross-origin network request guidance](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests).
+- Chrome extension cross-origin requests from extension pages and the service worker require host permissions. Keep these limited to the Google API origin used by the Drive client (`https://www.googleapis.com/*`); the `drive.appdata` OAuth scope still limits which Drive files the app can access. See [Chrome's cross-origin network request guidance](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests).
 
 Stable ID: generate the key pair once. Commit only the base64 public key into `manifest.json` as `"key"`. Keep the private `.pem` out of git (password manager or CI secret). The Chrome Web Store issues its own ID on first upload; if the extension will be published, upload once early, copy the store's public key into `"key"`, and register the OAuth client against that ID so unpacked and store builds share one identity.
 
@@ -95,7 +95,10 @@ Use `chrome.identity.getAuthToken()` for authorization. Never include a client s
 Token handling:
 
 - On HTTP 401, call `chrome.identity.removeCachedAuthToken()` and retry once with a fresh token.
-- Disconnect sends the token to `https://oauth2.googleapis.com/revoke` with a form-encoded `POST`, calls `removeCachedAuthToken()`, then clears Drive-specific metadata and device-file records. Local launcher data, `deviceId`, and `lastHlc` are kept. Google applies token revocation to the OAuth project, so it can also invalidate grants for other clients registered to that project.
+- Disconnect clears only this Chrome profile's Drive connection/bookkeeping and Chrome Identity cache. It never requests a token, contacts the revocation endpoint, or deletes Drive files. Local library data, snapshots, deviceId, and lastHlc remain. Other profiles/devices stay authorized. This explicitly supersedes the original revoke-on-disconnect requirement.
+- Authorization failures persist a local recovery state, pause background sync, and show a contextual Connect Google Drive action. Network failures retain bounded retries without changing authorization state. Only user-initiated Connect may open consent.
+- From a disconnected profile, Connect first identifies the Google account and asks the user to confirm it before saving the connection or starting sync. Cancel leaves the profile disconnected. Chrome may reuse the existing Google grant and skip its consent screen; the FavoritePod confirmation is the explicit reconnect step. Authorization recovery for a remembered account remains a one-click Connect action.
+- Connected Settings shows Sync now and Disconnect; Check account and Reconnect or switch account are removed. Google Account settings remain the place for account-wide revocation.
 - Identify the connected account with `GET drive/v3/about?fields=user(emailAddress,permissionId)`, store `permissionId` locally, and treat a change as an account switch.
 - While the OAuth consent screen is in "Testing" mode, refresh tokens expire after 7 days and only listed test users can connect. Move to "In production" before colleagues use sync. `drive.appdata` is a non-sensitive scope, so verification should be light.
 

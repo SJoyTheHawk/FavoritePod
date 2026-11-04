@@ -25,7 +25,7 @@ export function GroupHeader({
       aria-label={`${group.title}, ${count} ${count === 1 ? 'favorite' : 'favorites'}`}
       aria-controls={`group-section-${group.id}`}
       aria-expanded={!collapsed}
-      className={`group flex h-9 w-full min-w-0 items-center justify-between gap-3 rounded-md px-1 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isDragOver ? 'bg-primary-light/30 ring-1 ring-inset ring-primary/60' : 'hover:bg-surface-hover/60'}`}
+      className={`group flex h-9 w-full min-w-0 items-center justify-start gap-2 rounded-md px-1 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isDragOver ? 'bg-primary-light/30 ring-1 ring-inset ring-primary/60' : 'hover:bg-surface-hover/60'}`}
       onClick={onToggle}
       onDragOver={(event) => {
         const payload =
@@ -53,7 +53,7 @@ export function GroupHeader({
       onDragEnd={() => setIsDragOver(false)}
       type="button"
     >
-      <span className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="flex min-w-0 max-w-[calc(100%-2.5rem)] items-center gap-2">
         <span className="truncate text-base font-semibold text-text-primary">
           {group.title}
         </span>

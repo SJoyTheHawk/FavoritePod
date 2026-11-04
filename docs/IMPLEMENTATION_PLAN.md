@@ -554,10 +554,10 @@ phase.
 - [ ] Enable Drive API
 - [ ] Configure OAuth consent screen
 - [ ] Add test users
-- [ ] Implement `chrome.identity.getAuthToken()`
-- [ ] Build token refresh on 401
-- [ ] Implement disconnect with token revoke
-- [ ] Detect account switches via permissionId
+- [x] Implement `chrome.identity.getAuthToken()`
+- [x] Build token refresh on 401
+- [x] Implement disconnect with token revoke
+- [x] Detect account switches via permissionId
 
 **Settings UI**:
 ```
@@ -592,6 +592,8 @@ phase.
 - Tokens refresh automatically
 - Disconnect works cleanly
 - Account switch detected
+
+Browser verification steps: [`phase-8.1-manual-test.md`](./phase-8.1-manual-test.md).
 
 ### 8.2 Device File Management
 **Goal**: Per-device sync files with conflict-free updates

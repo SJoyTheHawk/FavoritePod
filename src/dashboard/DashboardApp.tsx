@@ -65,6 +65,14 @@ import {
 import { parseSafeUrl } from '../core/validation';
 import { useLibrary } from '../core/use-library';
 import type { Group, Item } from '../core/types';
+import {
+  checkGoogleDriveAccount,
+  connectGoogleDrive,
+  disconnectGoogleDrive,
+  getConnectedDriveAccount,
+  switchGoogleDriveAccount,
+  type DriveAccount,
+} from '../core/drive-auth';
 import { FavoriteCard } from './components/FavoriteCard';
 import { BookmarkSizeControl } from './components/BookmarkSizeControl';
 import { FavoriteDialog } from './components/FavoriteDialog';
@@ -218,6 +226,7 @@ export function DashboardApp() {
   const [fileAccessAllowed, setFileAccessAllowed] = useState<boolean>();
   const [fileAccessHintDismissed, setFileAccessHintDismissed] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [driveAccount, setDriveAccount] = useState<DriveAccount | null>(null);
   const startupSelectionApplied = useRef(false);
   const initialLastGroupId = useRef<string | null | undefined>(undefined);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -339,6 +348,7 @@ export function DashboardApp() {
       getShowPreview(),
       getPathOverrides(),
       getGroupingMode(),
+      getConnectedDriveAccount(),
     ])
       .then(
         ([
@@ -350,6 +360,7 @@ export function DashboardApp() {
           preview,
           overrides,
           grouping,
+          connectedDriveAccount,
         ]) => {
           if (view) setLayout(view);
           setOpenBehaviorState(behavior);
@@ -358,6 +369,7 @@ export function DashboardApp() {
           setShowPreviewState(preview);
           setPathOverridesState(overrides);
           setGroupingModeState(grouping);
+          setDriveAccount(connectedDriveAccount);
           initialLastGroupId.current = lastGroupId;
           setSettingsLoaded(true);
         },
@@ -510,6 +522,29 @@ export function DashboardApp() {
     await persistPathOverrides(overrides);
     setPathOverridesState(await getPathOverrides());
     notify('File locations saved for this device.');
+  };
+
+  const handleConnectDrive = async () => {
+    const result = await connectGoogleDrive();
+    if (result.status === 'connected') setDriveAccount(result.account);
+    return result;
+  };
+
+  const handleCheckDriveAccount = async () => {
+    const result = await checkGoogleDriveAccount();
+    if (result.status === 'connected') setDriveAccount(result.account);
+    return result;
+  };
+
+  const handleSwitchDriveAccount = async (account: DriveAccount) => {
+    await switchGoogleDriveAccount(account);
+    setDriveAccount(account);
+  };
+
+  const handleDisconnectDrive = async () => {
+    const result = await disconnectGoogleDrive();
+    setDriveAccount(null);
+    return result;
   };
 
   const handleFileAccessDenied = () => {
@@ -1165,7 +1200,7 @@ export function DashboardApp() {
           <div
             ref={slotRef}
             aria-hidden="true"
-            className="pointer-events-none min-w-0 rounded-lg border border-dashed border-primary/50 bg-primary-light/20"
+            className="pointer-events-none min-w-0 rounded-lg border-2 border-dashed border-primary/70 bg-primary-light/35 shadow-sm"
             style={{
               order: dragPreviewRank.get(draggedIds[0]),
               height: dragPlaceholderHeight,
@@ -1577,6 +1612,7 @@ export function DashboardApp() {
       {settingsOpen && (
         <SettingsDialog
           defaultView={layout}
+          driveAccount={driveAccount}
           groupingMode={groupingMode}
           homePageAvailable={!!homePageGroupId && groupsById.has(homePageGroupId)}
           openBehavior={openBehavior}
@@ -1588,6 +1624,10 @@ export function DashboardApp() {
           onSaveOpenBehavior={saveOpenBehavior}
           onSaveShowPreview={savePreviewVisibility}
           onSavePathOverrides={saveLocalPathOverrides}
+          onConnectDrive={handleConnectDrive}
+          onCheckDriveAccount={handleCheckDriveAccount}
+          onSwitchDriveAccount={handleSwitchDriveAccount}
+          onDisconnectDrive={handleDisconnectDrive}
           onArchiveAction={(mode) => {
             setSettingsOpen(false);
             setArchiveDialog(mode);

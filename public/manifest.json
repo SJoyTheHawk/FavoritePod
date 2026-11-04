@@ -24,7 +24,15 @@
     "service_worker": "src/background/service-worker.ts",
     "type": "module"
   },
-  "permissions": ["activeTab", "favicon", "unlimitedStorage"],
-  "host_permissions": ["file:///*"],
+  "permissions": ["activeTab", "favicon", "unlimitedStorage", "identity"],
+  "host_permissions": [
+    "file:///*",
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "301335487475-rpips565ff5gqc6s8dhp3buhpkroqb7h.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/drive.appdata"]
+  },
   "optional_permissions": ["history", "topSites"]
 }

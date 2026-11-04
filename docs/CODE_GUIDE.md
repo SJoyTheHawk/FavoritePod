@@ -306,7 +306,9 @@ comparison can reverse keys such as `aZ` and `aa`.
 
 ### IndexedDB Schema (Dexie)
 
-`src/core/db.ts` owns the schema. Version 1 creates these tables and indexes:
+`src/core/db.ts` owns the schema. Version 1 creates the base tables; version 2
+adds the `faviconUrl` item clock during upgrade, and version 3 adds the Drive
+asset cache. Current tables and indexes are:
 
 | Table | Primary key | Indexed fields |
 |-------|-------------|-----------------|
@@ -316,12 +318,15 @@ comparison can reverse keys such as `aZ` and `aa`.
 | `syncMeta` | `key` | - |
 | `snapshots` | auto ID | `createdAt` |
 | `deviceFiles` | `deviceId` | `lastSync` |
+| `driveAssets` | `hash` | `lastSync` |
 | `settings` | `key` | - |
 
 Snapshots include groups, items, and thumbnail blobs. `storage.ts` keeps the
 three newest snapshots and restores their contents in one Dexie transaction.
-Future schema changes should add a Dexie version and migration; version 1
-currently needs no migration.
+`driveAssets` caches the remote file ID, name, modified time, and byte size for
+each content hash; disconnecting or switching Google accounts clears this
+account-specific cache while retaining local thumbnails. Future schema changes
+should add a Dexie version and migration.
 
 ### URL Validation
 

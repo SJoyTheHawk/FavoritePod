@@ -550,10 +550,10 @@ phase.
 **Goal**: Secure OAuth flow via Chrome Identity API
 
 **Tasks**:
-- [ ] Set up Google Cloud Project
-- [ ] Enable Drive API
-- [ ] Configure OAuth consent screen
-- [ ] Add test users
+- [x] Set up Google Cloud Project
+- [x] Enable Drive API
+- [x] Configure OAuth consent screen
+- [x] Add test users
 - [x] Implement `chrome.identity.getAuthToken()`
 - [x] Build token refresh on 401
 - [x] Implement disconnect with token revoke
@@ -599,16 +599,16 @@ Browser verification steps: [`phase-8.1-manual-test.md`](./phase-8.1-manual-test
 **Goal**: Per-device sync files with conflict-free updates
 
 **Tasks**:
-- [ ] Generate stable deviceId on first run
-- [ ] Create device file: `launcher-state-device-<id>.json`
-- [ ] List appDataFolder files
-- [ ] Download only modified files
-- [ ] Upload device state with PATCH
-- [ ] Implement file compaction (remove stale devices)
+- [x] Generate and persist stable `deviceId` on first run
+- [x] Create device file: `launcher-state-device-<id>.json`
+- [x] List paginated appDataFolder files
+- [x] Download only files whose `modifiedTime` changed
+- [x] Upload device state with PATCH (create the file on first upload)
+- [x] Merge stale device records before removing files older than 90 days
 
 **Device File Structure**:
 ```typescript
-interface DeviceFile {
+interface DriveDeviceState {
   schemaVersion: 1;
   deviceId: string;
   revision: number;
@@ -623,34 +623,48 @@ interface DeviceFile {
 ```
 
 **Acceptance**:
-- Each device has its own file
-- Updates don't overwrite others
-- Compaction removes old devices
-- File list is efficient
+- Each device has its own file in the private `appDataFolder`
+- Updates target only that device's file and refuse to overwrite an unseen remote change
+- Compaction merges device records into the current file before deleting files stale for 90 days
+- Listing is paginated and downloads skip files with cached matching `modifiedTime`
+
+Automated verification: `npm test -- --run src/core/__tests__/drive-files.test.ts`.
+Chrome end-to-end verification is deferred until Phase 8.4 adds a sync trigger; the
+current phase has no user-facing action that invokes these file operations.
 
 ### 8.3 Asset Sync
 **Goal**: Deduplicated thumbnail sync
 
 **Tasks**:
-- [ ] Upload thumbnails as `asset-<sha256>.jpg`
-- [ ] Skip already-uploaded hashes
-- [ ] Download missing thumbnails
-- [ ] Implement orphan cleanup (unreferenced assets)
-- [ ] Track upload progress
-- [ ] Handle Drive quota errors
+- [x] Upload thumbnails as `asset-<sha256>.jpg` into the private `appDataFolder`
+- [x] Skip already-uploaded hashes and report local or remote missing assets
+- [x] Download missing thumbnails and verify their content hash and image dimensions
+- [x] Remove unreferenced assets only after 90 days, rechecking before deletion
+- [x] Report per-asset upload, download, and cleanup progress for the sync UI
+- [x] Translate Drive quota failures into a clear storage-full message
 
 **Upload Strategy**:
-1. Collect all hashes from merged state
-2. List existing asset files
-3. Upload missing hashes only
-4. Store Drive fileId for each hash
-5. Clean up orphaned assets (>90 days)
+1. Collect preview hashes from merged state
+2. List existing asset files in pages and cache their `fileId` by hash
+3. Upload missing local JPEGs only, verifying each blob matches its SHA-256 name
+4. Download missing local previews only, verifying bytes before saving them
+5. Clean up unreferenced assets only after 90 days and a second remote listing
+
+The uploaded JPEG is the exact blob whose SHA-256 is `Item.previewHash`. The
+locally generated 320×200 derivative remains a display-only optimization; using
+it as the remote asset would require a second synchronized hash before it could
+be safely downloaded and verified. Uploads use the existing 5 MB image limit.
 
 **Acceptance**:
-- Thumbnails sync correctly
-- Deduplication works
-- Orphans are cleaned up
-- Quota errors are clear
+- Missing thumbnails can be uploaded and downloaded by content hash
+- Existing assets are reused instead of uploaded again
+- Old unreferenced assets are removed while recent or referenced assets remain
+- Quota failures explain that Drive storage is full
+
+Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-assets.test.ts`.
+Chrome end-to-end verification is deferred until Phase 8.4 adds a sync trigger;
+this phase provides the tested asset operations and progress callbacks, but no
+user-facing action invokes them yet.
 
 ### 8.4 Sync Engine & Merge
 **Goal**: Conflict-free multi-device sync

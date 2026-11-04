@@ -143,6 +143,7 @@ async function persistIfAccountMatches(
     'rw',
     db.syncMeta,
     db.deviceFiles,
+    db.driveAssets,
     async (): Promise<DriveConnectionResult> => {
       const existing = accountFromRecord(
         (await db.syncMeta.get(DRIVE_ACCOUNT_KEY))?.value,
@@ -188,7 +189,11 @@ async function clearDriveStateInTransaction(): Promise<void> {
   const driveMetadataKeys = await db.syncMeta
     .filter((record) => record.key.startsWith(DRIVE_METADATA_PREFIX))
     .primaryKeys();
-  await Promise.all([db.syncMeta.bulkDelete(driveMetadataKeys), db.deviceFiles.clear()]);
+  await Promise.all([
+    db.syncMeta.bulkDelete(driveMetadataKeys),
+    db.deviceFiles.clear(),
+    db.driveAssets.clear(),
+  ]);
 }
 
 /** Confirm an account switch and discard only account-specific sync bookkeeping. */
@@ -199,7 +204,7 @@ export async function switchGoogleDriveAccount(account: DriveAccount): Promise<v
     );
   }
 
-  await db.transaction('rw', db.syncMeta, db.deviceFiles, async () => {
+  await db.transaction('rw', db.syncMeta, db.deviceFiles, db.driveAssets, async () => {
     await clearDriveStateInTransaction();
     await db.syncMeta.put({ key: DRIVE_ACCOUNT_KEY, value: account });
   });
@@ -230,6 +235,12 @@ export async function disconnectGoogleDrive(): Promise<DriveDisconnectResult> {
     }
   }
 
-  await db.transaction('rw', db.syncMeta, db.deviceFiles, clearDriveStateInTransaction);
+  await db.transaction(
+    'rw',
+    db.syncMeta,
+    db.deviceFiles,
+    db.driveAssets,
+    clearDriveStateInTransaction,
+  );
   return { revocationConfirmed };
 }

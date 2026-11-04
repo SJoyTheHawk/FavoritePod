@@ -1,9 +1,21 @@
 import { z } from 'zod';
+import { compareHLC } from './hlc';
 import type { Thumbnail } from './types';
 
-const ClockSchema = z.string().min(1).max(128);
+export const ClockSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .refine((value) => {
+    try {
+      compareHLC(value, value);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 
-const GroupSchema = z
+export const GroupSchema = z
   .object({
     id: z.string().min(1).max(128),
     parentId: z.string().min(1).max(128).nullable(),
@@ -20,7 +32,7 @@ const GroupSchema = z
   })
   .strict();
 
-const ItemSchema = z
+export const ItemSchema = z
   .object({
     id: z.string().min(1).max(128),
     groupId: z.string().min(1).max(128),

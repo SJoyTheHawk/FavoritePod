@@ -79,6 +79,14 @@ describe('Google Drive authorization', () => {
       lastSync: 10,
       revision: 1,
     });
+    await db.driveAssets.put({
+      hash: 'a'.repeat(64),
+      fileId: 'asset-file',
+      name: `asset-${'a'.repeat(64)}.jpg`,
+      modifiedTime: '2026-01-01T00:00:00.000Z',
+      lastSync: 10,
+      size: 100,
+    });
     identity.getAuthToken.mockResolvedValue({ token: 'bob-token' });
     vi.mocked(fetch).mockResolvedValue(aboutResponse(bob));
 
@@ -89,11 +97,13 @@ describe('Google Drive authorization', () => {
     });
     expect(await getConnectedDriveAccount()).toEqual(alice);
     expect(await db.deviceFiles.count()).toBe(1);
+    expect(await db.driveAssets.count()).toBe(1);
 
     await switchGoogleDriveAccount(bob);
 
     expect(await getConnectedDriveAccount()).toEqual(bob);
     expect(await db.deviceFiles.count()).toBe(0);
+    expect(await db.driveAssets.count()).toBe(0);
     expect(await db.syncMeta.get('drive.lastSync')).toBeUndefined();
     expect(await db.syncMeta.get('deviceId')).toMatchObject({ value: 'device-local' });
     expect(await db.syncMeta.get('lastHlc')).toBeDefined();
@@ -154,6 +164,14 @@ describe('Google Drive authorization', () => {
       lastSync: 1,
       revision: 1,
     });
+    await db.driveAssets.put({
+      hash: 'b'.repeat(64),
+      fileId: 'asset-file',
+      name: `asset-${'b'.repeat(64)}.jpg`,
+      modifiedTime: '2026-01-01T00:00:00.000Z',
+      lastSync: 10,
+      size: 100,
+    });
     identity.getAuthToken.mockResolvedValue({ token: 'revoke-me' });
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
 
@@ -169,6 +187,7 @@ describe('Google Drive authorization', () => {
     expect(identity.removeCachedAuthToken).toHaveBeenCalledWith({ token: 'revoke-me' });
     expect(await getConnectedDriveAccount()).toBeNull();
     expect(await db.deviceFiles.count()).toBe(0);
+    expect(await db.driveAssets.count()).toBe(0);
     expect(await db.syncMeta.get('deviceId')).toMatchObject({ value: 'device-local' });
     expect(await db.syncMeta.get('lastHlc')).toMatchObject({ value: 'local-clock' });
   });

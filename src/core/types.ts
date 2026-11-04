@@ -43,8 +43,34 @@ export interface KeyValueRecord {
 export interface DeviceFile {
   deviceId: string;
   fileId?: string;
+  name?: string;
+  modifiedTime?: string;
   lastSync: number;
   revision: number;
+}
+
+/** Versioned JSON content stored in Drive's appDataFolder for one device. */
+export interface DriveDeviceState {
+  schemaVersion: 1;
+  deviceId: string;
+  revision: number;
+  lastUpdate: string;
+  groups: Group[];
+  items: Item[];
+  tombstones: {
+    groups: Record<string, HLC>;
+    items: Record<string, HLC>;
+  };
+}
+
+/** Local cache of the Drive file that stores one content-addressed preview. */
+export interface DriveAssetFile {
+  hash: string;
+  fileId: string;
+  name: string;
+  modifiedTime: string;
+  lastSync: number;
+  size: number;
 }
 
 export interface LibrarySnapshot {

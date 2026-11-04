@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type {
   DeviceFile,
+  DriveAssetFile,
   Group,
   Item,
   KeyValueRecord,
@@ -15,6 +16,7 @@ export class FavoritePodDB extends Dexie {
   syncMeta!: Table<KeyValueRecord, string>;
   snapshots!: Table<LibrarySnapshot, number>;
   deviceFiles!: Table<DeviceFile, string>;
+  driveAssets!: Table<DriveAssetFile, string>;
   settings!: Table<KeyValueRecord, string>;
 
   constructor() {
@@ -38,6 +40,7 @@ export class FavoritePodDB extends Dexie {
             item.clock.faviconUrl ??= item.clock.url;
           });
       });
+    this.version(3).stores({ driveAssets: 'hash,lastSync' });
   }
 }
 

@@ -186,7 +186,7 @@ Maintenance:
 - Device files not updated in 90 days are removed after their records are merged into the current device's file. This keeps reinstalls (which create new device IDs) from accumulating files.
 - Asset files not referenced by any live record are deleted after the same grace period.
 
-Preview assets should be resized before upload, for example to a maximum of 320×200 pixels and a reasonable JPEG size limit (around 40 KB). `appDataFolder` counts against the user's Drive quota. Large libraries must show a clear Drive quota or upload-limit message.
+Drive stores the exact JPEG blob whose SHA-256 is referenced by `Item.previewHash`, with the existing 5 MB per-image limit. The 320×200 derivative is local-only because it has no synchronized hash; uploading it under the full preview's hash would make content verification fail on download. If quota measurements later justify smaller remote previews, add a separate synchronized hash for that derivative first. `appDataFolder` counts against the user's Drive quota, and quota failures must show a clear message.
 
 On first connection, show item and group counts for both sides, then a choice:
 
@@ -243,7 +243,7 @@ Chrome constraints for `file://`:
 Capture:
 
 - "Save current page" from the popup calls `chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 80 })`. The popup click grants `activeTab`, so no host permissions are needed.
-- Resize with `OffscreenCanvas` to 640×400 for local display and 320×200 for sync, then `convertToBlob({ type: 'image/jpeg', quality: 0.75 })`. Hash with `crypto.subtle.digest('SHA-256', ...)`.
+- Resize with `OffscreenCanvas` to 640×400 for the stored preview and 320×200 for a local display derivative, then `convertToBlob({ type: 'image/jpeg', quality: 0.75 })`. Hash the stored preview with `crypto.subtle.digest('SHA-256', ...)`.
 - `captureVisibleTab` cannot capture `chrome://`, Chrome Web Store, or other extension pages, and is rate-limited to about two calls per second. Fall back to favicon + title card.
 - Items added without capture (history suggestions, imports without images, manual URLs) show the fallback card and an "Update thumbnail" action that opens the page and captures when the user returns to the popup. Do not open background tabs to auto-capture.
 - Favicons: use the MV3 `favicon` permission and `chrome-extension://<id>/_favicon/?pageUrl=<url>&size=64` (build it with `chrome.runtime.getURL('/_favicon/')`). This avoids sending URLs to a third-party favicon service.

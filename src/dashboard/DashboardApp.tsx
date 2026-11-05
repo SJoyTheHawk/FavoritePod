@@ -11,6 +11,7 @@ import {
   Cog6ToothIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
+  GlobeAltIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
   NoSymbolIcon,
@@ -42,6 +43,7 @@ import {
   restoreItem,
   restoreItems,
   restoreItemPositions,
+  hideVisitedSiteUrl,
   setDefaultView,
   setCollapsedGroups,
   setGroupingMode,
@@ -68,6 +70,9 @@ import {
   type PathOverride,
 } from '../core/file-links';
 import { parseSafeUrl } from '../core/validation';
+import { normalizeVisitedSiteUrl, type VisitedSiteSuggestion } from '../core/discovery';
+import { useOptionalFeatures } from './use-optional-features';
+import { useVisitedSites } from './use-visited-sites';
 import { useLibrary } from '../core/use-library';
 import type { Group, Item } from '../core/types';
 import {
@@ -114,6 +119,7 @@ import { GroupDialog } from './components/GroupDialog';
 import { GroupTree } from './components/GroupTree';
 import { GroupedFavoriteSection } from './components/GroupedFavoriteSection';
 import { SettingsDialog } from './components/SettingsDialog';
+import { VisitedSitesView } from './components/VisitedSitesView';
 import { DriveSyncChoiceDialog } from './components/DriveSyncChoiceDialog';
 import { GoogleDriveSignInDialog } from './components/GoogleDriveSignInDialog';
 import { ImportExportDialog } from './components/ImportExportDialog';
@@ -134,7 +140,13 @@ import { getGroupedFavoriteView, getItemsByGroupAndDescendants } from './grouped
 installDriveSyncChangeHooks();
 
 type DialogState =
-  | { type: 'favorite'; item?: Item; groupId?: string }
+  | {
+      type: 'favorite';
+      item?: Item;
+      groupId?: string;
+      initialUrl?: string;
+      initialTitle?: string;
+    }
   | { type: 'move-favorite'; item: Item }
   | { type: 'group'; group?: Group; parentId?: string | null }
   | null;
@@ -327,6 +339,13 @@ function errorMessage(cause: unknown): string {
 
 export function DashboardApp() {
   const { groups, items, loading, error } = useLibrary();
+  const optionalFeatures = useOptionalFeatures();
+  const visitedSites = useVisitedSites(optionalFeatures.discoveryEnabled, items);
+  const [activeView, setActiveView] = useState<'favorites' | 'discovery'>('favorites');
+  const [discoveryGroupId, setDiscoveryGroupId] = useState('');
+  const [savingSuggestionUrl, setSavingSuggestionUrl] = useState<string>();
+  const suggestionSaveInProgress = useRef(false);
+  const contextMenuEditorHandled = useRef(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
   const [homePageGroupId, setHomePageGroupIdState] = useState<string>();
@@ -371,6 +390,7 @@ export function DashboardApp() {
   const bookmarkSize = bookmarkSizes[layout];
   const [dialog, setDialog] = useState<DialogState>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<'discovery'>();
   const [driveSignInOpen, setDriveSignInOpen] = useState(false);
   const [archiveDialog, setArchiveDialog] = useState<ArchiveDialogState>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -394,6 +414,9 @@ export function DashboardApp() {
     [groups],
   );
   const selectedGroup = selectedGroupId ? groupsById.get(selectedGroupId) : undefined;
+  const selectedDiscoveryGroupId = groupsById.has(discoveryGroupId)
+    ? discoveryGroupId
+    : (groups[0]?.id ?? '');
   const hasLocalFiles = useMemo(
     () => items.some((item) => parseSafeUrl(item.url)?.protocol === 'file:'),
     [items],
@@ -516,6 +539,37 @@ export function DashboardApp() {
   useEffect(() => {
     if (error) notifyError(error);
   }, [error, notifyError]);
+
+  useEffect(() => {
+    if (optionalFeatures.error) notifyError(optionalFeatures.error);
+  }, [notifyError, optionalFeatures.error]);
+
+  useEffect(() => {
+    if (loading || contextMenuEditorHandled.current) return;
+    contextMenuEditorHandled.current = true;
+    const location = new URL(window.location.href);
+    const urlValue = location.searchParams.get('addFavoriteUrl');
+    if (!urlValue) return;
+    const parsed = parseSafeUrl(urlValue);
+    const title = location.searchParams.get('addFavoriteTitle') ?? undefined;
+    const groupId = location.searchParams.get('addFavoriteGroupId') ?? undefined;
+    for (const key of ['addFavoriteUrl', 'addFavoriteTitle', 'addFavoriteGroupId']) {
+      location.searchParams.delete(key);
+    }
+    window.history.replaceState(null, '', location);
+    if (!parsed) {
+      notifyError('Use an http, https, or file address.');
+      return;
+    }
+    const existing = items.find((item) => parseSafeUrl(item.url)?.href === parsed.href);
+    setDialog({
+      type: 'favorite',
+      item: existing,
+      initialUrl: parsed.href,
+      initialTitle: title,
+      groupId: groupId && groupsById.has(groupId) ? groupId : undefined,
+    });
+  }, [groupsById, items, loading, notifyError]);
 
   useEffect(() => {
     if (!hasLocalFiles) {
@@ -875,6 +929,7 @@ export function DashboardApp() {
   };
 
   const selectGroup = (groupId: string | null) => {
+    setActiveView('favorites');
     setSelectedGroupId(groupId);
     void setLastSelectedGroupId(groupId).catch((cause: unknown) =>
       notifyError(errorMessage(cause)),
@@ -884,6 +939,34 @@ export function DashboardApp() {
   const savePreviewVisibility = async (show: boolean) => {
     await setShowPreview(show);
     setShowPreviewState(show);
+  };
+
+  const saveVisitedSite = async (suggestion: VisitedSiteSuggestion) => {
+    if (suggestionSaveInProgress.current) return;
+    suggestionSaveInProgress.current = true;
+    setSavingSuggestionUrl(suggestion.url);
+    try {
+      if (items.some((item) => normalizeVisitedSiteUrl(item.url) === suggestion.url))
+        return;
+      const created = await createItem({
+        url: suggestion.url,
+        title: suggestion.title,
+        groupId: selectedDiscoveryGroupId || undefined,
+      });
+      registerHistory({
+        label: 'favorite added',
+        undo: async () => deleteItem(created.id),
+        redo: async () => {
+          await restoreItem(created.id);
+        },
+      });
+      notify(`Saved to ${groupLabels.get(created.groupId) ?? 'Favorites'}.`);
+    } catch (cause) {
+      notifyError(errorMessage(cause));
+    } finally {
+      suggestionSaveInProgress.current = false;
+      setSavingSuggestionUrl(undefined);
+    }
   };
 
   const saveSidebarCollapsed = async (collapsed: boolean) => {
@@ -1677,7 +1760,10 @@ export function DashboardApp() {
           <button
             aria-label="Settings"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => {
+              setSettingsSection(undefined);
+              setSettingsOpen(true);
+            }}
             title="Settings"
             type="button"
           >
@@ -1739,6 +1825,19 @@ export function DashboardApp() {
             }
             id="favorite-group-sidebar"
           >
+            <button
+              aria-pressed={activeView === 'discovery'}
+              className={`mb-3 flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium transition ${activeView === 'discovery' ? 'bg-primary-light text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'}`}
+              onClick={() => {
+                clearFavoriteDrag();
+                setSelectedIds(new Set());
+                setActiveView('discovery');
+              }}
+              type="button"
+            >
+              <GlobeAltIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+              Frequently visited
+            </button>
             <GroupTree
               groups={groups}
               items={items}
@@ -1769,7 +1868,7 @@ export function DashboardApp() {
                 }
               }}
               onSelect={selectGroup}
-              selectedGroupId={selectedGroupId}
+              selectedGroupId={activeView === 'favorites' ? selectedGroupId : undefined}
             />
           </div>
         </aside>
@@ -1777,11 +1876,13 @@ export function DashboardApp() {
         <section
           className="min-w-0 flex-1 px-4 py-6 sm:px-7 sm:py-8"
           onDragOver={(event) => {
+            if (activeView !== 'favorites') return;
             if (getActiveLibraryDragPayload()?.type !== 'item') return;
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
           }}
           onDrop={(event) => {
+            if (activeView !== 'favorites') return;
             const payload = readLibraryDragData(event.dataTransfer);
             if (payload?.type !== 'item') return;
             event.preventDefault();
@@ -1790,221 +1891,247 @@ export function DashboardApp() {
             clearLibraryDragData();
           }}
         >
-          <div className="mx-auto max-w-7xl">
-            {hasLocalFiles && fileAccessAllowed === false && !fileAccessHintDismissed && (
-              <FileAccessHint
-                onDismiss={() => setFileAccessHintDismissed(true)}
-                settingsUrl={getExtensionSettingsUrl()}
-              />
-            )}
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="truncate text-xl font-semibold">
-                  {selectedGroup ? groupLabels.get(selectedGroup.id) : 'All favorites'}
-                </h1>
-                <p className="mt-1 text-sm text-text-secondary">
-                  {visibleItems.length}{' '}
-                  {visibleItems.length === 1 ? 'favorite' : 'favorites'}
-                </p>
-              </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <label className="relative block w-full sm:w-[min(19rem,35vw)]">
-                  <MagnifyingGlassIcon
-                    aria-hidden="true"
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary"
+          {activeView === 'discovery' ? (
+            <VisitedSitesView
+              enabled={optionalFeatures.discoveryEnabled}
+              groups={groups}
+              suggestions={visitedSites.suggestions}
+              selectedGroupId={selectedDiscoveryGroupId}
+              loading={visitedSites.loading || loading}
+              error={visitedSites.error}
+              savingUrl={savingSuggestionUrl}
+              onGroupChange={setDiscoveryGroupId}
+              onSave={(suggestion) => void saveVisitedSite(suggestion)}
+              onHide={(suggestion) => {
+                void hideVisitedSiteUrl(suggestion.url).catch((cause: unknown) =>
+                  notifyError(errorMessage(cause)),
+                );
+              }}
+              onRefresh={visitedSites.refresh}
+              onOpenSettings={() => {
+                setSettingsSection('discovery');
+                setSettingsOpen(true);
+              }}
+            />
+          ) : (
+            <div className="mx-auto max-w-7xl">
+              {hasLocalFiles &&
+                fileAccessAllowed === false &&
+                !fileAccessHintDismissed && (
+                  <FileAccessHint
+                    onDismiss={() => setFileAccessHintDismissed(true)}
+                    settingsUrl={getExtensionSettingsUrl()}
                   />
-                  <input
-                    aria-label="Search favorites"
-                    className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-primary"
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search favorites"
-                    type="search"
-                    value={search}
-                  />
-                </label>
-                <div
-                  aria-label="View mode"
-                  className="flex h-10 items-center rounded-md border border-border p-1"
-                >
-                  <button
-                    aria-label="Grid view"
-                    aria-pressed={layout === 'grid'}
-                    className={`flex h-8 w-8 items-center justify-center rounded ${layout === 'grid' ? 'bg-surface-hover text-text-primary' : 'text-text-tertiary hover:text-text-primary'}`}
-                    onClick={() => setLayout('grid')}
-                    title="Grid view"
-                    type="button"
-                  >
-                    <Squares2X2Icon aria-hidden="true" className="h-4 w-4" />
-                  </button>
-                  <button
-                    aria-label="List view"
-                    aria-pressed={layout === 'list'}
-                    className={`flex h-8 w-8 items-center justify-center rounded ${layout === 'list' ? 'bg-surface-hover text-text-primary' : 'text-text-tertiary hover:text-text-primary'}`}
-                    onClick={() => setLayout('list')}
-                    title="List view"
-                    type="button"
-                  >
-                    <ListBulletIcon aria-hidden="true" className="h-4 w-4" />
-                  </button>
+                )}
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="truncate text-xl font-semibold">
+                    {selectedGroup ? groupLabels.get(selectedGroup.id) : 'All favorites'}
+                  </h1>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    {visibleItems.length}{' '}
+                    {visibleItems.length === 1 ? 'favorite' : 'favorites'}
+                  </p>
                 </div>
-                <BookmarkSizeControl
-                  view={layout}
-                  size={bookmarkSize}
-                  disabled={!sizesReady || !!draggingFavoriteId}
-                  onChange={changeBookmarkSize}
-                />
-              </div>
-            </div>
-
-            {visibleItems.length > 0 && (
-              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-                <label className="flex h-8 items-center gap-2 text-sm text-text-primary">
-                  <input
-                    aria-label="Select all visible favorites"
-                    checked={allVisibleSelected}
-                    className="h-4 w-4 accent-[var(--color-primary)]"
-                    onChange={toggleSelectAll}
-                    type="checkbox"
-                  />
-                  <span>{selectedVisibleItems.length} selected</span>
-                </label>
-                {selectedVisibleItems.length > 0 && (
-                  <>
-                    <select
-                      aria-label="Move selected favorites to group"
-                      className="h-9 min-w-40 rounded-md border border-border bg-background px-2 text-sm"
-                      onChange={(event) => {
-                        if (event.target.value) void moveSelected(event.target.value);
-                        event.currentTarget.value = '';
-                      }}
-                      value=""
-                    >
-                      <option value="">Move to group…</option>
-                      {groups.map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {groupLabels.get(group.id) ?? group.title}
-                        </option>
-                      ))}
-                    </select>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <label className="relative block w-full sm:w-[min(19rem,35vw)]">
+                    <MagnifyingGlassIcon
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary"
+                    />
+                    <input
+                      aria-label="Search favorites"
+                      className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-primary"
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Search favorites"
+                      type="search"
+                      value={search}
+                    />
+                  </label>
+                  <div
+                    aria-label="View mode"
+                    className="flex h-10 items-center rounded-md border border-border p-1"
+                  >
                     <button
-                      className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-danger transition hover:bg-danger-light"
-                      onClick={() => void deleteSelected()}
+                      aria-label="Grid view"
+                      aria-pressed={layout === 'grid'}
+                      className={`flex h-8 w-8 items-center justify-center rounded ${layout === 'grid' ? 'bg-surface-hover text-text-primary' : 'text-text-tertiary hover:text-text-primary'}`}
+                      onClick={() => setLayout('grid')}
+                      title="Grid view"
                       type="button"
                     >
-                      <TrashIcon aria-hidden="true" className="h-4 w-4" />
-                      Delete
+                      <Squares2X2Icon aria-hidden="true" className="h-4 w-4" />
                     </button>
-                  </>
-                )}
-                {selectedVisibleItems.length > 0 && (
-                  <button
-                    aria-label="Clear selection"
-                    className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-text-secondary transition hover:bg-background hover:text-text-primary"
-                    onClick={() => setSelectedIds(new Set())}
-                    title="Clear selection"
-                    type="button"
-                  >
-                    <XMarkIcon aria-hidden="true" className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            )}
-
-            {loading || !sizesReady ? (
-              <div
-                className="bookmark-collection"
-                data-layout={layout}
-                data-size={bookmarkSize}
-                aria-label="Loading favorites"
-                aria-busy="true"
-              >
-                {Array.from({ length: 8 }, (_, index) => (
-                  <div
-                    className="bookmark-card flex min-w-0 overflow-hidden rounded-lg border border-border"
-                    data-layout={layout}
-                    data-size={bookmarkSize}
-                    key={index}
-                  >
-                    {bookmarkSize !== 'compact' && (
-                      <div className="bookmark-preview shrink-0 animate-pulse bg-surface-hover" />
-                    )}
-                    <div className="bookmark-details flex min-w-0 flex-col justify-center gap-2">
-                      <div className="h-3 w-3/4 animate-pulse rounded bg-surface-hover" />
-                      <div className="h-3 w-1/2 animate-pulse rounded bg-surface-hover" />
-                    </div>
+                    <button
+                      aria-label="List view"
+                      aria-pressed={layout === 'list'}
+                      className={`flex h-8 w-8 items-center justify-center rounded ${layout === 'list' ? 'bg-surface-hover text-text-primary' : 'text-text-tertiary hover:text-text-primary'}`}
+                      onClick={() => setLayout('list')}
+                      title="List view"
+                      type="button"
+                    >
+                      <ListBulletIcon aria-hidden="true" className="h-4 w-4" />
+                    </button>
                   </div>
-                ))}
-              </div>
-            ) : groupedView.mode === 'hierarchical' &&
-              (sectionGroups.length > 0 || groupedView.directItems.length > 0) ? (
-              <div className="space-y-8">
-                {groupedView.directItems.length > 0 &&
-                  renderFavoriteCollection(groupedView.directItems)}
-                {sectionGroups.map((group) => (
-                  <GroupedFavoriteSection
-                    collapsedGroups={collapsedGroups}
-                    group={group}
-                    groups={groups}
-                    itemsByGroup={itemsByGroup}
-                    key={group.id}
-                    onDropIntoGroup={dropIntoGroup}
-                    onToggleCollapse={toggleGroupCollapse}
-                    renderItems={renderFavoriteCollection}
-                    searching={searching}
+                  <BookmarkSizeControl
+                    view={layout}
+                    size={bookmarkSize}
+                    disabled={!sizesReady || !!draggingFavoriteId}
+                    onChange={changeBookmarkSize}
                   />
-                ))}
+                </div>
               </div>
-            ) : visibleItems.length > 0 ? (
-              renderFavoriteCollection(
-                groupedView.mode === 'hierarchical' ? visibleItems : groupedView.items,
-              )
-            ) : (
-              <div className="flex min-h-[min(60vh,32rem)] flex-col items-center justify-center px-6 text-center">
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-surface text-text-tertiary">
-                  {search ? (
-                    <MagnifyingGlassIcon aria-hidden="true" className="h-7 w-7" />
-                  ) : (
-                    <BookmarkIcon aria-hidden="true" className="h-7 w-7" />
+
+              {visibleItems.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+                  <label className="flex h-8 items-center gap-2 text-sm text-text-primary">
+                    <input
+                      aria-label="Select all visible favorites"
+                      checked={allVisibleSelected}
+                      className="h-4 w-4 accent-[var(--color-primary)]"
+                      onChange={toggleSelectAll}
+                      type="checkbox"
+                    />
+                    <span>{selectedVisibleItems.length} selected</span>
+                  </label>
+                  {selectedVisibleItems.length > 0 && (
+                    <>
+                      <select
+                        aria-label="Move selected favorites to group"
+                        className="h-9 min-w-40 rounded-md border border-border bg-background px-2 text-sm"
+                        onChange={(event) => {
+                          if (event.target.value) void moveSelected(event.target.value);
+                          event.currentTarget.value = '';
+                        }}
+                        value=""
+                      >
+                        <option value="">Move to group…</option>
+                        {groups.map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {groupLabels.get(group.id) ?? group.title}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-danger transition hover:bg-danger-light"
+                        onClick={() => void deleteSelected()}
+                        type="button"
+                      >
+                        <TrashIcon aria-hidden="true" className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </>
+                  )}
+                  {selectedVisibleItems.length > 0 && (
+                    <button
+                      aria-label="Clear selection"
+                      className="ml-auto flex h-8 w-8 items-center justify-center rounded-md text-text-secondary transition hover:bg-background hover:text-text-primary"
+                      onClick={() => setSelectedIds(new Set())}
+                      title="Clear selection"
+                      type="button"
+                    >
+                      <XMarkIcon aria-hidden="true" className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
-                <h2 className="text-lg font-semibold">
-                  {search
-                    ? 'No matches'
-                    : selectedGroup
-                      ? 'No favorites in this group'
-                      : 'No favorites yet'}
-                </h2>
-                <p className="mt-2 max-w-sm text-sm leading-relaxed text-text-secondary">
-                  {search
-                    ? 'Try a different title or address.'
-                    : 'Your saved pages and local tools will appear here.'}
-                </p>
-                {search ? (
-                  <button
-                    className="mt-5 min-h-10 rounded-md border border-border px-4 text-sm font-medium transition hover:bg-surface-hover"
-                    onClick={() => setSearch('')}
-                    type="button"
-                  >
-                    Clear search
-                  </button>
-                ) : (
-                  <button
-                    className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-hover"
-                    onClick={() =>
-                      setDialog({
-                        type: 'favorite',
-                        groupId: selectedGroupId ?? undefined,
-                      })
-                    }
-                    type="button"
-                  >
-                    <PlusIcon aria-hidden="true" className="h-4 w-4" />
-                    Add favorite
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+
+              {loading || !sizesReady ? (
+                <div
+                  className="bookmark-collection"
+                  data-layout={layout}
+                  data-size={bookmarkSize}
+                  aria-label="Loading favorites"
+                  aria-busy="true"
+                >
+                  {Array.from({ length: 8 }, (_, index) => (
+                    <div
+                      className="bookmark-card flex min-w-0 overflow-hidden rounded-lg border border-border"
+                      data-layout={layout}
+                      data-size={bookmarkSize}
+                      key={index}
+                    >
+                      {bookmarkSize !== 'compact' && (
+                        <div className="bookmark-preview shrink-0 animate-pulse bg-surface-hover" />
+                      )}
+                      <div className="bookmark-details flex min-w-0 flex-col justify-center gap-2">
+                        <div className="h-3 w-3/4 animate-pulse rounded bg-surface-hover" />
+                        <div className="h-3 w-1/2 animate-pulse rounded bg-surface-hover" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : groupedView.mode === 'hierarchical' &&
+                (sectionGroups.length > 0 || groupedView.directItems.length > 0) ? (
+                <div className="space-y-8">
+                  {groupedView.directItems.length > 0 &&
+                    renderFavoriteCollection(groupedView.directItems)}
+                  {sectionGroups.map((group) => (
+                    <GroupedFavoriteSection
+                      collapsedGroups={collapsedGroups}
+                      group={group}
+                      groups={groups}
+                      itemsByGroup={itemsByGroup}
+                      key={group.id}
+                      onDropIntoGroup={dropIntoGroup}
+                      onToggleCollapse={toggleGroupCollapse}
+                      renderItems={renderFavoriteCollection}
+                      searching={searching}
+                    />
+                  ))}
+                </div>
+              ) : visibleItems.length > 0 ? (
+                renderFavoriteCollection(
+                  groupedView.mode === 'hierarchical' ? visibleItems : groupedView.items,
+                )
+              ) : (
+                <div className="flex min-h-[min(60vh,32rem)] flex-col items-center justify-center px-6 text-center">
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-surface text-text-tertiary">
+                    {search ? (
+                      <MagnifyingGlassIcon aria-hidden="true" className="h-7 w-7" />
+                    ) : (
+                      <BookmarkIcon aria-hidden="true" className="h-7 w-7" />
+                    )}
+                  </div>
+                  <h2 className="text-lg font-semibold">
+                    {search
+                      ? 'No matches'
+                      : selectedGroup
+                        ? 'No favorites in this group'
+                        : 'No favorites yet'}
+                  </h2>
+                  <p className="mt-2 max-w-sm text-sm leading-relaxed text-text-secondary">
+                    {search
+                      ? 'Try a different title or address.'
+                      : 'Your saved pages and local tools will appear here.'}
+                  </p>
+                  {search ? (
+                    <button
+                      className="mt-5 min-h-10 rounded-md border border-border px-4 text-sm font-medium transition hover:bg-surface-hover"
+                      onClick={() => setSearch('')}
+                      type="button"
+                    >
+                      Clear search
+                    </button>
+                  ) : (
+                    <button
+                      className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-hover"
+                      onClick={() =>
+                        setDialog({
+                          type: 'favorite',
+                          groupId: selectedGroupId ?? undefined,
+                        })
+                      }
+                      type="button"
+                    >
+                      <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                      Add favorite
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
 
@@ -2012,6 +2139,8 @@ export function DashboardApp() {
         <FavoriteDialog
           groups={groups}
           initialGroupId={dialog.groupId}
+          initialUrl={dialog.initialUrl}
+          initialTitle={dialog.initialTitle}
           item={dialog.item}
           key={dialog.item?.id ?? 'new-favorite'}
           onClose={() => setDialog(null)}
@@ -2042,6 +2171,7 @@ export function DashboardApp() {
       )}
       {settingsOpen && (
         <SettingsDialog
+          initialSection={settingsSection}
           defaultView={layout}
           driveAccount={driveAccount}
           driveConnectionStatus={driveConnection.status}
@@ -2056,12 +2186,19 @@ export function DashboardApp() {
           homePageAvailable={!!homePageGroupId && groupsById.has(homePageGroupId)}
           openBehavior={openBehavior}
           showPreview={showPreview}
+          siteDiscoveryEnabled={optionalFeatures.discoveryEnabled}
+          siteDiscoveryPermissionGranted={optionalFeatures.discoveryPermissionGranted}
+          contextMenuEnabled={optionalFeatures.contextMenuEnabled}
+          contextMenuPermissionGranted={optionalFeatures.contextMenuPermissionGranted}
+          optionalFeaturesReady={optionalFeatures.ready}
           pathOverrides={pathOverrides}
           onClose={() => setSettingsOpen(false)}
           onSaveDefaultView={saveDefaultView}
           onSaveGroupingMode={saveGroupingMode}
           onSaveOpenBehavior={saveOpenBehavior}
           onSaveShowPreview={savePreviewVisibility}
+          onSaveSiteDiscoveryEnabled={optionalFeatures.saveSiteDiscoveryEnabled}
+          onSaveContextMenuEnabled={optionalFeatures.saveContextMenuEnabled}
           onSavePathOverrides={saveLocalPathOverrides}
           onOpenDriveSignIn={() => setDriveSignInOpen(true)}
           onDisconnectDrive={handleDisconnectDrive}

@@ -19,6 +19,8 @@ _Screenshots show the current interface with sample content._
 - **Keep local tools handy.** Save links to local HTML pages and files alongside websites.
 - **Sync when you want.** Connect Google Drive to share your library across Chrome profiles and devices.
 - **Take a backup with you.** Export your library, including previews, to a ZIP file and import it later.
+- **Discover pages to keep.** Optionally suggest pages from Chrome top sites and recent history.
+- **Save from a right-click.** Enable page, link, and group actions in Chrome’s context menu.
 
 ## Save your first favorite
 
@@ -45,6 +47,23 @@ Switch between the grid and list views to suit how you browse.
 Hover over a favorite to see a larger preview and quick actions. You can edit its
 name or address, copy its link, or open it. Undo and redo help you recover from
 accidental library edits.
+
+## Optional discovery and right-click saving
+
+Open **Settings → Optional features** to enable either feature independently.
+Both start off, and Chrome requests their optional permissions when enabled.
+
+**Visited-site discovery** adds suggestions in **Frequently visited** in the
+sidebar. Choose a destination in **Save to**, then use + to save a page or Hide
+to dismiss it. Saved pages are excluded. Suggestions use top sites and up to
+500 history entries from the last 30 days. Disabling discovery removes its
+History/Top sites access. History and hidden suggestions stay in the current
+profile; only pages you explicitly save can enter exports or Drive sync.
+
+**Right-click save menu** adds **Save to FavoritePod** to page and link menus.
+Choose a page, link, or destination group to open the existing Add favorite
+dialog with its details filled in. Confirm to save, or Cancel to leave it out
+of your library. Disable the setting to remove the menu.
 
 ## Use local files and tools
 

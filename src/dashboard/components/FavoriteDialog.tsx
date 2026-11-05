@@ -17,6 +17,8 @@ interface FavoriteDialogProps {
   groups: Group[];
   item?: Item;
   initialGroupId?: string;
+  initialUrl?: string;
+  initialTitle?: string;
   onClose: () => void;
   onSave: (value: { title: string; url: string; groupId?: string }) => Promise<Item>;
   onDelete?: (item: Item) => Promise<boolean>;
@@ -27,13 +29,15 @@ export function FavoriteDialog({
   groups,
   item,
   initialGroupId,
+  initialUrl,
+  initialTitle,
   onClose,
   onSave,
   onDelete,
   onUpdateThumbnail,
 }: FavoriteDialogProps) {
-  const [title, setTitle] = useState(item?.title ?? '');
-  const [url, setUrl] = useState(item?.url ?? '');
+  const [title, setTitle] = useState(item?.title ?? initialTitle ?? '');
+  const [url, setUrl] = useState(item?.url ?? initialUrl ?? '');
   const [groupId, setGroupId] = useState(
     item?.groupId ?? initialGroupId ?? groups[0]?.id ?? '',
   );

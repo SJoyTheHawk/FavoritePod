@@ -33,7 +33,7 @@ import {
 interface GroupTreeProps {
   groups: Group[];
   items: Item[];
-  selectedGroupId: string | null;
+  selectedGroupId: string | null | undefined;
   onSelect: (groupId: string | null) => void;
   onEdit: (group: Group) => void;
   onDelete: (group: Group) => void;
@@ -50,7 +50,7 @@ interface BranchProps extends Omit<
   'items' | 'selectedGroupId' | 'onSelect' | 'onCreateGroup'
 > {
   siblings: Group[];
-  selectedGroupId: string | null;
+  selectedGroupId: string | null | undefined;
   onSelect: (groupId: string | null) => void;
   expanded: Set<string>;
   onToggle: (groupId: string) => void;

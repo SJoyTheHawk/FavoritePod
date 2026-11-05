@@ -361,7 +361,9 @@ If you're choosing what to work on, prioritize in this order:
    - ZIP export/import
 
 **Implemented in v1**: Google Drive sync, profile-local connection recovery,
-sync status/history, and quota reporting. **Defer to v2**: history discovery,
+sync status/history, quota reporting, optional visited-site discovery, and
+right-click saving (Phases 9.1/9.2). Discovery/history access and context menus
+are opt-in from Settings; hidden suggestions stay local. **Defer to v2**:
 optional visual polish, and other features not listed in the implementation plan.
 
 ---

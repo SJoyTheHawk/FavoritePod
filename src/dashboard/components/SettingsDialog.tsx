@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Description,
   Dialog,
@@ -30,9 +30,15 @@ import type { GroupingMode, LibraryView, OpenBehavior } from '../../core/storage
 import type { ArchiveDialogMode } from './ImportExportDialog';
 
 interface SettingsDialogProps {
+  initialSection?: 'discovery';
   defaultView: LibraryView;
   groupingMode: GroupingMode;
   showPreview: boolean;
+  siteDiscoveryEnabled: boolean;
+  siteDiscoveryPermissionGranted: boolean;
+  contextMenuEnabled: boolean;
+  contextMenuPermissionGranted: boolean;
+  optionalFeaturesReady: boolean;
   openBehavior: OpenBehavior;
   driveAccount: DriveAccount | null;
   driveConnectionStatus: DriveConnectionState['status'];
@@ -49,6 +55,8 @@ interface SettingsDialogProps {
   onSaveDefaultView: (view: LibraryView) => Promise<void>;
   onSaveGroupingMode: (mode: GroupingMode) => Promise<void>;
   onSaveShowPreview: (showPreview: boolean) => Promise<void>;
+  onSaveSiteDiscoveryEnabled: (enabled: boolean) => Promise<void>;
+  onSaveContextMenuEnabled: (enabled: boolean) => Promise<void>;
   onSaveOpenBehavior: (behavior: OpenBehavior) => Promise<void>;
   onSavePathOverrides: (overrides: PathOverride[]) => Promise<void>;
   onOpenDriveSignIn: () => void;
@@ -73,9 +81,15 @@ function syncStageLabel(progress?: DriveSyncProgress): string | undefined {
 }
 
 export function SettingsDialog({
+  initialSection,
   defaultView,
   groupingMode,
   showPreview,
+  siteDiscoveryEnabled,
+  siteDiscoveryPermissionGranted,
+  contextMenuEnabled,
+  contextMenuPermissionGranted,
+  optionalFeaturesReady,
   openBehavior,
   driveAccount,
   driveConnectionStatus,
@@ -92,6 +106,8 @@ export function SettingsDialog({
   onSaveDefaultView,
   onSaveGroupingMode,
   onSaveShowPreview,
+  onSaveSiteDiscoveryEnabled,
+  onSaveContextMenuEnabled,
   onSaveOpenBehavior,
   onSavePathOverrides,
   onOpenDriveSignIn,
@@ -104,6 +120,23 @@ export function SettingsDialog({
   const [driveError, setDriveError] = useState<string>();
   const [driveBusy, setDriveBusy] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [featureBusy, setFeatureBusy] = useState<'discovery' | 'contextMenus' | null>(
+    null,
+  );
+  const [featureError, setFeatureError] = useState<string>();
+  const discoverySectionRef = useRef<HTMLDivElement>(null);
+  const discoverySwitchRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (initialSection !== 'discovery') return;
+    const frame = requestAnimationFrame(() => {
+      discoverySectionRef.current?.scrollIntoView({ block: 'center' });
+      if (optionalFeaturesReady) {
+        discoverySwitchRef.current?.focus({ preventScroll: true });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [initialSection, optionalFeaturesReady]);
   const showDriveStorageWarning =
     driveConnectionStatus === 'connected' &&
     online &&
@@ -150,6 +183,24 @@ export function SettingsDialog({
     }
   };
 
+  const saveOptionalFeature = async (
+    feature: 'discovery' | 'contextMenus',
+    enabled: boolean,
+  ) => {
+    setFeatureBusy(feature);
+    setFeatureError(undefined);
+    try {
+      if (feature === 'discovery') await onSaveSiteDiscoveryEnabled(enabled);
+      else await onSaveContextMenuEnabled(enabled);
+    } catch (cause) {
+      setFeatureError(
+        cause instanceof Error ? cause.message : 'Could not update this setting.',
+      );
+    } finally {
+      setFeatureBusy(null);
+    }
+  };
+
   const saveGroupingMode = async (mode: GroupingMode) => {
     setError(undefined);
     try {
@@ -180,7 +231,12 @@ export function SettingsDialog({
   };
 
   return (
-    <Dialog className="relative z-50" onClose={onClose} open>
+    <Dialog
+      className="relative z-50"
+      initialFocus={initialSection === 'discovery' ? discoverySwitchRef : undefined}
+      onClose={onClose}
+      open
+    >
       <DialogBackdrop className="fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
         <DialogPanel className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl">
@@ -307,6 +363,85 @@ export function SettingsDialog({
               </button>
             </div>
           </fieldset>
+
+          <section className="mt-6 border-t border-border pt-5">
+            <h3 className="text-sm font-medium text-text-primary">Optional features</h3>
+            <div className="mt-3 divide-y divide-border rounded-md border border-border">
+              <div
+                className="flex items-center justify-between gap-4 px-3 py-3"
+                id="visited-site-discovery-setting"
+                ref={discoverySectionRef}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-text-primary">
+                    Visited-site discovery
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+                    Use Chrome top sites and recent history for suggestions. Hidden
+                    suggestions stay on this device.
+                    {!siteDiscoveryPermissionGranted && (
+                      <span className="block text-text-tertiary">
+                        Chrome will ask for History and Top sites access when enabled.
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  aria-checked={siteDiscoveryEnabled}
+                  aria-label="Visited-site discovery"
+                  className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:cursor-wait disabled:opacity-60 ${siteDiscoveryEnabled ? 'bg-primary' : 'bg-border'}`}
+                  disabled={!optionalFeaturesReady || featureBusy !== null}
+                  onClick={() =>
+                    void saveOptionalFeature('discovery', !siteDiscoveryEnabled)
+                  }
+                  role="switch"
+                  ref={discoverySwitchRef}
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${siteDiscoveryEnabled ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-4 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-text-primary">
+                    Right-click save menu
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+                    Add page, link, and group save actions to Chrome’s context menu.
+                    {!contextMenuPermissionGranted && (
+                      <span className="block text-text-tertiary">
+                        Chrome will ask for context menu access when enabled.
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  aria-checked={contextMenuEnabled}
+                  aria-label="Right-click save menu"
+                  className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:cursor-wait disabled:opacity-60 ${contextMenuEnabled ? 'bg-primary' : 'bg-border'}`}
+                  disabled={!optionalFeaturesReady || featureBusy !== null}
+                  onClick={() =>
+                    void saveOptionalFeature('contextMenus', !contextMenuEnabled)
+                  }
+                  role="switch"
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${contextMenuEnabled ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
+              </div>
+            </div>
+            {featureError && (
+              <p className="mt-2 text-sm text-danger" role="alert">
+                {featureError}
+              </p>
+            )}
+          </section>
 
           <section className="mt-6 border-t border-border pt-5">
             <h3 className="text-sm font-medium text-text-primary">Import and export</h3>

@@ -16,11 +16,54 @@ import type {
 const DEFAULT_GROUP_TITLE = 'Favorites';
 const SNAPSHOT_LIMIT = 3;
 const DISMISSED_RECENT_ITEM_IDS = 'dismissedRecentItemIds';
+const HIDDEN_VISITED_SITE_URLS = 'hiddenVisitedSiteUrls';
 
 export type LibraryView = 'grid' | 'list';
 export type BookmarkSize = 'compact' | 'extra-small' | 'small' | 'medium' | 'large';
 export type OpenBehavior = 'last' | 'all' | 'home';
 export type GroupingMode = 'hierarchical' | 'labeled' | 'flat';
+
+export async function getSiteDiscoveryEnabled(): Promise<boolean> {
+  const record = await db.settings.get('siteDiscoveryEnabled');
+  return record?.value === true;
+}
+
+export async function setSiteDiscoveryEnabled(enabled: boolean): Promise<void> {
+  await db.settings.put({ key: 'siteDiscoveryEnabled', value: enabled });
+}
+
+export async function getContextMenuEnabled(): Promise<boolean> {
+  const record = await db.settings.get('contextMenuEnabled');
+  return record?.value === true;
+}
+
+export async function setContextMenuEnabled(enabled: boolean): Promise<void> {
+  await db.settings.put({ key: 'contextMenuEnabled', value: enabled });
+}
+
+export async function getHiddenVisitedSiteUrls(): Promise<string[]> {
+  const record = await db.settings.get(HIDDEN_VISITED_SITE_URLS);
+  if (!Array.isArray(record?.value)) return [];
+  return [
+    ...new Set(
+      record.value.filter(
+        (url): url is string => typeof url === 'string' && isValidUrl(url),
+      ),
+    ),
+  ];
+}
+
+export async function hideVisitedSiteUrl(url: string): Promise<void> {
+  if (!isValidUrl(url)) return;
+  await db.transaction('rw', db.settings, async () => {
+    const hidden = await getHiddenVisitedSiteUrls();
+    if (hidden.includes(url)) return;
+    await db.settings.put({
+      key: HIDDEN_VISITED_SITE_URLS,
+      value: [...hidden, url],
+    });
+  });
+}
 
 const COLLAPSED_GROUPS_KEY = 'favoritepod:collapsedGroups';
 

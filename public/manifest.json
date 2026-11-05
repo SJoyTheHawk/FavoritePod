@@ -30,5 +30,5 @@
     "client_id": "301335487475-rpips565ff5gqc6s8dhp3buhpkroqb7h.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/drive.appdata"]
   },
-  "optional_permissions": ["history", "topSites"]
+  "optional_permissions": ["history", "topSites", "contextMenus"]
 }

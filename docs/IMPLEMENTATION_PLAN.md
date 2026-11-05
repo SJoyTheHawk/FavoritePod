@@ -5,6 +5,9 @@
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
 **Current status**: Phases 2-8.5 are implemented and covered by automated checks.
+Phases 9.1 and 9.2 are implemented as of 2026-11-06; Chrome permission prompts,
+native menus, and visual acceptance remain open in
+[`phase-9-manual-test.md`](./phase-9-manual-test.md).
 Phases 4 and 5 closed on 2026-11-03; Phase 7 closed on 2026-11-04 after
 automated and user-reported manual Chrome validation. Manual Chrome validation
 for extension loading, HMR, screenshots, nested drag-and-drop, keyboard
@@ -776,18 +779,18 @@ Automated verification: `npx vitest run --config vitest.config.ts src/core/__tes
 
 ## Phase 9: Optional Features (Week 13-14)
 
-### 9.1 Visited-Site Discovery
+### 9.1 Visited-Site Discovery — Implementation Complete (2026-11-06)
 **Goal**: Suggest pages to save
 
 **Tasks**:
-- [ ] Request optional permissions in settings
-- [ ] Implement `chrome.topSites.get()`
-- [ ] Implement `chrome.history.search()`
-- [ ] Filter already-saved URLs
-- [ ] Filter user-hidden suggestions
-- [ ] Build suggestions UI (separate tab/section)
-- [ ] Add "Save to group" quick action
-- [ ] Add "Hide" action (local-only)
+- [x] Request optional permissions in settings
+- [x] Implement `chrome.topSites.get()`
+- [x] Implement `chrome.history.search()`
+- [x] Filter already-saved URLs
+- [x] Filter user-hidden suggestions
+- [x] Build suggestions UI (separate tab/section)
+- [x] Add "Save to group" quick action
+- [x] Add "Hide" action (local-only)
 
 **Suggestions UI**:
 ```
@@ -806,20 +809,52 @@ Automated verification: `npx vitest run --config vitest.config.ts src/core/__tes
 - Filtering works
 - Privacy is respected (local hide list)
 
-### 9.2 Context Menu Integration (Optional)
+Implementation notes:
+- Off by default; Settings requests `history` and `topSites` within the user click.
+  Switching discovery off stops reads, clears in-memory results, and removes both
+  optional grants. Browser-side revocation also disables discovery.
+- Frequently visited is a separate sidebar view with the existing colors,
+  typography, borders, buttons, group labels, and favicon fallback.
+- Top sites retain Chrome's order, followed by up to 500 history entries from the
+  last 30 days ranked by visits and recency. At most 50 suggestions display. Only
+  http/https URLs qualify; saved/hidden URLs are normalized without fragments.
+- Save uses the selected group (or creates the default Favorites group in an empty
+  library), supports undo/redo, and disappears from suggestions. Hiding is local
+  IndexedDB state and is excluded from Drive sync and ZIP exports. Unselected
+  suggestions and browser history are never written to library records.
+
+### 9.2 Context Menu Integration (Optional) — Implementation Complete (2026-11-06)
 **Goal**: Right-click to save page/link
 
 **Tasks**:
-- [ ] Add `contextMenus` permission
-- [ ] Create "Save to FavoritePod" menu item
-- [ ] Handle page context (save current page)
-- [ ] Handle link context (save linked page)
-- [ ] Show group selection submenu
+- [x] Add `contextMenus` permission (optional, requested from Settings)
+- [x] Create "Save to FavoritePod" menu item
+- [x] Handle page context (save current page)
+- [x] Handle link context (save linked page)
+- [x] Show group selection submenu
+- [x] Add a persistent Settings switch to enable/disable the right-click save menu
 
 **Acceptance**:
 - Right-click works on pages
 - Right-click works on links
 - Group selection is quick
+
+Implementation notes:
+- Off by default. Enable **Settings → Optional features → Right-click save menu**
+  to request the optional permission. Disabling removes menu entries immediately;
+  its permission can be reused on re-enable.
+- Page/link actions open the existing Add favorite dialog with the URL/title
+  filled in. Group actions preselect the destination. Saving confirms the edit;
+  Cancel does not add a favorite. Already-saved exact URLs open their editor.
+- The service worker rebuilds menus on startup, install, permission changes, and
+  library group changes, including import/sync. Group names use full » paths,
+  respect deletion/restoration clocks, and omit an empty group submenu.
+- Only safe http/https/file URLs enter the editor; no content script or broad
+  host permission is added. New saves use favicon fallback without a screenshot.
+
+Automated verification: `npm test`, `npm run type-check`, `npm run lint`,
+`npm run format:check`, and `npm run build`. Browser acceptance is tracked
+separately in [`phase-9-manual-test.md`](./phase-9-manual-test.md).
 
 ## Phase 10: Polish & Testing (Week 14-16)
 

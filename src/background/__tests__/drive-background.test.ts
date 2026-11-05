@@ -8,6 +8,11 @@ vi.mock('../../core/drive-sync', async (importOriginal) => {
   return { ...original, syncGoogleDrive: vi.fn() };
 });
 
+vi.mock('../context-menus', () => ({
+  installContextMenus: vi.fn(),
+  refreshContextMenus: vi.fn().mockResolvedValue(undefined),
+}));
+
 const listeners: {
   alarm?: (alarm: { name: string }) => void;
   message?: (message: unknown) => void;

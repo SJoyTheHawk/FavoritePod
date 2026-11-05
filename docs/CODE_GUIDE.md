@@ -208,7 +208,8 @@ export default defineConfig({
   
   "optional_permissions": [
     "history",
-    "topSites"
+    "topSites",
+    "contextMenus"
   ],
   
   "host_permissions": [
@@ -224,7 +225,8 @@ export default defineConfig({
 | `activeTab` | Read the active tab, capture its screenshot, open its URL | Temporary when the popup is used |
 | `favicon` | Read Chrome’s cached website icons as a fallback | Reload the extension after manifest changes |
 | `unlimitedStorage` | Protect the IndexedDB library from normal quota eviction | No install warning |
-| `history` (optional) | Visited-site suggestions (planned) | Runtime permission dialog |
+| `history`, `topSites` (optional) | Visited-site suggestions | Requested when enabled in Settings |
+| `contextMenus` (optional) | Save pages/links to selected groups from Chrome's menu | Requested when enabled in Settings |
 
 **Important**: Do not request `<all_urls>` host permissions. The `file:///*`
 host permission is limited to local files and is required for Phase 6 file
@@ -346,6 +348,29 @@ online browser event resumes sync. Treat authorization, offline, network, quota,
 and permanent API failures as separate statuses. Only retry network failures;
 authorization recovery is explicit and quota errors should point to storage
 management.
+
+### Optional Discovery and Context Menus
+
+`core/optional-features.ts` requests optional permissions synchronously from
+Settings click handlers, before awaiting IndexedDB. Feature flags and the hidden
+suggestion URL list live in profile-local `settings`; they do not enter exports
+or Drive device state. Discovery is off by default. Disabling it removes History
+and Top sites permissions; revocation is observed by open dashboards.
+
+`core/discovery.ts` merges top sites with up to 500 history results from the last
+30 days, ranks frequent/recent pages, deduplicates URL fragments, and excludes
+saved or hidden URLs. Only http/https suggestions qualify.
+`dashboard/use-visited-sites.ts` owns in-memory browser results and does not
+persist raw history. Saving uses `createItem` and the standard undo/redo flow.
+
+`background/context-menus.ts` serializes native menu rebuilds and watches
+settings/groups with Dexie `liveQuery`. Click listeners are registered at worker
+startup (or when the optional API is first granted). Menu actions open the
+dashboard editor with validated URL/title/group parameters; the dashboard clears
+those parameters and reuses an existing favorite for an exact saved URL. Group
+labels use full » paths. Disabling the setting removes menus immediately while
+retaining the optional grant for re-enable. The service worker contains no DOM or
+localStorage calls.
 
 ### URL Validation
 

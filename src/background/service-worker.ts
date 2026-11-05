@@ -5,6 +5,10 @@ import {
   syncGoogleDrive,
 } from '../core/drive-sync';
 import { DRIVE_LIBRARY_CHANGED_MESSAGE } from '../core/drive-sync-triggers';
+import { CONTEXT_MENUS_REFRESH_MESSAGE } from '../core/optional-features';
+import { installContextMenus, refreshContextMenus } from './context-menus';
+
+installContextMenus();
 
 const PERIODIC_SYNC_ALARM = 'favoritepod-drive-periodic-sync';
 const DEBOUNCED_SYNC_ALARM = 'favoritepod-drive-debounced-sync';
@@ -23,7 +27,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onStartup.addListener(registerPeriodicSync);
 
-chrome.runtime.onMessage.addListener((message: unknown) => {
+chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (typeof message !== 'object' || message === null || !('type' in message)) {
     return;
   }
@@ -38,6 +42,15 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
     void chrome.runtime
       .sendMessage({ type: DRIVE_LIBRARY_CHANGED_MESSAGE, source: 'service-worker' })
       .catch(() => undefined);
+  } else if (
+    message.type === CONTEXT_MENUS_REFRESH_MESSAGE &&
+    sender.id === chrome.runtime.id
+  ) {
+    void refreshContextMenus().then(
+      () => sendResponse({ ok: true }),
+      () => sendResponse({ error: 'Could not update the right-click menu. Try again.' }),
+    );
+    return true;
   } else if (
     message.type === 'favoritepod.sync.completed' ||
     message.type === DRIVE_CONNECTION_CHANGED

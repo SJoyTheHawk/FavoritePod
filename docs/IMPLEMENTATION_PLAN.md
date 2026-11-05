@@ -10,8 +10,8 @@ automated and user-reported manual Chrome validation. Manual Chrome validation
 for extension loading, HMR, screenshots, nested drag-and-drop, keyboard
 navigation, thumbnail previews, and `file://` access remains open; see
 `NEXT_STEPS.md` and the phase 4-6 manual test checklists. Phase 8.4 was closed
-on 2026-11-05 after user validation. Phase 8.5 implementation is complete;
-Chrome-specific checks remain in `phase-8.5-manual-test.md`.
+on 2026-11-05 after user validation. Phase 8.5 closed on 2026-11-06 after all
+manual Chrome checks passed; see [`phase-8.5-manual-test.md`](./phase-8.5-manual-test.md).
 
 ## Architecture Overview
 
@@ -732,7 +732,7 @@ milestone. The detailed Chrome acceptance sequence remains in
 
 Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-sync.test.ts src/core/__tests__/drive-files.test.ts`, followed by `npm run type-check`, `npm run lint`, and `npm run build`.
 
-### 8.5 Error Handling & UI - Implementation Complete (2026-11-05)
+### 8.5 Error Handling & UI - Closed (2026-11-06)
 **Goal**: Clear sync status and error messages
 
 **Tasks**:

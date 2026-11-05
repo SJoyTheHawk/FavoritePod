@@ -249,6 +249,31 @@ describe('local library storage', () => {
     });
   });
 
+  it('removes cached Drive storage usage when upgrading', async () => {
+    await db.delete();
+    const legacy = new Dexie('FavoritePod');
+    legacy.version(3).stores({
+      groups: 'id,parentId,orderKey,deleted',
+      items: 'id,groupId,orderKey,deleted,url,previewHash',
+      thumbnails: 'hash,size,createdAt',
+      syncMeta: 'key',
+      snapshots: '++id,createdAt',
+      deviceFiles: 'deviceId,lastSync',
+      driveAssets: 'hash,lastSync',
+      settings: 'key',
+    });
+    await legacy.open();
+    await legacy.table('syncMeta').bulkPut([
+      { key: 'drive.storageQuota', value: { usageInDrive: 1024 } },
+      { key: 'drive.lastSync', value: 'keep' },
+    ]);
+    legacy.close();
+
+    await db.open();
+    expect(await db.syncMeta.get('drive.storageQuota')).toBeUndefined();
+    expect((await db.syncMeta.get('drive.lastSync'))?.value).toBe('keep');
+  });
+
   it('persists a favicon across reopen, edit, and snapshot restore', async () => {
     const faviconUrl = 'data:image/png;base64,aWNvbg==';
     const item = await createItem({ url: 'https://icon.example', faviconUrl });

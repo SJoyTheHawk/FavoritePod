@@ -4,7 +4,6 @@ import { liveQuery } from 'dexie';
 import {
   verifyGoogleDriveAccount,
   getDriveConnectionState,
-  getDriveStorageQuota,
   markDriveAuthorizationRequired,
   driveFetch,
   DRIVE_CONNECTION_CHANGED,
@@ -32,15 +31,8 @@ const bob = {
   permissionId: 'permission-bob',
 };
 
-function aboutResponse(
-  account: typeof alice,
-  status = 200,
-  storageQuota?: Record<string, string>,
-): Response {
-  return new Response(
-    JSON.stringify({ user: account, ...(storageQuota ? { storageQuota } : {}) }),
-    { status },
-  );
+function aboutResponse(account: typeof alice, status = 200): Response {
+  return new Response(JSON.stringify({ user: account }), { status });
 }
 
 beforeEach(async () => {
@@ -62,57 +54,6 @@ afterAll(async () => {
 });
 
 describe('Google Drive authorization', () => {
-  it('reads and caches Drive account storage usage', async () => {
-    await db.syncMeta.put({ key: 'drive.account', value: alice });
-    identity.getAuthToken.mockResolvedValue({ token: 'drive-token' });
-    vi.mocked(fetch).mockImplementation(async (input) => {
-      const url = new URL(String(input));
-      if (url.searchParams.get('fields')?.startsWith('user(')) {
-        return aboutResponse(alice);
-      }
-      return aboutResponse(alice, 200, {
-        usage: '2097152',
-        usageInDrive: '1048576',
-        usageInDriveTrash: '1024',
-        limit: '10485760',
-      });
-    });
-
-    const quota = await getDriveStorageQuota();
-    expect(quota).toMatchObject({
-      usageInDrive: 1_048_576,
-      usage: 2_097_152,
-      usageInDriveTrash: 1_024,
-      limit: 10_485_760,
-    });
-    const [request] = vi.mocked(fetch).mock.calls[1] ?? [];
-    const url = new URL(String(request));
-    expect(url.pathname).toBe('/drive/v3/about');
-    expect(url.searchParams.get('fields')).toBe(
-      'storageQuota(limit,usage,usageInDrive,usageInDriveTrash)',
-    );
-
-    await expect(getDriveStorageQuota()).resolves.toEqual(quota);
-    expect(fetch).toHaveBeenCalledTimes(3);
-  });
-
-  it('supports accounts with unlimited Drive storage', async () => {
-    await db.syncMeta.put({ key: 'drive.account', value: alice });
-    identity.getAuthToken.mockResolvedValue({ token: 'drive-token' });
-    vi.mocked(fetch).mockImplementation(async (input) => {
-      const url = new URL(String(input));
-      if (url.searchParams.get('fields')?.startsWith('user(')) {
-        return aboutResponse(alice);
-      }
-      return aboutResponse(alice, 200, { usageInDrive: '2048' });
-    });
-
-    await expect(getDriveStorageQuota()).resolves.toMatchObject({
-      usageInDrive: 2048,
-      limit: undefined,
-    });
-  });
-
   it('requires confirmation before saving a newly authorized profile', async () => {
     identity.getAuthToken.mockResolvedValue({ token: 'temporary-access-token' });
     vi.mocked(fetch).mockImplementation(async () => aboutResponse(alice));

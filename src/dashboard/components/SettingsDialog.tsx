@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Description,
   Dialog,
@@ -9,8 +9,10 @@ import {
 import {
   ArrowPathIcon,
   ArrowDownTrayIcon,
+  ArrowTopRightOnSquareIcon,
   ArrowUpTrayIcon,
   ChevronRightIcon,
+  ExclamationTriangleIcon,
   FolderPlusIcon,
   ListBulletIcon,
   Squares2X2Icon,
@@ -18,12 +20,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { normalizePathOverrides, type PathOverride } from '../../core/file-links';
-import type {
-  DriveAccount,
-  DriveConnectionResult,
-  DriveConnectionState,
-} from '../../core/drive-auth';
-import type { DriveStorageQuota } from '../../core/drive-auth';
+import type { DriveAccount, DriveConnectionState } from '../../core/drive-auth';
 import type { DriveSyncProgress } from '../../core/drive-sync';
 import type {
   DriveSyncErrorCode,
@@ -45,8 +42,6 @@ interface SettingsDialogProps {
   driveSyncMessage?: string;
   driveSyncProgress?: DriveSyncProgress;
   driveSyncHistory: DriveSyncHistoryEntry[];
-  driveStorageQuota?: DriveStorageQuota;
-  driveStorageLoading: boolean;
   online: boolean;
   homePageAvailable: boolean;
   pathOverrides: PathOverride[];
@@ -56,26 +51,10 @@ interface SettingsDialogProps {
   onSaveShowPreview: (showPreview: boolean) => Promise<void>;
   onSaveOpenBehavior: (behavior: OpenBehavior) => Promise<void>;
   onSavePathOverrides: (overrides: PathOverride[]) => Promise<void>;
-  onConnectDrive: () => Promise<DriveConnectionResult>;
-  onPrepareDriveConnection: () => Promise<DriveAccount>;
-  onConfirmDriveConnection: (account: DriveAccount) => Promise<DriveConnectionResult>;
-  onCancelDriveConnection: () => Promise<void>;
-  onSwitchDriveAccount: (account: DriveAccount) => Promise<void>;
+  onOpenDriveSignIn: () => void;
   onDisconnectDrive: () => Promise<void>;
   onSyncDrive: () => Promise<void>;
   onArchiveAction: (mode: ArchiveDialogMode) => void;
-}
-
-function formatDriveBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
 }
 
 function syncStageLabel(progress?: DriveSyncProgress): string | undefined {
@@ -106,8 +85,6 @@ export function SettingsDialog({
   driveSyncMessage,
   driveSyncProgress,
   driveSyncHistory,
-  driveStorageQuota,
-  driveStorageLoading,
   online,
   homePageAvailable,
   pathOverrides,
@@ -117,11 +94,7 @@ export function SettingsDialog({
   onSaveShowPreview,
   onSaveOpenBehavior,
   onSavePathOverrides,
-  onConnectDrive,
-  onPrepareDriveConnection,
-  onConfirmDriveConnection,
-  onCancelDriveConnection,
-  onSwitchDriveAccount,
+  onOpenDriveSignIn,
   onDisconnectDrive,
   onSyncDrive,
   onArchiveAction,
@@ -129,113 +102,14 @@ export function SettingsDialog({
   const [error, setError] = useState<string>();
   const [editedOverrides, setEditedOverrides] = useState(pathOverrides);
   const [driveError, setDriveError] = useState<string>();
-  const [driveMessage, setDriveMessage] = useState<string>();
   const [driveBusy, setDriveBusy] = useState(false);
-  const [connectCandidate, setConnectCandidate] = useState<DriveAccount>();
-  const [pendingDriveAccount, setPendingDriveAccount] = useState<DriveAccount>();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-
-  useEffect(() => {
-    if (driveConnectionStatus === 'disconnected') {
-      setPendingDriveAccount(undefined);
-      setConfirmDisconnect(false);
-      setDriveError(undefined);
-      setDriveMessage(undefined);
-    }
-  }, [driveConnectionStatus]);
-
-  useEffect(() => {
-    if (driveConnectionStatus !== 'disconnected') setConnectCandidate(undefined);
-  }, [driveConnectionStatus]);
-
-  const connectDrive = async () => {
-    setDriveBusy(true);
-    setDriveError(undefined);
-    setDriveMessage(undefined);
-    setPendingDriveAccount(undefined);
-    try {
-      const result = await onConnectDrive();
-      if (result.status === 'account-switch-required') {
-        setPendingDriveAccount(result.nextAccount);
-      } else {
-        setPendingDriveAccount(undefined);
-      }
-    } catch (cause) {
-      setDriveError(
-        cause instanceof Error ? cause.message : 'Could not connect to Google Drive.',
-      );
-    } finally {
-      setDriveBusy(false);
-    }
-  };
-
-  const prepareDriveConnection = async () => {
-    setDriveBusy(true);
-    setDriveError(undefined);
-    setDriveMessage(undefined);
-    setConnectCandidate(undefined);
-    try {
-      setConnectCandidate(await onPrepareDriveConnection());
-    } catch (cause) {
-      setDriveError(
-        cause instanceof Error ? cause.message : 'Could not connect to Google Drive.',
-      );
-    } finally {
-      setDriveBusy(false);
-    }
-  };
-
-  const confirmDriveConnection = async () => {
-    if (!connectCandidate) return;
-    setDriveBusy(true);
-    setDriveError(undefined);
-    try {
-      const result = await onConfirmDriveConnection(connectCandidate);
-      setConnectCandidate(undefined);
-      if (result.status === 'account-switch-required') {
-        setPendingDriveAccount(result.nextAccount);
-      }
-    } catch (cause) {
-      setConnectCandidate(undefined);
-      setDriveError(
-        cause instanceof Error ? cause.message : 'Could not connect to Google Drive.',
-      );
-    } finally {
-      setDriveBusy(false);
-    }
-  };
-
-  const cancelPreparedDriveConnection = async () => {
-    setDriveBusy(true);
-    setDriveError(undefined);
-    try {
-      await onCancelDriveConnection();
-    } catch (cause) {
-      setDriveError(
-        cause instanceof Error ? cause.message : 'Could not cancel the connection.',
-      );
-    } finally {
-      setConnectCandidate(undefined);
-      setDriveBusy(false);
-    }
-  };
-
-  const confirmDriveAccountSwitch = async () => {
-    if (!pendingDriveAccount) return;
-    setDriveBusy(true);
-    setDriveError(undefined);
-    try {
-      await onSwitchDriveAccount(pendingDriveAccount);
-      setDriveMessage(`Switched to ${pendingDriveAccount.emailAddress}.`);
-      setPendingDriveAccount(undefined);
-    } catch (cause) {
-      setDriveError(
-        cause instanceof Error ? cause.message : 'Could not switch Google accounts.',
-      );
-    } finally {
-      setDriveBusy(false);
-    }
-  };
+  const showDriveStorageWarning =
+    driveConnectionStatus === 'connected' &&
+    online &&
+    !driveSyncing &&
+    Boolean(driveSyncError) &&
+    driveSyncErrorCode === 'quota-exceeded';
 
   const dismissDisconnect = () => {
     if (driveBusy) return;
@@ -246,11 +120,9 @@ export function SettingsDialog({
   const disconnectDrive = async () => {
     setDriveBusy(true);
     setDriveError(undefined);
-    setDriveMessage(undefined);
     try {
       await onDisconnectDrive();
       setConfirmDisconnect(false);
-      setPendingDriveAccount(undefined);
     } catch (cause) {
       setDriveError(
         cause instanceof Error ? cause.message : 'Could not disconnect Google Drive.',
@@ -474,10 +346,10 @@ export function SettingsDialog({
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-text-secondary">
               {driveConnectionStatus === 'authorization-required'
-                ? 'Select Connect Google Drive to authorize this profile and resume syncing. Your local changes are saved.'
+                ? 'Reconnect Google Drive to resume syncing. Your local changes are saved.'
                 : driveAccount
                   ? 'Sync your favorites across devices using Google Drive’s private app folder.'
-                  : 'Connect your Google account to sync favorites using Drive’s private app folder.'}
+                  : 'Sign in to sync your favorites across devices.'}
             </p>
             <div className="mt-3 rounded-md border border-border bg-surface px-3 py-3">
               {driveAccount ? (
@@ -537,24 +409,27 @@ export function SettingsDialog({
                           />
                         </div>
                       </div>
-                    ) : driveSyncError ? (
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="min-w-0 flex-1 text-sm text-danger" role="alert">
-                          {driveSyncErrorCode === 'network-error'
-                            ? 'Could not reach Google Drive. Your changes are saved locally.'
-                            : driveSyncError}
-                        </p>
-                        {driveSyncErrorCode === 'quota-exceeded' ? (
-                          <a
-                            className="shrink-0 text-sm font-medium text-primary hover:underline"
-                            href="https://drive.google.com/drive/quota"
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            Manage storage
-                          </a>
-                        ) : null}
+                    ) : showDriveStorageWarning ? (
+                      <div className="flex items-start gap-2.5" role="alert">
+                        <ExclamationTriangleIcon
+                          aria-hidden="true"
+                          className="mt-0.5 h-5 w-5 shrink-0 text-warning"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary">
+                            Google Drive storage is full
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+                            Free up space in Google Drive to continue syncing.
+                          </p>
+                        </div>
                       </div>
+                    ) : driveSyncError ? (
+                      <p className="text-sm text-danger" role="alert">
+                        {driveSyncErrorCode === 'network-error'
+                          ? 'Could not reach Google Drive. Your changes are saved locally.'
+                          : driveSyncError}
+                      </p>
                     ) : driveSyncMessage ? (
                       <p className="text-sm text-text-secondary" role="status">
                         {driveSyncMessage}
@@ -566,26 +441,47 @@ export function SettingsDialog({
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
-                    <button
-                      className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy || driveSyncing || !online}
-                      onClick={() =>
-                        void (driveConnectionStatus === 'authorization-required'
-                          ? connectDrive()
-                          : onSyncDrive())
-                      }
-                      type="button"
-                    >
-                      {driveSyncing
-                        ? 'Syncing…'
-                        : driveConnectionStatus === 'authorization-required'
-                          ? 'Connect Google Drive'
+                    {showDriveStorageWarning && (
+                      <a
+                        className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                        href="https://drive.google.com/drive/quota"
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Manage storage
+                        <ArrowTopRightOnSquareIcon
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0"
+                        />
+                        <span className="sr-only"> (opens in a new tab)</span>
+                      </a>
+                    )}
+                    {driveConnectionStatus === 'authorization-required' && (
+                      <button
+                        className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
+                        disabled={driveBusy || driveSyncing || !online}
+                        onClick={onOpenDriveSignIn}
+                        type="button"
+                      >
+                        Reconnect Google Drive
+                      </button>
+                    )}
+                    {driveConnectionStatus === 'connected' && (
+                      <button
+                        className={`min-h-9 rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-wait disabled:opacity-60 ${showDriveStorageWarning ? 'border border-border text-text-primary hover:bg-surface-hover' : 'bg-primary text-white hover:bg-primary-hover'}`}
+                        disabled={driveBusy || driveSyncing || !online}
+                        onClick={() => void onSyncDrive()}
+                        type="button"
+                      >
+                        {driveSyncing
+                          ? 'Syncing…'
                           : driveSyncError &&
                               driveSyncErrorCode !== 'offline' &&
                               driveSyncErrorCode !== 'quota-exceeded'
                             ? 'Try again'
                             : 'Sync now'}
-                    </button>
+                      </button>
+                    )}
                     <button
                       className="min-h-9 rounded-md px-3 text-sm font-medium text-danger transition hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
                       disabled={driveBusy || driveSyncing}
@@ -599,82 +495,16 @@ export function SettingsDialog({
                     </button>
                   </div>
                 </>
-              ) : connectCandidate ? (
-                <div
-                  aria-labelledby="drive-connect-confirm-title"
-                  className="rounded-md border border-border bg-background p-3"
-                  role="group"
-                >
-                  <p
-                    className="text-sm font-medium text-text-primary"
-                    id="drive-connect-confirm-title"
-                  >
-                    Connect Google Drive as {connectCandidate.emailAddress}?
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                    FavoritePod uses the Google account signed in to this Chrome profile.
-                    To use a different account, change this Chrome profile’s account
-                    first.
-                  </p>
-                  <div className="mt-3 flex justify-center gap-2">
-                    <button
-                      className="min-h-9 rounded-md border border-border px-3 text-sm text-text-primary transition hover:bg-surface-hover disabled:opacity-60"
-                      disabled={driveBusy}
-                      onClick={() => void cancelPreparedDriveConnection()}
-                      type="button"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      autoFocus
-                      className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy}
-                      onClick={() => void confirmDriveConnection()}
-                      type="button"
-                    >
-                      Connect
-                    </button>
-                  </div>
-                </div>
               ) : (
                 <div className="flex justify-center">
                   <button
                     className="min-h-10 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
-                    disabled={driveBusy}
-                    onClick={() => void prepareDriveConnection()}
+                    disabled={!online}
+                    onClick={onOpenDriveSignIn}
                     type="button"
                   >
                     Connect Google Drive
                   </button>
-                </div>
-              )}
-
-              {pendingDriveAccount && (
-                <div className="mt-3 rounded-md border border-warning/40 bg-background p-3">
-                  <p className="text-sm text-text-primary" role="status">
-                    Google returned {pendingDriveAccount.emailAddress}, while this device
-                    is connected as {driveAccount?.emailAddress ?? 'another account'}.
-                    Switching clears Drive file records for the previous account. Your
-                    favorites and device identity stay on this device.
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      className="min-h-9 rounded-md border border-border px-3 text-sm text-text-primary hover:bg-surface-hover disabled:opacity-60"
-                      disabled={driveBusy}
-                      onClick={() => setPendingDriveAccount(undefined)}
-                      type="button"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
-                      disabled={driveBusy}
-                      onClick={() => void confirmDriveAccountSwitch()}
-                      type="button"
-                    >
-                      Switch account
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -683,60 +513,9 @@ export function SettingsDialog({
                   {driveError}
                 </p>
               )}
-              {driveMessage && (
-                <p className="mt-3 text-sm text-text-secondary" role="status">
-                  {driveMessage}
-                </p>
-              )}
             </div>
             {driveAccount && (
               <>
-                <div className="mt-4 border-b border-border pb-4">
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="font-medium text-text-primary">Drive storage</span>
-                    {driveStorageQuota ? (
-                      <span className="text-right text-text-secondary">
-                        {formatDriveBytes(
-                          driveStorageQuota.usage ?? driveStorageQuota.usageInDrive,
-                        )}{' '}
-                        used
-                        {driveStorageQuota.limit !== undefined
-                          ? ` of ${formatDriveBytes(driveStorageQuota.limit)}`
-                          : ' · no storage limit reported'}
-                      </span>
-                    ) : driveStorageLoading ? (
-                      <span className="text-text-secondary">Loading…</span>
-                    ) : (
-                      <span className="text-text-secondary">Usage unavailable</span>
-                    )}
-                  </div>
-                  {driveStorageQuota?.limit ? (
-                    <div
-                      aria-label="Google account storage used"
-                      aria-valuemax={driveStorageQuota.limit}
-                      aria-valuemin={0}
-                      aria-valuenow={Math.min(
-                        driveStorageQuota.usage ?? driveStorageQuota.usageInDrive,
-                        driveStorageQuota.limit,
-                      )}
-                      className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface"
-                      role="progressbar"
-                    >
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{
-                          width: `${Math.min(100, (100 * (driveStorageQuota.usage ?? driveStorageQuota.usageInDrive)) / driveStorageQuota.limit)}%`,
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                  {driveStorageQuota && (
-                    <p className="mt-1 text-xs text-text-tertiary">
-                      Drive files: {formatDriveBytes(driveStorageQuota.usageInDrive)}.
-                      Total account usage can also include Gmail and Photos.
-                    </p>
-                  )}
-                </div>
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm font-medium text-text-primary hover:text-primary">
                     Sync history ({driveSyncHistory.length})

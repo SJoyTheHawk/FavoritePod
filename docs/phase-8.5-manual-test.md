@@ -3,46 +3,61 @@
 Build and load the unpacked extension from `dist/`. Connect a test Google
 account before checking the Drive-specific states.
 
+**Result**: All manual test items passed in Chrome on 2026-11-06, as reported
+by the user.
+
 ## Status and progress
 
-1. In the dashboard header, verify the Google Drive status icon is present. Its
-   tooltip should describe the current state; click it to open Settings.
-2. With Drive connected, run **Sync now**. Settings should show the active sync
-   stage and any available item count while downloading or syncing previews.
-3. Change a favorite in another Chrome profile and sync. The receiving profile
-   should briefly show that remote changes were merged automatically.
-4. Wait for sync to complete. Settings should show the latest sync time and the
-   history should contain the outcome.
+- [x] In the dashboard header, find the Google Drive button. When no account is
+   connected, it shows a cloud. Click it and check that a small Google Drive
+   sign-in window opens without opening the rest of Settings.
+- [x] Finish sign-in. The button should show a check mark. Click the check mark to
+   sync your favorites. While syncing, it should show moving arrows and ignore
+   additional clicks.
+- [x] Wait for the sync to finish. A notification should say **Favorites synced**.
+   Settings should show the latest sync time and the sync history should contain
+   the result.
+- [x] Change a favorite in another Chrome profile and sync. The receiving profile
+   should briefly explain that changes from another device were included.
 
 ## Offline behavior and recovery
 
-1. Connect Drive and make a local change. Use Chrome DevTools network throttling
-   or disable network access for the dashboard, then choose **Sync now**.
-2. Verify FavoritePod reports offline, retains the local change, and records the
-   offline attempt. It should not make Drive API requests while `navigator.onLine`
-   is false.
-3. Restore network access. The online trigger should resume sync automatically
-   and clear the current error state after success.
-4. Simulate an authorization failure using an expired/revoked test grant. Verify
-   the header and Settings identify the authorization state and provide
-   **Connect Google Drive**. Successful authorization resumes sync; do not retry
-   authorization failures as network errors.
-5. Simulate a transient network failure and a Drive quota error. Network failure
-   should offer **Try again**; quota failure should offer **Manage storage**.
+- [x] Connect Drive and make a local change. Turn off the network, then click the
+   Drive button while it shows a cross.
+- [x] The button should show moving arrows briefly, then return to the cross. A
+   notification should say **Failed to sync favorites**. The local change must
+   remain saved, and no Drive API request should be made while offline.
+- [x] Restore network access. FavoritePod should try again automatically and the
+   button should return to a check mark after a successful sync.
+- [x] Simulate an authorization failure using an expired or revoked test grant.
+   The Drive button should offer a focused reconnect window. Successful sign-in
+   resumes syncing; authorization failures should not be retried as network
+   failures.
+- [x] Simulate a temporary network failure and a Drive storage-limit error. A
+   failed manual sync should show **Failed to sync favorites**; a storage-limit
+   error should show a warning icon, **Google Drive storage is full**, and a
+   separate muted explanation in Settings. **Manage storage** should be the
+   primary button in the centered action row, beside a secondary **Sync now**
+   and **Disconnect**. Check that the text and actions wrap without overlapping
+   in a narrow window and remain readable in light and dark themes. Tab to
+   **Manage storage**, check its visible focus ring, and press Enter to open
+   Google Drive storage in a new tab. After restoring normal requests and
+   successfully syncing, the warning and storage button should disappear and
+   **Sync now** should return to its normal primary style.
 
 ## History and storage
 
-1. Run successful, failed, and offline sync attempts. Open **Sync history** in
+- [x] Run successful, failed, and offline sync attempts. Open **Sync history** in
    Settings and verify outcomes, messages, and timestamps are readable.
-2. Repeatedly sync until more than 20 outcomes exist. History should retain only
+- [x] Repeatedly sync until more than 20 outcomes exist. History should retain only
    the newest 20 entries.
-3. Open Settings while connected. Drive storage usage should display in human
+- [x] Open Settings while connected. Drive storage usage should display in human
    readable units and show a usage bar when Google provides a limit. This is the
    account's overall Drive usage, including files outside FavoritePod.
-4. Disconnect and reconnect. Drive history and quota cache are profile-local
+- [x] Disconnect and reconnect. Drive history and quota cache are profile-local
    Drive metadata; local favorites and thumbnails remain intact.
 
 Automated coverage for quota parsing/cache, bounded history, offline handling,
 status progress, and background progress messages is included in the core and
-background test suites. Real OAuth expiration, quota, and multiple-profile
-behavior still require Chrome verification.
+background test suites. The Chrome checks above, including OAuth recovery,
+storage-limit handling, and multi-profile behavior, have also passed.

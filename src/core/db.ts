@@ -41,6 +41,11 @@ export class FavoritePodDB extends Dexie {
           });
       });
     this.version(3).stores({ driveAssets: 'hash,lastSync' });
+    this.version(4)
+      .stores({})
+      .upgrade(async (transaction) => {
+        await transaction.table('syncMeta').delete('drive.storageQuota');
+      });
   }
 }
 

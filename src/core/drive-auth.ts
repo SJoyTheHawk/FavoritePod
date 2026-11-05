@@ -5,17 +5,7 @@ const DRIVE_METADATA_PREFIX = 'drive.';
 const DRIVE_ABOUT_URL =
   'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress,permissionId)';
 const DRIVE_AUTH_REQUIRED_KEY = 'drive.authorizationRequired';
-const DRIVE_STORAGE_QUOTA_KEY = 'drive.storageQuota';
-const DRIVE_STORAGE_QUOTA_TTL_MS = 30 * 60 * 1000;
 export const DRIVE_CONNECTION_CHANGED = 'favoritepod.drive.connection-changed';
-
-export interface DriveStorageQuota {
-  usageInDrive: number;
-  usage?: number;
-  usageInDriveTrash?: number;
-  limit?: number;
-  fetchedAt: number;
-}
 
 export interface DriveAccount {
   emailAddress: string;
@@ -288,76 +278,6 @@ async function persistIfAccountMatches(
 export async function getConnectedDriveAccount(): Promise<DriveAccount | null> {
   const record = await db.syncMeta.get(DRIVE_ACCOUNT_KEY);
   return accountFromRecord(record?.value);
-}
-
-function parseQuotaBytes(value: unknown): number | undefined {
-  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
-}
-
-/** Read Google Drive account storage usage, using a short-lived local cache. */
-export async function getDriveStorageQuota(
-  forceRefresh = false,
-): Promise<DriveStorageQuota | undefined> {
-  await verifyGoogleDriveAccount();
-  const cachedValue = (await db.syncMeta.get(DRIVE_STORAGE_QUOTA_KEY))?.value;
-  const cached =
-    typeof cachedValue === 'object' && cachedValue !== null
-      ? (cachedValue as Partial<DriveStorageQuota>)
-      : undefined;
-  if (
-    !forceRefresh &&
-    cached &&
-    typeof cached.fetchedAt === 'number' &&
-    Number.isFinite(cached.fetchedAt) &&
-    Date.now() - cached.fetchedAt < DRIVE_STORAGE_QUOTA_TTL_MS &&
-    typeof cached.usageInDrive === 'number' &&
-    Number.isSafeInteger(cached.usageInDrive) &&
-    cached.usageInDrive >= 0
-  ) {
-    return cached as DriveStorageQuota;
-  }
-
-  const url = new URL('/drive/v3/about', 'https://www.googleapis.com');
-  url.searchParams.set(
-    'fields',
-    'storageQuota(limit,usage,usageInDrive,usageInDriveTrash)',
-  );
-  const response = await driveFetch(url);
-  if (!response.ok) {
-    throw new DriveAuthError(
-      `Could not read Google Drive storage usage (HTTP ${response.status}).`,
-      response.status === 429 || response.status >= 500
-        ? 'network-error'
-        : 'identity-error',
-      response.status === 429 || response.status >= 500,
-    );
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new DriveAuthError('Google Drive returned unreadable storage information.');
-  }
-  const quota =
-    typeof payload === 'object' && payload !== null && 'storageQuota' in payload
-      ? (payload as { storageQuota?: unknown }).storageQuota
-      : undefined;
-  if (typeof quota !== 'object' || quota === null) return undefined;
-  const fields = quota as Record<string, unknown>;
-  const usageInDrive = parseQuotaBytes(fields.usageInDrive);
-  if (usageInDrive === undefined) return undefined;
-  const result: DriveStorageQuota = {
-    usageInDrive,
-    usage: parseQuotaBytes(fields.usage),
-    usageInDriveTrash: parseQuotaBytes(fields.usageInDriveTrash),
-    limit: parseQuotaBytes(fields.limit),
-    fetchedAt: Date.now(),
-  };
-  await db.syncMeta.put({ key: DRIVE_STORAGE_QUOTA_KEY, value: result });
-  return result;
 }
 
 /** Authorize and identify the Google account without connecting this profile. */

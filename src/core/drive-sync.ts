@@ -70,6 +70,11 @@ export type DriveSyncResult =
       mergedRemoteChanges: boolean;
     };
 
+export interface DriveSyncOptions {
+  /** Wait for another context's sync to finish instead of returning skipped. */
+  waitForLock?: boolean;
+}
+
 export class DriveSyncError extends Error {
   constructor(message: string) {
     super(message);
@@ -490,24 +495,28 @@ async function performSync(
 export async function syncGoogleDrive(
   choice?: DriveSyncChoice,
   onProgress?: DriveSyncProgressCallback,
+  options: DriveSyncOptions = {},
 ): Promise<DriveSyncResult> {
   const startedAt = new Date().toISOString();
   try {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       throw new DriveSyncOfflineError();
     }
-    const result = await withGoogleDriveSyncLock(() => {
-      let resolvedChoice = choice;
-      return retryDriveSync(() =>
-        performSync(
-          resolvedChoice,
-          (nextChoice) => {
-            resolvedChoice = nextChoice;
-          },
-          onProgress,
-        ),
-      );
-    });
+    const result = await withGoogleDriveSyncLock(
+      () => {
+        let resolvedChoice = choice;
+        return retryDriveSync(() =>
+          performSync(
+            resolvedChoice,
+            (nextChoice) => {
+              resolvedChoice = nextChoice;
+            },
+            onProgress,
+          ),
+        );
+      },
+      { waitForLock: options.waitForLock === true },
+    );
     if (!result || result.status === 'skipped') {
       return result ?? { status: 'skipped', reason: 'already-running' };
     }
@@ -547,6 +556,7 @@ export async function syncGoogleDrive(
 /** Run account mutations under the same lock used by sync in every extension context. */
 export async function withGoogleDriveSyncLock<T>(
   operation: () => Promise<T>,
+  options: { waitForLock?: boolean } = {},
 ): Promise<T | null> {
   if (typeof navigator === 'undefined' || !navigator.locks) {
     throw new DriveSyncError('This browser cannot safely coordinate Drive sync yet.');
@@ -554,7 +564,9 @@ export async function withGoogleDriveSyncLock<T>(
 
   return navigator.locks.request(
     SYNC_LOCK_NAME,
-    { mode: 'exclusive', ifAvailable: true },
+    options.waitForLock
+      ? { mode: 'exclusive' }
+      : { mode: 'exclusive', ifAvailable: true },
     (lock) => (lock ? operation() : Promise.resolve(null)),
   );
 }

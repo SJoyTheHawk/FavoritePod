@@ -352,16 +352,22 @@ management.
 ### Optional Discovery and Context Menus
 
 `core/optional-features.ts` requests optional permissions synchronously from
-Settings click handlers, before awaiting IndexedDB. Feature flags and the hidden
-suggestion URL list live in profile-local `settings`; they do not enter exports
-or Drive device state. Discovery is off by default. Disabling it removes History
-and Top sites permissions; revocation is observed by open dashboards.
+Settings click handlers, before awaiting IndexedDB. Feature flags, hidden shortcut
+URLs, and `showFrequentlyVisited` live in profile-local `settings`; they do not
+enter exports or Drive state. Visibility defaults on; access remains opt-in.
+Hiding stops reads without revoking grants. Disabling access removes History and
+Top sites permissions; revocation is observed by open dashboards.
 
 `core/discovery.ts` merges top sites with up to 500 history results from the last
 30 days, ranks frequent/recent pages, deduplicates URL fragments, and excludes
-saved or hidden URLs. Only http/https suggestions qualify.
+hidden URLs. Saved sites remain available as shortcuts. Only http/https URLs
+qualify, with ten results by default.
 `dashboard/use-visited-sites.ts` owns in-memory browser results and does not
-persist raw history. Saving uses `createItem` and the standard undo/redo flow.
+persist raw history. `FrequentlyVisitedSection` appears only in All favorites
+outside search, using compact grid dimensions regardless of library view/size.
+Clicking opens the site with `openSavedUrl`; accessible overflow menus provide
+Add to favorites, Edit favorite for normalized URL matches, and Hide shortcut.
+Saving reuses `FavoriteDialog` and undo/redo, keeping All favorites selected.
 
 `background/context-menus.ts` serializes native menu rebuilds and watches
 settings/groups with Dexie `liveQuery`. Click listeners are registered at worker

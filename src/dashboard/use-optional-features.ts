@@ -1,6 +1,11 @@
 import { liveQuery } from 'dexie';
 import { useEffect, useState } from 'react';
-import { getContextMenuEnabled, getSiteDiscoveryEnabled } from '../core/storage';
+import {
+  getContextMenuEnabled,
+  getShowFrequentlyVisited,
+  getSiteDiscoveryEnabled,
+  setShowFrequentlyVisited,
+} from '../core/storage';
 import {
   saveContextMenuEnabled,
   saveSiteDiscoveryEnabled,
@@ -8,6 +13,7 @@ import {
 
 export function useOptionalFeatures() {
   const [preferences, setPreferences] = useState({
+    showFrequentlyVisited: true,
     discovery: false,
     contextMenu: false,
   });
@@ -41,6 +47,7 @@ export function useOptionalFeatures() {
         });
     };
     const subscription = liveQuery(async () => ({
+      showFrequentlyVisited: await getShowFrequentlyVisited(),
       discovery: await getSiteDiscoveryEnabled(),
       contextMenu: await getContextMenuEnabled(),
     })).subscribe({
@@ -69,6 +76,8 @@ export function useOptionalFeatures() {
   return {
     ready: permissionsReady && preferencesReady,
     error,
+    showFrequentlyVisited: preferences.showFrequentlyVisited,
+    saveShowFrequentlyVisited: setShowFrequentlyVisited,
     discoveryEnabled: preferences.discovery && permissions.discovery,
     discoveryPermissionGranted: permissions.discovery,
     contextMenuEnabled: preferences.contextMenu && permissions.contextMenu,

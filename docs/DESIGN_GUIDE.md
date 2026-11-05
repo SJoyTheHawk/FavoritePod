@@ -947,6 +947,21 @@ review dialog.
 
 ---
 
+## Frequently Visited Shortcuts
+
+Show Frequently visited above the All favorites heading and toolbar, outside search.
+Use compact 6.5rem tiles and a 0.5rem gap in every library view. Center each row,
+including partially filled rows, and wrap on narrow screens. Each shortcut has
+a 24px favicon in a transparent 48px area and one truncated centered 12px label.
+Keep tiles borderless with a surface hover state
+and visible keyboard focus. Clicking opens the site.
+
+Use an accessible three-dot menu for Add to favorites/Edit favorite and Hide
+shortcut. Show that button on hover, keyboard focus, menu-open, and touch. Keep
+Refresh, Settings, and Hide frequently visited in the section menu. Permission,
+empty, and error copy stays compact and inline. The default-on Settings visibility
+switch hides the whole section independently of access permission.
+
 ## Accessibility
 
 ### Keyboard Navigation

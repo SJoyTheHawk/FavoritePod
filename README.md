@@ -48,17 +48,23 @@ Hover over a favorite to see a larger preview and quick actions. You can edit it
 name or address, copy its link, or open it. Undo and redo help you recover from
 accidental library edits.
 
-## Optional discovery and right-click saving
+## Frequently visited and right-click saving
 
-Open **Settings → Optional features** to enable either feature independently.
-Both start off, and Chrome requests their optional permissions when enabled.
+**Frequently visited** shows up to ten compact shortcuts above your library in
+**All favorites**, in every grid/list view. Click to open a site. Its **…** menu
+offers **Add to favorites**, **Edit favorite** if already saved, and **Hide
+shortcut**. Saving opens the favorite editor so you can choose a group.
 
-**Visited-site discovery** adds suggestions in **Frequently visited** in the
-sidebar. Choose a destination in **Save to**, then use + to save a page or Hide
-to dismiss it. Saved pages are excluded. Suggestions use top sites and up to
-500 history entries from the last 30 days. Disabling discovery removes its
-History/Top sites access. History and hidden suggestions stay in the current
-profile; only pages you explicitly save can enter exports or Drive sync.
+The section is shown by default. Hide it using its **…** menu or turn off
+**Settings → Show frequently visited** for a cleaner layout. Showing it again
+restores your shortcuts without changing your favorites.
+
+Chrome access is separate: enable **Settings → Optional features → Frequently
+visited access** to grant Top sites and History permissions. Shortcuts use top
+sites and up to 500 history entries from the last 30 days. Hiding stops reads;
+disabling access also removes those permissions. History stays in memory, and
+hidden shortcuts and visibility stay in this profile. Only explicitly saved
+favorites enter exports or Drive sync.
 
 **Right-click save menu** adds **Save to FavoritePod** to page and link menus.
 Choose a page, link, or destination group to open the existing Add favorite

@@ -6,9 +6,8 @@ import {
   type TopSiteEntry,
 } from '../core/discovery';
 import { getHiddenVisitedSiteUrls } from '../core/storage';
-import type { Item } from '../core/types';
 
-export function useVisitedSites(enabled: boolean, items: Item[]) {
+export function useVisitedSites(enabled: boolean) {
   const [topSites, setTopSites] = useState<TopSiteEntry[]>([]);
   const [history, setHistory] = useState<HistorySiteEntry[]>([]);
   const [hiddenUrls, setHiddenUrls] = useState<string[]>([]);
@@ -78,14 +77,9 @@ export function useVisitedSites(enabled: boolean, items: Item[]) {
   const suggestions = useMemo(
     () =>
       enabled && hiddenReady && !hiddenError
-        ? buildVisitedSiteSuggestions(
-            topSites,
-            history,
-            items.map((item) => item.url),
-            hiddenUrls,
-          )
+        ? buildVisitedSiteSuggestions(topSites, history, hiddenUrls)
         : [],
-    [enabled, hiddenError, hiddenReady, history, hiddenUrls, items, topSites],
+    [enabled, hiddenError, hiddenReady, history, hiddenUrls, topSites],
   );
   return {
     suggestions,

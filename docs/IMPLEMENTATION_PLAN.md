@@ -779,49 +779,41 @@ Automated verification: `npx vitest run --config vitest.config.ts src/core/__tes
 
 ## Phase 9: Optional Features (Week 13-14)
 
-### 9.1 Visited-Site Discovery — Implementation Complete (2026-11-06)
-**Goal**: Suggest pages to save
+### 9.1 Frequently Visited Shortcuts — Implementation Complete (2026-11-06)
+**Goal**: Open frequently visited sites quickly from All favorites.
+
+This shortcut design supersedes the original separate save-suggestions view.
 
 **Tasks**:
-- [x] Request optional permissions in settings
-- [x] Implement `chrome.topSites.get()`
-- [x] Implement `chrome.history.search()`
-- [x] Filter already-saved URLs
-- [x] Filter user-hidden suggestions
-- [x] Build suggestions UI (separate tab/section)
-- [x] Add "Save to group" quick action
-- [x] Add "Hide" action (local-only)
-
-**Suggestions UI**:
-```
-┌────────────────────────────────────────────┐
-│ Frequently Visited                         │
-├────────────────────────────────────────────┤
-│ [Thumbnail] example.com      [+] [Hide]    │
-│ [Thumbnail] github.com       [+] [Hide]    │
-│ ...                                        │
-└────────────────────────────────────────────┘
-```
+- [x] Request optional History/Top sites access in Settings
+- [x] Merge Chrome top sites with recent history results
+- [x] Show up to ten shortcuts within All favorites, including already-saved sites
+- [x] Always use compact grid format, independent of library view and size
+- [x] Open the site on click; put Add/Edit favorite and Hide in its … menu
+- [x] Reuse the favorite editor for title and destination selection
+- [x] Add default-on visibility setting and a section-menu Hide action
+- [x] Persist hidden shortcuts locally
 
 **Acceptance**:
-- Permission request works
-- Suggestions are relevant
-- Filtering works
-- Privacy is respected (local hide list)
+- Permission requests are explicit; denied/revoked access is handled
+- The section appears only in All favorites outside search
+- Saving keeps the shortcut and All favorites view; undo/redo works
+- Hiding a shortcut does not delete a favorite or browser history
+- Visibility persists across reloads independently of access permissions
+- Keyboard, touch, desktop/narrow layouts, and light/dark themes work
 
 Implementation notes:
-- Off by default; Settings requests `history` and `topSites` within the user click.
-  Switching discovery off stops reads, clears in-memory results, and removes both
-  optional grants. Browser-side revocation also disables discovery.
-- Frequently visited is a separate sidebar view with the existing colors,
-  typography, borders, buttons, group labels, and favicon fallback.
+- Visibility defaults on. Browser access remains opt-in through **Settings →
+  Optional features → Frequently visited access**. Hiding stops reads and clears
+  results; turning access off also removes both grants.
 - Top sites retain Chrome's order, followed by up to 500 history entries from the
-  last 30 days ranked by visits and recency. At most 50 suggestions display. Only
-  http/https URLs qualify; saved/hidden URLs are normalized without fragments.
-- Save uses the selected group (or creates the default Favorites group in an empty
-  library), supports undo/redo, and disappears from suggestions. Hiding is local
-  IndexedDB state and is excluded from Drive sync and ZIP exports. Unselected
-  suggestions and browser history are never written to library records.
+  last 30 days ranked by visits and recency. Only http/https URLs qualify; hidden
+  URLs and duplicate fragments are filtered. Already-saved sites remain visible.
+- The section uses compact-grid spacing, centered labels, favicon fallbacks, and
+  theme colors. Site menus use accessible Headless UI components.
+- Add to favorites opens the standard editor with URL/title filled in and a group
+  selector. A normalized saved URL opens Edit favorite. Saves support undo/redo.
+  History, visibility, hidden URLs, and grants never enter sync/exports.
 
 ### 9.2 Context Menu Integration (Optional) — Implementation Complete (2026-11-06)
 **Goal**: Right-click to save page/link

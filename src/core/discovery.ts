@@ -31,12 +31,11 @@ export function normalizeVisitedSiteUrl(value: string): string | undefined {
 export function buildVisitedSiteSuggestions(
   topSites: readonly TopSiteEntry[],
   history: readonly HistorySiteEntry[],
-  favoriteUrls: readonly string[],
   hiddenUrls: readonly string[],
-  limit = 50,
+  limit = 10,
 ): VisitedSiteSuggestion[] {
   const excluded = new Set(
-    [...favoriteUrls, ...hiddenUrls]
+    hiddenUrls
       .map(normalizeVisitedSiteUrl)
       .filter((url): url is string => url !== undefined),
   );

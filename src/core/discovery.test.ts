@@ -10,7 +10,7 @@ describe('visited-site discovery', () => {
     expect(normalizeVisitedSiteUrl('javascript:alert(1)')).toBeUndefined();
   });
 
-  it('prioritizes top sites, merges history, and filters saved or hidden URLs', () => {
+  it('prioritizes top sites, merges history, and only filters hidden URLs', () => {
     const suggestions = buildVisitedSiteSuggestions(
       [
         { url: 'https://top.example/', title: 'Top Site' },
@@ -37,8 +37,7 @@ describe('visited-site discovery', () => {
         },
         { url: 'https://hidden.example/', title: 'Hidden', visitCount: 40 },
       ],
-      ['https://saved.example/#section'],
-      ['https://hidden.example/'],
+      ['https://hidden.example/#section'],
     );
 
     expect(suggestions).toEqual([
@@ -47,6 +46,10 @@ describe('visited-site discovery', () => {
         title: 'Top Site',
         visitCount: 20,
         lastVisitTime: 300,
+      },
+      {
+        url: 'https://saved.example/',
+        title: 'Saved',
       },
       {
         url: 'https://frequent.example/',
@@ -72,7 +75,6 @@ describe('visited-site discovery', () => {
         { url: 'https://most-visited.example/', visitCount: 9, lastVisitTime: 50 },
       ],
       [],
-      [],
       2,
     );
 
@@ -80,5 +82,21 @@ describe('visited-site discovery', () => {
       'https://most-visited.example/',
       'https://newer.example/',
     ]);
+  });
+
+  it('limits the shortcut section to ten safe, unique sites by default', () => {
+    const topSites = [
+      { url: 'javascript:alert(1)', title: 'Unsafe' },
+      { url: 'https://site0.example/#duplicate', title: 'First' },
+      ...Array.from({ length: 12 }, (_, index) => ({
+        url: `https://site${index}.example/`,
+        title: `Site ${index}`,
+      })),
+    ];
+    const sites = buildVisitedSiteSuggestions(topSites, [], []);
+    expect(sites).toHaveLength(10);
+    expect(new Set(sites.map((site) => site.url)).size).toBe(10);
+    expect(sites[0]).toEqual({ url: 'https://site0.example/', title: 'First' });
+    expect(buildVisitedSiteSuggestions(topSites, [], [], 0)).toEqual([]);
   });
 });

@@ -23,6 +23,15 @@ export type BookmarkSize = 'compact' | 'extra-small' | 'small' | 'medium' | 'lar
 export type OpenBehavior = 'last' | 'all' | 'home';
 export type GroupingMode = 'hierarchical' | 'labeled' | 'flat';
 
+export async function getShowFrequentlyVisited(): Promise<boolean> {
+  const record = await db.settings.get('showFrequentlyVisited');
+  return record?.value !== false;
+}
+
+export async function setShowFrequentlyVisited(show: boolean): Promise<void> {
+  await db.settings.put({ key: 'showFrequentlyVisited', value: show });
+}
+
 export async function getSiteDiscoveryEnabled(): Promise<boolean> {
   const record = await db.settings.get('siteDiscoveryEnabled');
   return record?.value === true;

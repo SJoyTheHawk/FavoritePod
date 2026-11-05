@@ -4,9 +4,11 @@ import {
   getContextMenuEnabled,
   getHiddenVisitedSiteUrls,
   getSiteDiscoveryEnabled,
+  getShowFrequentlyVisited,
   hideVisitedSiteUrl,
   setContextMenuEnabled,
   setSiteDiscoveryEnabled,
+  setShowFrequentlyVisited,
 } from '../storage';
 import { saveContextMenuEnabled, saveSiteDiscoveryEnabled } from '../optional-features';
 
@@ -28,6 +30,22 @@ afterAll(async () => {
 });
 
 describe('optional features', () => {
+  it('shows shortcuts by default and persists hiding independently of access', async () => {
+    expect(await getShowFrequentlyVisited()).toBe(true);
+    expect(await getSiteDiscoveryEnabled()).toBe(false);
+    await setSiteDiscoveryEnabled(true);
+    await setShowFrequentlyVisited(false);
+    db.close();
+    await db.open();
+    expect(await getShowFrequentlyVisited()).toBe(false);
+    expect(await getSiteDiscoveryEnabled()).toBe(true);
+    await setShowFrequentlyVisited(true);
+    expect(await getShowFrequentlyVisited()).toBe(true);
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
+    expect(chrome.permissions.remove).not.toHaveBeenCalled();
+    expect(await db.syncMeta.count()).toBe(0);
+  });
+
   it('defaults off and persists each feature independently', async () => {
     expect(await getSiteDiscoveryEnabled()).toBe(false);
     expect(await getContextMenuEnabled()).toBe(false);

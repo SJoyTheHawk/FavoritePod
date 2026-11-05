@@ -34,6 +34,7 @@ interface SettingsDialogProps {
   defaultView: LibraryView;
   groupingMode: GroupingMode;
   showPreview: boolean;
+  showFrequentlyVisited: boolean;
   siteDiscoveryEnabled: boolean;
   siteDiscoveryPermissionGranted: boolean;
   contextMenuEnabled: boolean;
@@ -55,6 +56,7 @@ interface SettingsDialogProps {
   onSaveDefaultView: (view: LibraryView) => Promise<void>;
   onSaveGroupingMode: (mode: GroupingMode) => Promise<void>;
   onSaveShowPreview: (showPreview: boolean) => Promise<void>;
+  onSaveShowFrequentlyVisited: (show: boolean) => Promise<void>;
   onSaveSiteDiscoveryEnabled: (enabled: boolean) => Promise<void>;
   onSaveContextMenuEnabled: (enabled: boolean) => Promise<void>;
   onSaveOpenBehavior: (behavior: OpenBehavior) => Promise<void>;
@@ -85,6 +87,7 @@ export function SettingsDialog({
   defaultView,
   groupingMode,
   showPreview,
+  showFrequentlyVisited,
   siteDiscoveryEnabled,
   siteDiscoveryPermissionGranted,
   contextMenuEnabled,
@@ -106,6 +109,7 @@ export function SettingsDialog({
   onSaveDefaultView,
   onSaveGroupingMode,
   onSaveShowPreview,
+  onSaveShowFrequentlyVisited,
   onSaveSiteDiscoveryEnabled,
   onSaveContextMenuEnabled,
   onSaveOpenBehavior,
@@ -178,6 +182,15 @@ export function SettingsDialog({
     setError(undefined);
     try {
       await onSaveShowPreview(value);
+    } catch {
+      setError('Could not save this preference.');
+    }
+  };
+
+  const saveFrequentlyVisitedVisibility = async (show: boolean) => {
+    setError(undefined);
+    try {
+      await onSaveShowFrequentlyVisited(show);
     } catch {
       setError('Could not save this preference.');
     }
@@ -268,6 +281,31 @@ export function SettingsDialog({
               <span
                 aria-hidden="true"
                 className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${showPreview ? 'translate-x-6' : 'translate-x-1'}`}
+              />
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-text-primary">
+                Show frequently visited
+              </p>
+              <p className="mt-1 text-xs text-text-secondary">
+                Show compact site shortcuts in All favorites.
+              </p>
+            </div>
+            <button
+              aria-checked={showFrequentlyVisited}
+              aria-label="Show frequently visited"
+              className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-60 ${showFrequentlyVisited ? 'bg-primary' : 'bg-border'}`}
+              disabled={!optionalFeaturesReady}
+              onClick={() => void saveFrequentlyVisitedVisibility(!showFrequentlyVisited)}
+              role="switch"
+              type="button"
+            >
+              <span
+                aria-hidden="true"
+                className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${showFrequentlyVisited ? 'translate-x-6' : 'translate-x-1'}`}
               />
             </button>
           </div>
@@ -374,11 +412,11 @@ export function SettingsDialog({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-text-primary">
-                    Visited-site discovery
+                    Frequently visited access
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                    Use Chrome top sites and recent history for suggestions. Hidden
-                    suggestions stay on this device.
+                    Use Chrome top sites and recent history for your shortcuts. Hidden
+                    shortcuts stay on this device.
                     {!siteDiscoveryPermissionGranted && (
                       <span className="block text-text-tertiary">
                         Chrome will ask for History and Top sites access when enabled.
@@ -388,7 +426,7 @@ export function SettingsDialog({
                 </div>
                 <button
                   aria-checked={siteDiscoveryEnabled}
-                  aria-label="Visited-site discovery"
+                  aria-label="Frequently visited access"
                   className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:cursor-wait disabled:opacity-60 ${siteDiscoveryEnabled ? 'bg-primary' : 'bg-border'}`}
                   disabled={!optionalFeaturesReady || featureBusy !== null}
                   onClick={() =>

@@ -18,14 +18,14 @@ function SizeIcon({ view, size }: { view: LibraryView; size: BookmarkSize }) {
       <svg aria-hidden="true" className="h-6 w-6" viewBox="0 0 28 28" fill="currentColor">
         {Array.from({ length: view === 'grid' ? 6 : 4 }, (_, i) => {
           const x = view === 'grid' ? 2 + (i % 2) * 14 : 2;
-          const y = view === 'grid' ? 4 + Math.floor(i / 2) * 8 : 3 + i * 6;
+          const y = view === 'grid' ? 2 + Math.floor(i / 2) * 8 : 3 + i * 6;
           return (
             <g key={i}>
-              <rect x={x} y={y} width={3} height={3} rx={0.5} />
+              <rect x={view === 'grid' ? x + 4 : x} y={y} width={3} height={3} rx={0.5} />
               <rect
-                x={x + 5}
-                y={y + 1}
-                width={view === 'grid' ? 5 : 19}
+                x={view === 'grid' ? x + 1 : x + 5}
+                y={view === 'grid' ? y + 4 : y + 1}
+                width={view === 'grid' ? 10 : 19}
                 height={1.5}
                 rx={0.5}
               />

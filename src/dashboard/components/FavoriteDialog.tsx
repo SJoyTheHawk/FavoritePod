@@ -175,7 +175,7 @@ export function FavoriteDialog({
                   type="file"
                 />
                 <button
-                  className="inline-flex h-9 w-fit items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
+                  className="inline-flex h-9 w-fit items-center justify-center gap-2 justify-self-center rounded-md px-3 text-sm font-medium text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
                   disabled={busy || !onUpdateThumbnail}
                   onClick={() => fileInput.current?.click()}
                   type="button"

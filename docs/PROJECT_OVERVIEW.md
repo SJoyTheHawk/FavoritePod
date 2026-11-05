@@ -36,7 +36,7 @@ test checklists.
 ![FavoritePod popup home screen with recent pages and the Add bookmark review dialog](screenshots/popup.png)
 
 The capture shows the popup home screen behind the focused bookmark review dialog.
-The page content and address are representative Chrome tab details.
+The page content and address are sample tab details, captured with the current UI.
 
 ### Empty Dashboard
 
@@ -50,7 +50,8 @@ Mobile:
 
 ### Grid and List Views
 
-The populated examples use Chrome documentation and GitHub favorites.
+The populated examples use sample favorites and previews. See the
+[screenshot notes](screenshots/README.md) for capture details.
 
 Grid:
 

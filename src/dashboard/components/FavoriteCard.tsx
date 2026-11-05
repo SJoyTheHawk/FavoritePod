@@ -300,6 +300,7 @@ export function FavoriteCard({
   ) : (
     <FavoriteFallback item={item} compact={layout === 'list' || size !== 'large'} />
   );
+  const isCompactGrid = layout === 'grid' && size === 'compact';
 
   const card = (
     <article
@@ -489,24 +490,43 @@ export function FavoriteCard({
           : {}),
       }}
     >
-      {size !== 'compact' && (
+      {size !== 'compact' || isCompactGrid ? (
         <div className="bookmark-preview relative min-w-0 shrink-0 overflow-hidden">
           <button
             ref={previewTriggerRef}
             aria-label={`Open ${item.title}`}
             aria-expanded={hoverPreviewOpen}
             aria-haspopup="dialog"
-            className="absolute inset-0 h-full w-full text-left focus-visible:z-10 focus-visible:outline-offset-[-2px]"
+            className={`absolute inset-0 h-full w-full focus-visible:z-10 focus-visible:outline-offset-[-2px] ${isCompactGrid ? 'flex items-center justify-center' : 'text-left'}`}
             onClick={() => void openItem()}
             type="button"
           >
-            {preview}
-            <span className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-black/65 px-3 py-2 text-left text-xs font-medium text-white opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-              <span className="block truncate">{item.title}</span>
-            </span>
+            {isCompactGrid ? (
+              <span className="flex h-9 w-9 items-center justify-center">
+                <FaviconImage
+                  url={item.url}
+                  faviconUrl={item.faviconUrl}
+                  fallback={
+                    isLocalFile ? (
+                      <DocumentIcon aria-hidden="true" className="h-7 w-7" />
+                    ) : (
+                      <GlobeAltIcon aria-hidden="true" className="h-7 w-7" />
+                    )
+                  }
+                  className="h-7 w-7"
+                />
+              </span>
+            ) : (
+              <>
+                {preview}
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-black/65 px-3 py-2 text-left text-xs font-medium text-white opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                  <span className="block truncate">{item.title}</span>
+                </span>
+              </>
+            )}
           </button>
         </div>
-      )}
+      ) : null}
       <label className="bookmark-select absolute left-2 top-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-background/90 shadow-sm backdrop-blur-sm">
         <input
           aria-label={`Select ${item.title}`}
@@ -567,44 +587,50 @@ export function FavoriteCard({
         className={`bookmark-details flex min-w-0 items-center justify-between gap-3 ${isMissingFile ? 'opacity-60' : ''}`}
       >
         <button
-          ref={size === 'compact' ? previewTriggerRef : undefined}
+          ref={size === 'compact' && !isCompactGrid ? previewTriggerRef : undefined}
           aria-label={`Open ${item.title}`}
           title={
             size === 'compact' ? `${item.title} — ${getUrlLabel(item.url)}` : undefined
           }
-          className="min-w-0 text-left"
+          className={`min-w-0 ${isCompactGrid ? 'w-full text-center' : 'text-left'}`}
           onClick={() => void openItem()}
           type="button"
         >
-          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary transition-colors group-hover:text-primary">
-            <FaviconImage
-              url={item.url}
-              faviconUrl={item.faviconUrl}
-              fallback={
-                isLocalFile ? (
-                  <DocumentIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                ) : (
-                  <GlobeAltIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                )
-              }
-            />
-            <span className="truncate">{item.title}</span>
-          </span>
-          <span className="bookmark-domain mt-1 flex min-w-0 items-center gap-1.5 truncate text-xs text-text-tertiary">
-            {isLocalFile && fileAvailability !== 'available' && (
-              <span
-                aria-hidden="true"
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${fileAvailability === 'missing' ? 'bg-danger' : 'bg-text-tertiary'}`}
+          <span
+            className={`${isCompactGrid ? 'block truncate text-center text-xs' : 'flex items-center gap-2 text-sm'} min-w-0 font-medium text-text-primary transition-colors group-hover:text-primary`}
+          >
+            {!isCompactGrid && (
+              <FaviconImage
+                url={item.url}
+                faviconUrl={item.faviconUrl}
+                fallback={
+                  isLocalFile ? (
+                    <DocumentIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <GlobeAltIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  )
+                }
               />
             )}
-            <span className="truncate">
-              {isLocalFile
-                ? fileAvailability === 'available'
-                  ? 'Local file'
-                  : `Local file: ${fileAvailability[0].toUpperCase()}${fileAvailability.slice(1)}`
-                : getUrlLabel(item.url)}
-            </span>
+            <span className="truncate">{item.title}</span>
           </span>
+          {!isCompactGrid && (
+            <span className="bookmark-domain mt-1 flex min-w-0 items-center gap-1.5 truncate text-xs text-text-tertiary">
+              {isLocalFile && fileAvailability !== 'available' && (
+                <span
+                  aria-hidden="true"
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${fileAvailability === 'missing' ? 'bg-danger' : 'bg-text-tertiary'}`}
+                />
+              )}
+              <span className="truncate">
+                {isLocalFile
+                  ? fileAvailability === 'available'
+                    ? 'Local file'
+                    : `Local file: ${fileAvailability[0].toUpperCase()}${fileAvailability.slice(1)}`
+                  : getUrlLabel(item.url)}
+              </span>
+            </span>
+          )}
         </button>
       </div>
       {isMissingFile && (

@@ -213,8 +213,19 @@ describe('Google Drive preview assets', () => {
       );
 
     await expect(uploadMissingDriveAssets([hash])).rejects.toThrow(
-      'Google Drive storage is full. Free up space or disconnect sync.',
+      'Google Drive storage is full. Free up space in Google Drive to continue syncing.',
     );
+  });
+
+  it('retries rate-limited asset operations as transient failures', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ error: { errors: [{ reason: 'userRateLimitExceeded' }] } }, 403),
+    );
+
+    await expect(listDriveAssets()).rejects.toMatchObject({
+      retryable: true,
+      code: 'network-error',
+    });
   });
 
   it('downloads a missing preview and validates its content hash', async () => {

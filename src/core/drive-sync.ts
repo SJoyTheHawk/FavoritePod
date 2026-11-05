@@ -19,6 +19,7 @@ import { compareHLC, tickHLC } from './hlc';
 import { isGroupDeleted, isItemDeleted, mergeLibrary } from './merge';
 import { createSnapshot, getDeviceId } from './storage';
 import { withoutDriveChangeNotification } from './drive-sync-triggers';
+import { recordDriveSyncHistory, type DriveSyncErrorCode } from './drive-sync-history';
 import type { DriveDeviceState, Group, HLC, Item, LibraryState } from './types';
 
 const SYNC_LOCK_NAME = 'favoritepod-google-drive-sync';
@@ -41,10 +42,19 @@ export interface DriveSyncPreview {
 }
 
 export type DriveSyncStage =
-  'checking' | 'downloading' | 'merging' | 'uploading' | 'complete';
+  | 'checking'
+  | 'downloading'
+  | 'merging'
+  | 'uploading'
+  | 'assets-downloading'
+  | 'assets-uploading'
+  | 'cleaning'
+  | 'complete';
 
 export interface DriveSyncProgress {
   stage: DriveSyncStage;
+  current?: number;
+  total?: number;
 }
 
 export type DriveSyncProgressCallback = (progress: DriveSyncProgress) => void;
@@ -57,6 +67,7 @@ export type DriveSyncResult =
       uploadedAssets: number;
       downloadedAssets: number;
       missingAssets: number;
+      mergedRemoteChanges: boolean;
     };
 
 export class DriveSyncError extends Error {
@@ -64,6 +75,46 @@ export class DriveSyncError extends Error {
     super(message);
     this.name = 'DriveSyncError';
   }
+}
+
+export class DriveSyncOfflineError extends DriveSyncError {
+  readonly code = 'offline';
+
+  constructor() {
+    super(
+      'You’re offline. Your changes are saved and will sync when you’re back online.',
+    );
+    this.name = 'DriveSyncOfflineError';
+  }
+}
+
+export function getDriveSyncErrorCode(cause: unknown): DriveSyncErrorCode {
+  if (cause instanceof DriveSyncOfflineError) return 'offline';
+  if (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    cause.code === 'authorization-required'
+  ) {
+    return 'authorization-required';
+  }
+  if (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    cause.code === 'quota-exceeded'
+  ) {
+    return 'quota-exceeded';
+  }
+  if (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'retryable' in cause &&
+    cause.retryable === true
+  ) {
+    return 'network-error';
+  }
+  return 'sync-error';
 }
 
 export class DriveSyncChoiceRequired extends Error {
@@ -340,8 +391,16 @@ async function performSync(
   const files = await listDriveDeviceFiles();
   onProgress?.({ stage: 'downloading' });
   const downloaded = firstSync
-    ? await downloadAllDriveDeviceFiles(files, { deferCacheUpdate: true })
-    : await downloadChangedDriveDeviceFiles(files, { deferCacheUpdate: true });
+    ? await downloadAllDriveDeviceFiles(files, {
+        deferCacheUpdate: true,
+        onProgress: (current, total) =>
+          onProgress?.({ stage: 'downloading', current, total }),
+      })
+    : await downloadChangedDriveDeviceFiles(files, {
+        deferCacheUpdate: true,
+        onProgress: (current, total) =>
+          onProgress?.({ stage: 'downloading', current, total }),
+      });
   const remoteStates = allDownloaded(downloaded);
   const remote = mergeDeviceStates(remoteStates);
   const local = await readLibrary();
@@ -368,7 +427,9 @@ async function performSync(
   const state = await createLocalDriveDeviceState(
     Math.max(1, (cachedDeviceFile?.revision ?? 0) + 1),
   );
+  onProgress?.({ stage: 'uploading', current: 0, total: 1 });
   await uploadDriveDeviceState(state);
+  onProgress?.({ stage: 'uploading', current: 1, total: 1 });
 
   const compacted = await compactStaleDriveDeviceFiles();
   const finalState = await applyRemoteState(
@@ -377,11 +438,33 @@ async function performSync(
     deviceId,
     new Date(),
   );
+  const mergedRemoteChanges =
+    choice === 'merge' &&
+    (!sameRecords(local.groups, finalState.groups) ||
+      !sameRecords(local.items, finalState.items));
   await setInitialSyncCompleted();
   const finalHashes = collectPreviewHashes(finalState);
-  const finalDownloads = await downloadMissingDriveAssets(finalHashes);
-  const finalUploads = await uploadMissingDriveAssets(finalHashes);
-  await compactOrphanDriveAssets(finalHashes);
+  const finalDownloads = await downloadMissingDriveAssets(finalHashes, (progress) =>
+    onProgress?.({
+      stage: 'assets-downloading',
+      current: progress.current,
+      total: progress.total,
+    }),
+  );
+  const finalUploads = await uploadMissingDriveAssets(finalHashes, (progress) =>
+    onProgress?.({
+      stage: 'assets-uploading',
+      current: progress.current,
+      total: progress.total,
+    }),
+  );
+  await compactOrphanDriveAssets(finalHashes, new Date(), (progress) =>
+    onProgress?.({
+      stage: 'cleaning',
+      current: progress.current,
+      total: progress.total,
+    }),
+  );
 
   const syncedAt = new Date().toISOString();
   await setLastSync(syncedAt);
@@ -399,6 +482,7 @@ async function performSync(
     downloadedAssets: finalDownloads.downloadedHashes.length,
     missingAssets:
       finalDownloads.missingRemoteHashes.length + finalUploads.missingLocalHashes.length,
+    mergedRemoteChanges,
   };
 }
 
@@ -407,19 +491,57 @@ export async function syncGoogleDrive(
   choice?: DriveSyncChoice,
   onProgress?: DriveSyncProgressCallback,
 ): Promise<DriveSyncResult> {
-  const result = await withGoogleDriveSyncLock(() => {
-    let resolvedChoice = choice;
-    return retryDriveSync(() =>
-      performSync(
-        resolvedChoice,
-        (nextChoice) => {
-          resolvedChoice = nextChoice;
-        },
-        onProgress,
-      ),
-    );
-  });
-  return result ?? { status: 'skipped', reason: 'already-running' };
+  const startedAt = new Date().toISOString();
+  try {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw new DriveSyncOfflineError();
+    }
+    const result = await withGoogleDriveSyncLock(() => {
+      let resolvedChoice = choice;
+      return retryDriveSync(() =>
+        performSync(
+          resolvedChoice,
+          (nextChoice) => {
+            resolvedChoice = nextChoice;
+          },
+          onProgress,
+        ),
+      );
+    });
+    if (!result || result.status === 'skipped') {
+      return result ?? { status: 'skipped', reason: 'already-running' };
+    }
+    try {
+      await recordDriveSyncHistory({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        startedAt,
+        completedAt: result.syncedAt,
+        status: result.mergedRemoteChanges ? 'merged' : 'synced',
+        message: result.mergedRemoteChanges
+          ? 'Remote changes were merged automatically.'
+          : 'Sync completed successfully.',
+      });
+    } catch {
+      // A local history failure must not change the result of a completed Drive sync.
+    }
+    return result;
+  } catch (cause) {
+    const completedAt = new Date().toISOString();
+    const needsChoice = cause instanceof DriveSyncChoiceRequired;
+    try {
+      await recordDriveSyncHistory({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        startedAt,
+        completedAt,
+        status: needsChoice ? 'needs-choice' : 'failed',
+        message: cause instanceof Error ? cause.message : 'Google Drive sync failed.',
+        ...(!needsChoice ? { errorCode: getDriveSyncErrorCode(cause) } : {}),
+      });
+    } catch {
+      // Sync results remain authoritative if local history storage is unavailable.
+    }
+    throw cause;
+  }
 }
 
 /** Run account mutations under the same lock used by sync in every extension context. */

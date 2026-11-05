@@ -1,6 +1,7 @@
 import { liveQuery } from 'dexie';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowPathIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
   BookmarkIcon,
@@ -9,12 +10,15 @@ import {
   ChevronRightIcon,
   Cog6ToothIcon,
   ExclamationCircleIcon,
+  ExclamationTriangleIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
+  NoSymbolIcon,
   PlusIcon,
   Squares2X2Icon,
   TrashIcon,
   XMarkIcon,
+  CloudIcon,
 } from '@heroicons/react/24/outline';
 import {
   createGroup,
@@ -73,19 +77,29 @@ import {
   connectGoogleDrive,
   disconnectGoogleDrive,
   getDriveConnectionState,
+  getDriveStorageQuota,
   prepareGoogleDriveConnection,
   type DriveConnectionResult,
   type DriveConnectionState,
+  type DriveStorageQuota,
   switchGoogleDriveAccount,
   type DriveAccount,
 } from '../core/drive-auth';
 import {
   DriveSyncChoiceRequired,
+  getDriveSyncErrorCode,
   syncGoogleDrive,
   type DriveSyncChoice,
+  type DriveSyncProgress,
   type DriveSyncPreview,
   withGoogleDriveSyncLock,
 } from '../core/drive-sync';
+import {
+  getDriveSyncHistory,
+  getLastDriveSyncTime,
+  type DriveSyncErrorCode,
+  type DriveSyncHistoryEntry,
+} from '../core/drive-sync-history';
 import {
   DRIVE_LIBRARY_CHANGED_EVENT,
   DRIVE_LIBRARY_CHANGED_MESSAGE,
@@ -205,6 +219,68 @@ function ToastItem({
   );
 }
 
+function DriveSyncStatusButton({
+  connectionStatus,
+  online,
+  syncing,
+  merged,
+  error,
+  progress,
+  onClick,
+}: {
+  connectionStatus: DriveConnectionState['status'];
+  online: boolean;
+  syncing: boolean;
+  merged: boolean;
+  error?: string;
+  progress?: DriveSyncProgress;
+  onClick: () => void;
+}) {
+  let label = 'Google Drive is not connected';
+  let icon = <CloudIcon aria-hidden="true" className="h-5 w-5" />;
+  let color = 'text-text-secondary';
+
+  if (connectionStatus !== 'disconnected' && !online) {
+    label = 'Offline. Changes are saved locally and will sync when online.';
+    icon = <NoSymbolIcon aria-hidden="true" className="h-5 w-5" />;
+    color = 'text-text-tertiary';
+  } else if (connectionStatus === 'authorization-required') {
+    label = 'Google Drive needs attention. Open Settings to reconnect.';
+    icon = <ExclamationTriangleIcon aria-hidden="true" className="h-5 w-5" />;
+    color = 'text-warning';
+  } else if (error) {
+    label = `Google Drive sync failed: ${error}`;
+    icon = <ExclamationCircleIcon aria-hidden="true" className="h-5 w-5" />;
+    color = 'text-danger';
+  } else if (syncing) {
+    label = progress?.stage
+      ? `Syncing Google Drive: ${progress.stage.replaceAll('-', ' ')}`
+      : 'Syncing Google Drive';
+    icon = <ArrowPathIcon aria-hidden="true" className="h-5 w-5 animate-spin" />;
+    color = 'text-primary';
+  } else if (merged) {
+    label = 'Remote changes were merged automatically.';
+    icon = <ExclamationTriangleIcon aria-hidden="true" className="h-5 w-5" />;
+    color = 'text-warning';
+  } else if (connectionStatus === 'connected') {
+    label = 'Google Drive is connected. Open Settings for sync details.';
+    icon = <CheckCircleIcon aria-hidden="true" className="h-5 w-5" />;
+    color = 'text-success';
+  }
+
+  return (
+    <button
+      aria-label={label}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition hover:bg-surface-hover ${color}`}
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      {icon}
+    </button>
+  );
+}
+
 function compareOrder(
   left: { orderKey: string; id: string },
   right: { orderKey: string; id: string },
@@ -255,7 +331,14 @@ export function DashboardApp() {
   const syncInProgress = useRef(false);
   const [driveSyncing, setDriveSyncing] = useState(false);
   const [driveSyncError, setDriveSyncError] = useState<string>();
+  const [driveSyncErrorCode, setDriveSyncErrorCode] = useState<DriveSyncErrorCode>();
   const [driveSyncMessage, setDriveSyncMessage] = useState<string>();
+  const [driveSyncProgress, setDriveSyncProgress] = useState<DriveSyncProgress>();
+  const [driveSyncHistory, setDriveSyncHistory] = useState<DriveSyncHistoryEntry[]>([]);
+  const [driveSyncMerged, setDriveSyncMerged] = useState(false);
+  const [driveStorageQuota, setDriveStorageQuota] = useState<DriveStorageQuota>();
+  const [driveStorageLoading, setDriveStorageLoading] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine);
   const [driveSyncChoicePreview, setDriveSyncChoicePreview] =
     useState<DriveSyncPreview>();
   const [driveSyncChoiceError, setDriveSyncChoiceError] = useState<string>();
@@ -316,14 +399,23 @@ export function DashboardApp() {
     syncInProgress.current = true;
     setDriveSyncing(true);
     setDriveSyncError(undefined);
+    setDriveSyncErrorCode(undefined);
     setDriveSyncChoiceError(undefined);
     try {
-      const result = await syncGoogleDrive(choice);
+      const result = await syncGoogleDrive(choice, (progress) => {
+        setDriveSyncProgress(progress.stage === 'complete' ? undefined : progress);
+        void chrome.runtime
+          .sendMessage({ type: 'favoritepod.sync.progress', progress })
+          .catch(() => undefined);
+      });
+      setDriveSyncProgress(undefined);
       setDriveSyncChoicePreview(undefined);
       setDriveSyncMessage(
         result.status === 'skipped'
           ? 'Another FavoritePod window is already syncing.'
-          : `Last synced at ${new Date(result.syncedAt).toLocaleTimeString()}.`,
+          : result.mergedRemoteChanges
+            ? 'Remote changes were merged automatically.'
+            : `Last synced at ${new Date(result.syncedAt).toLocaleTimeString()}.`,
       );
     } catch (cause) {
       const message = errorMessage(cause);
@@ -342,10 +434,12 @@ export function DashboardApp() {
         setDriveSyncChoiceError(message);
       } else {
         setDriveSyncError(message);
+        setDriveSyncErrorCode(getDriveSyncErrorCode(cause));
       }
     } finally {
       syncInProgress.current = false;
       setDriveSyncing(false);
+      setDriveSyncProgress(undefined);
     }
   }, []);
   const dismissToast = useCallback((id: number) => {
@@ -445,6 +539,84 @@ export function DashboardApp() {
   }, [notifyError]);
 
   useEffect(() => {
+    const subscription = liveQuery(async () => ({
+      entries: await getDriveSyncHistory(),
+      lastSyncedAt: await getLastDriveSyncTime(),
+    })).subscribe({
+      next: ({ entries, lastSyncedAt }) => {
+        setDriveSyncHistory(entries);
+        const latest = entries[0];
+        if (latest?.status === 'synced' || latest?.status === 'merged') {
+          setDriveSyncError(undefined);
+          setDriveSyncErrorCode(undefined);
+          const recentMerge =
+            latest.status === 'merged' &&
+            Date.now() - Date.parse(latest.completedAt) < 6000;
+          setDriveSyncMerged(recentMerge);
+          setDriveSyncMessage(
+            recentMerge
+              ? latest.message
+              : `Last synced at ${new Date(latest.completedAt).toLocaleTimeString()}.`,
+          );
+        } else if (latest?.status === 'failed') {
+          setDriveSyncMerged(false);
+          setDriveSyncError(
+            latest.errorCode === 'authorization-required' ? undefined : latest.message,
+          );
+          setDriveSyncErrorCode(
+            latest.errorCode === 'authorization-required' ? undefined : latest.errorCode,
+          );
+          setDriveSyncMessage(undefined);
+        } else {
+          setDriveSyncMerged(false);
+          setDriveSyncMessage(
+            lastSyncedAt
+              ? `Last synced at ${new Date(lastSyncedAt).toLocaleTimeString()}.`
+              : undefined,
+          );
+        }
+      },
+      error: (cause: unknown) => notifyError(errorMessage(cause)),
+    });
+    return () => subscription.unsubscribe();
+  }, [notifyError]);
+
+  useEffect(() => {
+    if (!driveSyncMerged) return;
+    const timeout = window.setTimeout(() => setDriveSyncMerged(false), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [driveSyncMerged]);
+
+  useEffect(() => {
+    const updateOnlineState = () => setOnline(navigator.onLine);
+    window.addEventListener('online', updateOnlineState);
+    window.addEventListener('offline', updateOnlineState);
+    return () => {
+      window.removeEventListener('online', updateOnlineState);
+      window.removeEventListener('offline', updateOnlineState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!settingsOpen || driveConnection.status !== 'connected') return;
+    let active = true;
+    setDriveStorageLoading(true);
+    void getDriveStorageQuota()
+      .then((quota) => {
+        if (active) setDriveStorageQuota(quota);
+      })
+      .catch(() => {
+        if (active) setDriveStorageQuota(undefined);
+      })
+      .finally(() => {
+        if (active) setDriveStorageLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [driveConnection.status, settingsOpen]);
+
+  useEffect(() => {
     const subscription = liveQuery(getDriveConnectionState).subscribe({
       next: (connection) => {
         setDriveConnection((previous) =>
@@ -455,6 +627,10 @@ export function DashboardApp() {
           setDriveSyncChoiceError(undefined);
           setDriveSyncMessage(undefined);
           setDriveSyncError(undefined);
+          setDriveSyncErrorCode(undefined);
+          setDriveSyncProgress(undefined);
+          setDriveStorageQuota(undefined);
+          setDriveStorageLoading(false);
         }
       },
       error: (cause: unknown) => notifyError(errorMessage(cause)),
@@ -490,23 +666,51 @@ export function DashboardApp() {
       }
       if (message.type === DRIVE_LIBRARY_CHANGED_MESSAGE) scheduleSync();
       if (
+        message.type === 'favoritepod.sync.progress' &&
+        'progress' in message &&
+        typeof message.progress === 'object' &&
+        message.progress !== null &&
+        'stage' in message.progress
+      ) {
+        const progress = message.progress as DriveSyncProgress;
+        setDriveSyncProgress(progress.stage === 'complete' ? undefined : progress);
+        setDriveSyncing(progress.stage !== 'complete');
+      }
+      if (
         message.type === 'favoritepod.sync.choice-required' &&
         'preview' in message &&
         typeof message.preview === 'object' &&
         message.preview !== null
       ) {
         setDriveSyncChoicePreview(message.preview as DriveSyncPreview);
+        setDriveSyncProgress(undefined);
+        setDriveSyncing(false);
       }
       if (message.type === 'favoritepod.sync.completed') {
         setDriveSyncError(undefined);
-        setDriveSyncMessage(`Last synced at ${new Date().toLocaleTimeString()}.`);
+        setDriveSyncErrorCode(undefined);
+        setDriveSyncProgress(undefined);
+        setDriveSyncing(false);
       }
       if (
         message.type === 'favoritepod.sync.failed' &&
         'message' in message &&
         typeof message.message === 'string'
       ) {
-        setDriveSyncError(message.message);
+        const errorCode =
+          'code' in message && typeof message.code === 'string'
+            ? (message.code as DriveSyncErrorCode)
+            : 'sync-error';
+        if (errorCode === 'authorization-required') {
+          void getDriveConnectionState().then(setDriveConnection);
+          setDriveSyncError(undefined);
+          setDriveSyncErrorCode(undefined);
+        } else {
+          setDriveSyncError(message.message);
+          setDriveSyncErrorCode(errorCode);
+        }
+        setDriveSyncProgress(undefined);
+        setDriveSyncing(false);
       }
     };
     window.addEventListener(DRIVE_LIBRARY_CHANGED_EVENT, scheduleSync);
@@ -1418,6 +1622,15 @@ export function DashboardApp() {
           >
             <ArrowUturnRightIcon aria-hidden="true" className="h-4 w-4" />
           </button>
+          <DriveSyncStatusButton
+            connectionStatus={driveConnection.status}
+            error={driveSyncError}
+            merged={driveSyncMerged}
+            online={online}
+            onClick={() => setSettingsOpen(true)}
+            progress={driveSyncProgress}
+            syncing={driveSyncing}
+          />
           <button
             aria-label="Settings"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
@@ -1791,7 +2004,13 @@ export function DashboardApp() {
           driveConnectionStatus={driveConnection.status}
           driveSyncing={driveSyncing}
           driveSyncError={driveSyncError}
+          driveSyncErrorCode={driveSyncErrorCode}
+          driveSyncHistory={driveSyncHistory}
           driveSyncMessage={driveSyncMessage}
+          driveSyncProgress={driveSyncProgress}
+          driveStorageQuota={driveStorageQuota}
+          driveStorageLoading={driveStorageLoading}
+          online={online}
           groupingMode={groupingMode}
           homePageAvailable={!!homePageGroupId && groupsById.has(homePageGroupId)}
           openBehavior={openBehavior}

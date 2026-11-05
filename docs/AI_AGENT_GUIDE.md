@@ -360,7 +360,9 @@ If you're choosing what to work on, prioritize in this order:
    - Edit/delete
    - ZIP export/import
 
-**Defer to v2**: Drive sync, history discovery, animations
+**Implemented in v1**: Google Drive sync, profile-local connection recovery,
+sync status/history, and quota reporting. **Defer to v2**: history discovery,
+optional visual polish, and other features not listed in the implementation plan.
 
 ---
 

@@ -6,6 +6,7 @@ import * as driveAuth from '../drive-auth';
 import * as driveFiles from '../drive-files';
 import { createHLC } from '../hlc';
 import { isItemDeleted } from '../merge';
+import { getDriveSyncHistory } from '../drive-sync-history';
 import * as storage from '../storage';
 import type { DriveDeviceState, Group, Item, LibraryState } from '../types';
 
@@ -313,6 +314,55 @@ describe('Google Drive sync orchestration', () => {
       status: 'skipped',
       reason: 'already-running',
     });
+  });
+
+  it('reports staged progress and persists successful sync history', async () => {
+    configureRemote(state('remote', { groups: [], items: [] }));
+    const progress: string[] = [];
+
+    const result = await syncGoogleDrive(undefined, (update) => {
+      progress.push(update.stage);
+    });
+
+    expect(result).toMatchObject({ status: 'synced', mergedRemoteChanges: false });
+    expect(progress).toContain('checking');
+    expect(progress).toContain('downloading');
+    expect(progress).toContain('merging');
+    expect(progress).toContain('uploading');
+    expect(progress).toContain('complete');
+    expect(await getDriveSyncHistory()).toMatchObject([
+      { status: 'synced', message: 'Sync completed successfully.' },
+    ]);
+  });
+
+  it('marks a merge when remote library records are applied', async () => {
+    await db.syncMeta.put({ key: 'drive.initialSyncCompleted', value: true });
+    configureRemote(
+      state('remote', {
+        groups: [group('remote-group', 1)],
+        items: [],
+      }),
+    );
+
+    await expect(syncGoogleDrive()).resolves.toMatchObject({
+      status: 'synced',
+      mergedRemoteChanges: true,
+    });
+    await expect(getDriveSyncHistory()).resolves.toMatchObject([
+      { status: 'merged', message: 'Remote changes were merged automatically.' },
+    ]);
+  });
+
+  it('does not call Drive while offline and records the deferred sync', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+
+    await expect(syncGoogleDrive()).rejects.toMatchObject({ code: 'offline' });
+
+    expect(driveAuth.verifyGoogleDriveAccount).not.toHaveBeenCalled();
+    expect(driveFiles.listDriveDeviceFiles).not.toHaveBeenCalled();
+    expect(await getDriveSyncHistory()).toMatchObject([
+      { status: 'failed', errorCode: 'offline' },
+    ]);
   });
 
   it.each(['disconnected', 'authorization-required'] as const)(

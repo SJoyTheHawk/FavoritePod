@@ -4,12 +4,14 @@
 
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
-**Current status**: Phases 2-7 are implemented and covered by automated checks.
+**Current status**: Phases 2-8.5 are implemented and covered by automated checks.
 Phases 4 and 5 closed on 2026-11-03; Phase 7 closed on 2026-11-04 after
 automated and user-reported manual Chrome validation. Manual Chrome validation
 for extension loading, HMR, screenshots, nested drag-and-drop, keyboard
 navigation, thumbnail previews, and `file://` access remains open; see
-`NEXT_STEPS.md` and the phase 4-6 manual test checklists.
+`NEXT_STEPS.md` and the phase 4-6 manual test checklists. Phase 8.4 was closed
+on 2026-11-05 after user validation. Phase 8.5 implementation is complete;
+Chrome-specific checks remain in `phase-8.5-manual-test.md`.
 
 ## Architecture Overview
 
@@ -672,6 +674,10 @@ Chrome end-to-end verification now uses the manual multi-profile flow in
 ### 8.4 Sync Engine & Merge
 **Goal**: Conflict-free multi-device sync
 
+**Status**: Closed at the user's direction on 2026-11-05 as an implementation
+milestone. The detailed Chrome acceptance sequence remains in
+[`phase-8.4-manual-test.md`](./phase-8.4-manual-test.md).
+
 **Tasks**:
 - [x] Implement sync lock (navigator.locks)
 - [x] Build sync orchestrator (download → merge → upload)
@@ -726,16 +732,16 @@ Chrome end-to-end verification now uses the manual multi-profile flow in
 
 Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-sync.test.ts src/core/__tests__/drive-files.test.ts`, followed by `npm run type-check`, `npm run lint`, and `npm run build`.
 
-### 8.5 Error Handling & UI
+### 8.5 Error Handling & UI - Implementation Complete (2026-11-05)
 **Goal**: Clear sync status and error messages
 
 **Tasks**:
-- [ ] Build sync status indicator (icon + tooltip)
-- [ ] Show sync progress
-- [ ] Display sync errors with actions
-- [ ] Implement offline mode
-- [ ] Add sync history log
-- [ ] Show Drive quota usage
+- [x] Build sync status indicator (icon + accessible tooltip)
+- [x] Show sync progress across dashboard and service worker syncs
+- [x] Display sync errors with contextual retry or storage actions
+- [x] Implement offline mode; preserve local changes and sync on reconnect
+- [x] Add a bounded, profile-local sync history log
+- [x] Show cached Google Drive storage usage in Settings
 
 **Sync States**:
 - ✓ Synced (green dot)
@@ -745,16 +751,28 @@ Automated verification: `npx vitest run --config vitest.config.ts src/core/__tes
 - ⊗ Offline (gray)
 
 **Error Messages**:
-- Quota exceeded: "Drive storage full. Free up space or disconnect sync."
-- Auth expired: "Please reconnect Google Drive."
-- Network error: "Sync will retry when online."
+- Quota exceeded: "Google Drive storage is full. Free up space in Google Drive to continue syncing."
+- Auth expired: Show "Connection needs attention" with **Connect Google Drive**.
+- Network error: Explain that local changes are saved and will sync when online; offer **Try again**.
 - Conflict repaired: "Concurrent changes merged automatically."
 
 **Acceptance**:
-- User always knows sync status
-- Errors are actionable
-- Offline mode works
-- Logs help debugging
+- User always knows sync status from the dashboard header and Settings
+- Errors are actionable and distinguish authorization, network, offline, and quota states
+- Offline changes remain local and sync when the browser comes online
+- The latest 20 sync outcomes remain available for debugging
+
+**Implementation notes**:
+- Sync history and cached quota metadata use the existing `syncMeta` table; no
+  Dexie migration is needed. Disconnect/account changes clear these Drive-scoped
+  records with the rest of that profile's Drive bookkeeping.
+- Storage usage comes from Drive `about.get` and describes the Google account's
+  Drive usage, including files outside FavoritePod; it is not an appDataFolder
+  size estimate. The value is cached for 30 minutes.
+- See [`phase-8.5-manual-test.md`](./phase-8.5-manual-test.md) for status,
+  offline, error, history, and quota checks.
+
+Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-auth.test.ts src/core/__tests__/drive-sync.test.ts src/core/__tests__/drive-sync-history.test.ts src/core/__tests__/drive-files.test.ts src/background/__tests__/drive-background.test.ts`, followed by `npm test`, `npm run type-check`, `npm run lint`, and `npm run build`.
 
 ## Phase 9: Optional Features (Week 13-14)
 

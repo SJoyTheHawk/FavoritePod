@@ -309,6 +309,23 @@ describe('Google Drive device files', () => {
     expect(await db.deviceFiles.get('device-local')).toMatchObject({ revision: 5 });
   });
 
+  it('classifies Drive storage quota errors for device-file uploads', async () => {
+    await db.syncMeta.put({ key: 'deviceId', value: 'device-local' });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(listResponse([]))
+      .mockResolvedValueOnce(
+        jsonResponse({ error: { errors: [{ reason: 'storageQuotaExceeded' }] } }, 403),
+      );
+
+    await expect(uploadDriveDeviceState(makeState('device-local'))).rejects.toMatchObject(
+      {
+        code: 'quota-exceeded',
+        message:
+          'Google Drive storage is full. Free up space in Google Drive to continue syncing.',
+      },
+    );
+  });
+
   it('refuses to overwrite a remote file changed since the last download', async () => {
     await db.syncMeta.put({ key: 'deviceId', value: 'device-local' });
     const cached = remoteFile('device-local', 'file-local');

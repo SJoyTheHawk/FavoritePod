@@ -325,8 +325,27 @@ Snapshots include groups, items, and thumbnail blobs. `storage.ts` keeps the
 three newest snapshots and restores their contents in one Dexie transaction.
 `driveAssets` caches the remote file ID, name, modified time, and byte size for
 each content hash; disconnecting or switching Google accounts clears this
-account-specific cache while retaining local thumbnails. Future schema changes
-should add a Dexie version and migration.
+account-specific cache while retaining local thumbnails. Drive sync status,
+error recovery state, bounded sync history, last-sync time, and cached account
+storage usage live in `syncMeta`; disconnecting or switching accounts clears
+these Drive-scoped keys. Future schema changes should add a Dexie version and
+migration only when table structure or indexes change.
+
+### Google Drive Sync and Status
+
+`src/core/drive-sync.ts` owns the download, merge, upload, and cleanup sequence.
+It reports typed stages through `DriveSyncProgressCallback`; dashboard and
+service-worker callers publish these updates so every open dashboard can show
+the current stage. `src/core/drive-sync-history.ts` stores the latest 20
+profile-local outcomes in `syncMeta`. `drive-auth.ts` reads Drive account
+storage usage through `about.get` and caches it for 30 minutes; this is the
+account's Drive usage, not FavoritePod's private-folder size.
+
+When offline, Drive requests are skipped, local edits remain available, and the
+online browser event resumes sync. Treat authorization, offline, network, quota,
+and permanent API failures as separate statuses. Only retry network failures;
+authorization recovery is explicit and quota errors should point to storage
+management.
 
 ### URL Validation
 

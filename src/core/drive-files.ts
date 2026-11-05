@@ -60,6 +60,7 @@ export interface DownloadChangedDeviceFilesResult {
 export interface DownloadDriveDeviceFilesOptions {
   /** Let the caller commit metadata only after the downloaded state is applied. */
   deferCacheUpdate?: boolean;
+  onProgress?: (current: number, total: number) => void;
 }
 
 export interface CompactionResult {
@@ -72,6 +73,7 @@ export class DriveFileError extends Error {
   constructor(
     message: string,
     readonly retryable = false,
+    readonly code: 'quota-exceeded' | 'network-error' | 'drive-error' = 'drive-error',
   ) {
     super(message);
     this.name = 'DriveFileError';
@@ -126,6 +128,31 @@ async function ensureDriveSuccess(response: Response, action: string): Promise<v
     );
   }
   if (response.status === 403) {
+    let reasons: string[] = [];
+    try {
+      const payload: unknown = await response.json();
+      const error = (payload as { error?: { errors?: Array<{ reason?: unknown }> } })
+        ?.error;
+      reasons = (error?.errors ?? []).flatMap((entry) =>
+        typeof entry.reason === 'string' ? [entry.reason] : [],
+      );
+    } catch {
+      // Use the generic permission message when Google provides no JSON details.
+    }
+    if (reasons.includes('storageQuotaExceeded')) {
+      throw new DriveFileError(
+        'Google Drive storage is full. Free up space in Google Drive to continue syncing.',
+        false,
+        'quota-exceeded',
+      );
+    }
+    if (reasons.some((reason) => reason.toLowerCase().includes('ratelimit'))) {
+      throw new DriveFileError(
+        `Google Drive is rate limiting the request to ${action}. Try again later.`,
+        true,
+        'network-error',
+      );
+    }
     throw new DriveFileError(
       'Google Drive denied this operation. Check the Drive API and app-data authorization.',
     );
@@ -137,6 +164,7 @@ async function ensureDriveSuccess(response: Response, action: string): Promise<v
     throw new DriveFileError(
       `Google Drive is temporarily unavailable while trying to ${action}.`,
       true,
+      'network-error',
     );
   }
   throw new DriveFileError(`Could not ${action} (Google Drive HTTP ${response.status}).`);
@@ -343,12 +371,13 @@ async function downloadDeviceFile(
 async function downloadDriveDeviceFiles(
   files: DriveDeviceFileMetadata[],
   force: boolean,
-  deferCacheUpdate = false,
+  options: DownloadDriveDeviceFilesOptions = {},
 ): Promise<DownloadChangedDeviceFilesResult> {
   const downloaded: DownloadedDriveDeviceFile[] = [];
   const unchanged: DriveDeviceFileMetadata[] = [];
 
-  for (const metadata of files) {
+  for (let index = 0; index < files.length; index += 1) {
+    const metadata = files[index]!;
     const cached = await db.deviceFiles.get(metadata.deviceId);
     if (
       !force &&
@@ -356,12 +385,13 @@ async function downloadDriveDeviceFiles(
       cached.modifiedTime === metadata.modifiedTime
     ) {
       unchanged.push(metadata);
-      continue;
+    } else {
+      downloaded.push({ metadata, state: await downloadDeviceFile(metadata) });
     }
-    downloaded.push({ metadata, state: await downloadDeviceFile(metadata) });
+    options.onProgress?.(index + 1, files.length);
   }
 
-  if (!deferCacheUpdate) await cacheDownloadedDriveDeviceFiles(downloaded);
+  if (!options.deferCacheUpdate) await cacheDownloadedDriveDeviceFiles(downloaded);
   return { downloaded, unchanged };
 }
 
@@ -371,7 +401,7 @@ export async function downloadChangedDriveDeviceFiles(
   options: DownloadDriveDeviceFilesOptions = {},
 ): Promise<DownloadChangedDeviceFilesResult> {
   const metadata = files ?? (await listDriveDeviceFiles());
-  return downloadDriveDeviceFiles(metadata, false, options.deferCacheUpdate);
+  return downloadDriveDeviceFiles(metadata, false, options);
 }
 
 /** Download every listed device state, bypassing the modified-time cache. */
@@ -380,7 +410,7 @@ export async function downloadAllDriveDeviceFiles(
   options: DownloadDriveDeviceFilesOptions = {},
 ): Promise<DownloadChangedDeviceFilesResult> {
   const metadata = files ?? (await listDriveDeviceFiles());
-  return downloadDriveDeviceFiles(metadata, true, options.deferCacheUpdate);
+  return downloadDriveDeviceFiles(metadata, true, options);
 }
 
 /** Persist cache entries only after the caller has applied every downloaded state. */
@@ -554,7 +584,9 @@ export async function compactStaleDriveDeviceFiles(
     };
   }
 
-  const allRemote = await downloadDriveDeviceFiles(listedBeforeMerge, true, true);
+  const allRemote = await downloadDriveDeviceFiles(listedBeforeMerge, true, {
+    deferCacheUpdate: true,
+  });
   const localRecords = await db.transaction('r', db.groups, db.items, async () => ({
     groups: await db.groups.toArray(),
     items: await db.items.toArray(),

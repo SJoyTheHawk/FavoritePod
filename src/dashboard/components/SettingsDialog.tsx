@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@headlessui/react';
 import {
+  ArrowPathIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
   ChevronRightIcon,
@@ -22,6 +23,12 @@ import type {
   DriveConnectionResult,
   DriveConnectionState,
 } from '../../core/drive-auth';
+import type { DriveStorageQuota } from '../../core/drive-auth';
+import type { DriveSyncProgress } from '../../core/drive-sync';
+import type {
+  DriveSyncErrorCode,
+  DriveSyncHistoryEntry,
+} from '../../core/drive-sync-history';
 import type { GroupingMode, LibraryView, OpenBehavior } from '../../core/storage';
 import type { ArchiveDialogMode } from './ImportExportDialog';
 
@@ -34,7 +41,13 @@ interface SettingsDialogProps {
   driveConnectionStatus: DriveConnectionState['status'];
   driveSyncing: boolean;
   driveSyncError?: string;
+  driveSyncErrorCode?: DriveSyncErrorCode;
   driveSyncMessage?: string;
+  driveSyncProgress?: DriveSyncProgress;
+  driveSyncHistory: DriveSyncHistoryEntry[];
+  driveStorageQuota?: DriveStorageQuota;
+  driveStorageLoading: boolean;
+  online: boolean;
   homePageAvailable: boolean;
   pathOverrides: PathOverride[];
   onClose: () => void;
@@ -53,6 +66,33 @@ interface SettingsDialogProps {
   onArchiveAction: (mode: ArchiveDialogMode) => void;
 }
 
+function formatDriveBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
+}
+
+function syncStageLabel(progress?: DriveSyncProgress): string | undefined {
+  if (!progress) return undefined;
+  const labels: Record<DriveSyncProgress['stage'], string> = {
+    checking: 'Checking Google Drive',
+    downloading: 'Downloading library updates',
+    merging: 'Merging changes',
+    uploading: 'Uploading library updates',
+    'assets-downloading': 'Downloading previews',
+    'assets-uploading': 'Uploading previews',
+    cleaning: 'Cleaning up old previews',
+    complete: 'Sync complete',
+  };
+  return labels[progress.stage];
+}
+
 export function SettingsDialog({
   defaultView,
   groupingMode,
@@ -62,7 +102,13 @@ export function SettingsDialog({
   driveConnectionStatus,
   driveSyncing,
   driveSyncError,
+  driveSyncErrorCode,
   driveSyncMessage,
+  driveSyncProgress,
+  driveSyncHistory,
+  driveStorageQuota,
+  driveStorageLoading,
+  online,
   homePageAvailable,
   pathOverrides,
   onClose,
@@ -447,10 +493,82 @@ export function SettingsDialog({
                       : 'Connected as '}
                     <span className="font-medium">{driveAccount.emailAddress}</span>
                   </p>
+                  <div className="mt-3 border-t border-border pt-3">
+                    {!online ? (
+                      <p className="text-sm text-text-secondary" role="status">
+                        Offline. Your changes are saved locally and will sync when you’re
+                        back online.
+                      </p>
+                    ) : driveSyncing ? (
+                      <div aria-live="polite" className="space-y-2" role="status">
+                        <div className="flex items-center gap-2 text-sm text-text-primary">
+                          <ArrowPathIcon
+                            aria-hidden="true"
+                            className="h-4 w-4 animate-spin text-primary"
+                          />
+                          <span>
+                            {syncStageLabel(driveSyncProgress) ?? 'Syncing Google Drive'}
+                          </span>
+                          {typeof driveSyncProgress?.current === 'number' &&
+                            typeof driveSyncProgress.total === 'number' &&
+                            driveSyncProgress.total > 0 && (
+                              <span className="ml-auto text-xs text-text-secondary">
+                                {driveSyncProgress.current} / {driveSyncProgress.total}
+                              </span>
+                            )}
+                        </div>
+                        <div
+                          aria-label="Google Drive sync progress"
+                          aria-valuemax={driveSyncProgress?.total ?? 1}
+                          aria-valuemin={0}
+                          aria-valuenow={driveSyncProgress?.current ?? 0}
+                          className="h-1.5 overflow-hidden rounded-full bg-background"
+                          role="progressbar"
+                        >
+                          <div
+                            className={`h-full rounded-full bg-primary transition-[width] duration-200 ${driveSyncProgress?.total ? '' : 'w-1/3 animate-pulse'}`}
+                            style={
+                              driveSyncProgress?.total
+                                ? {
+                                    width: `${Math.min(100, (100 * (driveSyncProgress.current ?? 0)) / driveSyncProgress.total)}%`,
+                                  }
+                                : undefined
+                            }
+                          />
+                        </div>
+                      </div>
+                    ) : driveSyncError ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="min-w-0 flex-1 text-sm text-danger" role="alert">
+                          {driveSyncErrorCode === 'network-error'
+                            ? 'Could not reach Google Drive. Your changes are saved locally.'
+                            : driveSyncError}
+                        </p>
+                        {driveSyncErrorCode === 'quota-exceeded' ? (
+                          <a
+                            className="shrink-0 text-sm font-medium text-primary hover:underline"
+                            href="https://drive.google.com/drive/quota"
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Manage storage
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : driveSyncMessage ? (
+                      <p className="text-sm text-text-secondary" role="status">
+                        {driveSyncMessage}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-text-secondary" role="status">
+                        Ready to sync.
+                      </p>
+                    )}
+                  </div>
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
                     <button
                       className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
-                      disabled={driveBusy || driveSyncing}
+                      disabled={driveBusy || driveSyncing || !online}
                       onClick={() =>
                         void (driveConnectionStatus === 'authorization-required'
                           ? connectDrive()
@@ -462,7 +580,11 @@ export function SettingsDialog({
                         ? 'Syncing…'
                         : driveConnectionStatus === 'authorization-required'
                           ? 'Connect Google Drive'
-                          : 'Sync now'}
+                          : driveSyncError &&
+                              driveSyncErrorCode !== 'offline' &&
+                              driveSyncErrorCode !== 'quota-exceeded'
+                            ? 'Try again'
+                            : 'Sync now'}
                     </button>
                     <button
                       className="min-h-9 rounded-md px-3 text-sm font-medium text-danger transition hover:bg-danger/10 disabled:cursor-wait disabled:opacity-60"
@@ -566,17 +688,99 @@ export function SettingsDialog({
                   {driveMessage}
                 </p>
               )}
-              {driveSyncError && (
-                <p className="mt-3 text-sm text-danger" role="alert">
-                  {driveSyncError}
-                </p>
-              )}
-              {driveSyncMessage && (
-                <p className="mt-3 text-sm text-text-secondary" role="status">
-                  {driveSyncMessage}
-                </p>
-              )}
             </div>
+            {driveAccount && (
+              <>
+                <div className="mt-4 border-b border-border pb-4">
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="font-medium text-text-primary">Drive storage</span>
+                    {driveStorageQuota ? (
+                      <span className="text-right text-text-secondary">
+                        {formatDriveBytes(
+                          driveStorageQuota.usage ?? driveStorageQuota.usageInDrive,
+                        )}{' '}
+                        used
+                        {driveStorageQuota.limit !== undefined
+                          ? ` of ${formatDriveBytes(driveStorageQuota.limit)}`
+                          : ' · no storage limit reported'}
+                      </span>
+                    ) : driveStorageLoading ? (
+                      <span className="text-text-secondary">Loading…</span>
+                    ) : (
+                      <span className="text-text-secondary">Usage unavailable</span>
+                    )}
+                  </div>
+                  {driveStorageQuota?.limit ? (
+                    <div
+                      aria-label="Google account storage used"
+                      aria-valuemax={driveStorageQuota.limit}
+                      aria-valuemin={0}
+                      aria-valuenow={Math.min(
+                        driveStorageQuota.usage ?? driveStorageQuota.usageInDrive,
+                        driveStorageQuota.limit,
+                      )}
+                      className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface"
+                      role="progressbar"
+                    >
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{
+                          width: `${Math.min(100, (100 * (driveStorageQuota.usage ?? driveStorageQuota.usageInDrive)) / driveStorageQuota.limit)}%`,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  {driveStorageQuota && (
+                    <p className="mt-1 text-xs text-text-tertiary">
+                      Drive files: {formatDriveBytes(driveStorageQuota.usageInDrive)}.
+                      Total account usage can also include Gmail and Photos.
+                    </p>
+                  )}
+                </div>
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-sm font-medium text-text-primary hover:text-primary">
+                    Sync history ({driveSyncHistory.length})
+                  </summary>
+                  {driveSyncHistory.length ? (
+                    <ol className="mt-2 divide-y divide-border">
+                      {driveSyncHistory.map((entry) => (
+                        <li className="py-2" key={entry.id}>
+                          <div className="flex items-baseline justify-between gap-3 text-xs">
+                            <span
+                              className={
+                                entry.status === 'failed'
+                                  ? 'font-medium text-danger'
+                                  : entry.status === 'needs-choice'
+                                    ? 'font-medium text-warning'
+                                    : 'font-medium text-success'
+                              }
+                            >
+                              {entry.status === 'synced'
+                                ? 'Synced'
+                                : entry.status === 'merged'
+                                  ? 'Changes merged'
+                                  : entry.status === 'needs-choice'
+                                    ? 'Waiting for your choice'
+                                    : 'Failed'}
+                            </span>
+                            <time className="text-text-tertiary">
+                              {new Date(entry.completedAt).toLocaleString()}
+                            </time>
+                          </div>
+                          <p className="mt-1 break-words text-xs text-text-secondary">
+                            {entry.message}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="mt-2 text-xs text-text-secondary">
+                      No sync activity yet.
+                    </p>
+                  )}
+                </details>
+              </>
+            )}
           </section>
 
           <section className="mt-6 border-t border-border pt-5">

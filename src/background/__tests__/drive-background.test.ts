@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../../core/db';
 import { DRIVE_CONNECTION_CHANGED } from '../../core/drive-auth';
-import { syncGoogleDrive } from '../../core/drive-sync';
+import { DriveSyncChoiceRequired, syncGoogleDrive } from '../../core/drive-sync';
 
 vi.mock('../../core/drive-sync', async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>();
@@ -81,6 +81,51 @@ describe('Drive background connection gates', () => {
     });
     listeners.alarm?.({ name: 'favoritepod-drive-periodic-sync' });
     await vi.waitFor(() => expect(syncGoogleDrive).toHaveBeenCalledOnce());
+  });
+
+  it('publishes progress from an alarm-driven sync to dashboard windows', async () => {
+    await db.syncMeta.put({
+      key: 'drive.account',
+      value: { emailAddress: 'test@example.com', permissionId: 'test' },
+    });
+    vi.mocked(syncGoogleDrive).mockImplementation(async (_choice, onProgress) => {
+      onProgress?.({ stage: 'downloading', current: 1, total: 2 });
+      return {
+        status: 'synced',
+        syncedAt: '2026-11-05T12:00:00.000Z',
+        uploadedAssets: 0,
+        downloadedAssets: 0,
+        missingAssets: 0,
+        mergedRemoteChanges: false,
+      };
+    });
+
+    listeners.alarm?.({ name: 'favoritepod-drive-periodic-sync' });
+
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'favoritepod.sync.progress',
+        progress: { stage: 'downloading', current: 1, total: 2 },
+      }),
+    );
+  });
+
+  it('sends choice-required when an alarm reaches first sync with two libraries', async () => {
+    await db.syncMeta.put({
+      key: 'drive.account',
+      value: { emailAddress: 'test@example.com', permissionId: 'test' },
+    });
+    const preview = { local: { groups: 1, items: 1 }, drive: { groups: 2, items: 2 } };
+    vi.mocked(syncGoogleDrive).mockRejectedValue(new DriveSyncChoiceRequired(preview));
+
+    listeners.alarm?.({ name: 'favoritepod-drive-periodic-sync' });
+
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'favoritepod.sync.choice-required',
+        preview,
+      }),
+    );
   });
 
   it('clears the pending debounce when connection state changes', () => {

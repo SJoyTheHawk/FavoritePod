@@ -1,9 +1,9 @@
+import { DRIVE_CONNECTION_CHANGED, getDriveConnectionState } from '../core/drive-auth';
 import {
-  DRIVE_CONNECTION_CHANGED,
-  DriveAuthError,
-  getDriveConnectionState,
-} from '../core/drive-auth';
-import { DriveSyncChoiceRequired, syncGoogleDrive } from '../core/drive-sync';
+  DriveSyncChoiceRequired,
+  getDriveSyncErrorCode,
+  syncGoogleDrive,
+} from '../core/drive-sync';
 import { DRIVE_LIBRARY_CHANGED_MESSAGE } from '../core/drive-sync-triggers';
 
 const PERIODIC_SYNC_ALARM = 'favoritepod-drive-periodic-sync';
@@ -54,7 +54,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   void (async () => {
     try {
       if ((await getDriveConnectionState()).status !== 'connected') return;
-      await syncGoogleDrive();
+      await syncGoogleDrive(undefined, (progress) => {
+        void chrome.runtime
+          .sendMessage({ type: 'favoritepod.sync.progress', progress })
+          .catch(() => undefined);
+      });
     } catch (cause) {
       if (cause instanceof DriveSyncChoiceRequired) {
         void chrome.runtime
@@ -72,7 +76,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         .sendMessage({
           type: 'favoritepod.sync.failed',
           message,
-          code: cause instanceof DriveAuthError ? cause.code : 'sync-error',
+          code: getDriveSyncErrorCode(cause),
         })
         .catch(() => undefined);
     }

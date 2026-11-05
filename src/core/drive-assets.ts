@@ -54,6 +54,7 @@ export class DriveAssetError extends Error {
   constructor(
     message: string,
     readonly retryable = false,
+    readonly code: 'quota-exceeded' | 'network-error' | 'drive-error' = 'drive-error',
   ) {
     super(message);
     this.name = 'DriveAssetError';
@@ -124,12 +125,16 @@ async function ensureDriveAssetSuccess(
     }
     if (reasons.includes('storageQuotaExceeded')) {
       throw new DriveAssetError(
-        'Google Drive storage is full. Free up space or disconnect sync.',
+        'Google Drive storage is full. Free up space in Google Drive to continue syncing.',
+        false,
+        'quota-exceeded',
       );
     }
     if (reasons.some((reason) => reason.toLowerCase().includes('ratelimit'))) {
       throw new DriveAssetError(
         'Google Drive is rate limiting asset sync. Try again later.',
+        true,
+        'network-error',
       );
     }
     throw new DriveAssetError(

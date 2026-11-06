@@ -16,6 +16,7 @@ import {
 import type { Item } from '../../core/types';
 import { getUrlLabel } from '../../core/validation';
 import { FavoriteFallback } from './FavoriteFallback';
+import { ThumbnailImage } from '../../components/ThumbnailImage';
 
 interface HoverPreviewProps {
   anchorRef: RefObject<HTMLElement | null>;
@@ -139,6 +140,8 @@ export function HoverPreview({
       }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
           onClose();
           anchorRef.current?.focus();
         }
@@ -146,15 +149,11 @@ export function HoverPreview({
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-surface">
         {/* Saved images also work for sites that prohibit embedding. */}
-        {fullThumbnailUrl || thumbnailUrl ? (
-          <img
-            alt={`Preview of ${item.title}`}
-            className="h-full w-full object-cover"
-            src={fullThumbnailUrl ?? thumbnailUrl}
-          />
-        ) : (
-          <FavoriteFallback item={item} />
-        )}
+        <ThumbnailImage
+          alt={`Preview of ${item.title}`}
+          src={fullThumbnailUrl ?? thumbnailUrl}
+          fallback={<FavoriteFallback item={item} />}
+        />
         <button
           aria-label="Close preview"
           className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/55 text-white transition hover:bg-black/75"

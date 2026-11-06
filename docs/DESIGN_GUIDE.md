@@ -1190,75 +1190,35 @@ function ErrorState({ error, onRetry }: Props) {
 
 ## Theme Switching
 
-### Implementation
+### Implemented in Phase 10.1 (2026-11-07)
 
-```tsx
-function useTheme() {
-  const [theme, setTheme] = useState<'auto' | 'light' | 'dark'>('auto');
-  
-  useEffect(() => {
-    // Load from storage
-    db.settings.get('theme').then(setting => {
-      setTheme(setting?.value || 'auto');
-    });
-  }, []);
-  
-  useEffect(() => {
-    // Apply theme
-    const root = document.documentElement;
-    
-    if (theme === 'auto') {
-      // Use system preference
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    } else {
-      root.setAttribute('data-theme', theme);
-    }
-    
-    // Save to storage
-    db.settings.put({ key: 'theme', value: theme });
-  }, [theme]);
-  
-  return { theme, setTheme };
-}
+- Keep the existing CSS variables in `src/styles/themes.css`; do not introduce a second palette.
+- Settings offers **System / Light / Dark**. System is stored as `auto` in the existing IndexedDB `settings` table under `theme` and is the default for missing or invalid records.
+- `useTheme()` in `src/dashboard/hooks/use-theme.ts` runs once per dashboard or popup app, not only inside Settings. It applies the resolved `data-theme` to `<html>`, observes settings with Dexie, and follows OS changes with `matchMedia`. Focus refresh handles pages resumed after an OS change.
+- Preference updates apply immediately, persist locally, and roll back on save failure. Errors appear in Settings. Appearance is not included in Drive sync or library exports.
+- The Settings selector uses native radios, visible keyboard focus, existing semantic colors, surface/background contrast, `rounded-md`, and the same small type and spacing as adjacent settings. System is the user-facing label for Auto.
 
-// Theme switcher component
-function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
-  
-  return (
-    <div className="flex gap-2 p-1 bg-surface rounded-lg">
-      <button
-        onClick={() => setTheme('light')}
-        className={`
-          px-3 py-1 rounded text-sm transition-colors
-          ${theme === 'light' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}
-        `}
-      >
-        Light
-      </button>
-      <button
-        onClick={() => setTheme('auto')}
-        className={`
-          px-3 py-1 rounded text-sm transition-colors
-          ${theme === 'auto' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}
-        `}
-      >
-        Auto
-      </button>
-      <button
-        onClick={() => setTheme('dark')}
-        className={`
-          px-3 py-1 rounded text-sm transition-colors
-          ${theme === 'dark' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}
-        `}
-      >
-        Dark
-      </button>
-    </div>
-  );
-}
-```
+The dashboard owns the hook for the page lifetime and passes its `theme`, `ready`, `saving`, `error`, and `setTheme` values to Settings. The popup initializes the same hook without rendering a separate selector.
+
+### Shared Motion and Loading Patterns
+
+- Use `AnimatedDialog` and `useDialogTransition` from `src/components/AnimatedDialog.tsx` for conditionally mounted dialogs. Route dismissal through the transition hook; the parent unmount callback runs after exit. Keep operation-specific busy/cancel guards.
+- Keep Headless UI `DialogBackdrop` and `DialogPanel` with `transition` and the shared `dialog-backdrop` / `dialog-panel` CSS classes. The 200ms fade and small panel movement use the guide's timing. Preserve existing widths, padding, backdrop, and focus traps.
+- Preserve existing drag-stack ghosts, placement highlights, and reorder/drop animations. Card hover changes the established shadow without adding transforms that conflict with drag geometry.
+- Use `ThumbnailImage` to hold image space while storage/decode is pending, fade in decoded previews, and fall back if an image fails. Existing object-URL cleanup remains with the owning card.
+- Use `ProgressBar` for real counts. Unknown counts remain indeterminate; never invent an overall sync percentage. Existing sync stage text remains visible.
+- Reuse initial skeletons in the current collection layout and size. Announce a single loading status and hide decorative placeholders from assistive technology.
+- Respect `prefers-reduced-motion`: stop repeating loading animations, remove dialog movement, and shorten transitions. Existing drag animations already check this preference.
+
+### Keyboard Behavior
+
+- Cmd/Ctrl+K focuses and selects launcher search; Escape clears it.
+- Favorite open controls accept arrows across visible expanded groups. Up/down follow the nearest visual row and column in responsive grids; Home/End go to the first/last visible favorite.
+- Keep ordinary Tab navigation for selection and action controls. Do not capture arrows in text/select fields, menus, dialogs, composition input, or while dragging.
+- Escape dismisses the active dialog/menu/preview through its existing handler. Modal focus remains trapped and returns to the trigger after closing.
+- Keep the visible-on-focus Skip to favorites link and semantic/native controls.
+
+See [Phase 10.1 manual checks](./manual_test/phase-10.1-manual-test.md). Browser automation complements actual OS, native toolbar, drag, and screen-reader acceptance; it does not mark those checks complete.
 
 ---
 

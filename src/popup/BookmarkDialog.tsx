@@ -8,7 +8,8 @@ import {
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { AnimatedDialog, useDialogTransition } from '../components/AnimatedDialog';
 import { captureFavicon } from '../core/favicon';
 import { capturePopupThumbnail } from '../core/popup-thumbnail';
 import { applyPathOverride, getPathOverrides } from '../core/file-links';
@@ -44,8 +45,10 @@ export function BookmarkDialog({
   libraryLoading,
   tab,
   saveRequest,
-  onClose,
+  onClose: onClosed,
 }: BookmarkDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onClose = dialogTransition.close;
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const groupsRef = useRef(groups);
@@ -300,10 +303,18 @@ export function BookmarkDialog({
   };
 
   return (
-    <Dialog className="relative z-50" onClose={close} open>
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+    <AnimatedDialog
+      className="relative z-50"
+      onClose={close}
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
+    >
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center p-3">
-        <DialogPanel className="flex max-h-[calc(100vh-24px)] w-full min-w-0 max-w-72 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
+        <DialogPanel
+          transition
+          className="dialog-panel flex max-h-[calc(100vh-24px)] w-full min-w-0 max-w-72 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl"
+        >
           <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
             <DialogTitle className="text-sm font-semibold text-text-primary">
               {saveRequest ? 'Save to FavoritePod' : 'Add bookmark'}
@@ -513,6 +524,6 @@ export function BookmarkDialog({
           )}
         </DialogPanel>
       </div>
-    </Dialog>
+    </AnimatedDialog>
   );
 }

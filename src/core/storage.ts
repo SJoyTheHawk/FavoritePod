@@ -22,6 +22,16 @@ export type LibraryView = 'grid' | 'list';
 export type BookmarkSize = 'compact' | 'extra-small' | 'small' | 'medium' | 'large';
 export type OpenBehavior = 'last' | 'all' | 'home';
 export type GroupingMode = 'hierarchical' | 'labeled' | 'flat';
+export type ThemePreference = 'auto' | 'light' | 'dark';
+
+export async function getThemePreference(): Promise<ThemePreference> {
+  const record = await db.settings.get('theme');
+  return record?.value === 'light' || record?.value === 'dark' ? record.value : 'auto';
+}
+
+export async function setThemePreference(theme: ThemePreference): Promise<void> {
+  await db.settings.put({ key: 'theme', value: theme });
+}
 
 export async function getShowFrequentlyVisited(): Promise<boolean> {
   const record = await db.settings.get('showFrequentlyVisited');

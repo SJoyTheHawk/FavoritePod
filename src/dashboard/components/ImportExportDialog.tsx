@@ -1,5 +1,6 @@
+import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useMemo, useRef, useState, type DragEvent } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import {
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
@@ -81,9 +82,11 @@ export function ImportExportDialog({
   mode,
   groups,
   items,
-  onClose,
+  onClose: onClosed,
   onImported,
 }: ImportExportDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onClose = dialogTransition.close;
   const [allGroupsSelected, setAllGroupsSelected] = useState(true);
   const [selectedGroupIds, setSelectedGroupIds] = useState(
     () => new Set(groups.map((group) => group.id)),
@@ -244,10 +247,18 @@ export function ImportExportDialog({
   const currentProgress = progressLabel(progress);
 
   return (
-    <Dialog className="relative z-50" onClose={busy ? () => {} : onClose} open>
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+    <AnimatedDialog
+      className="relative z-50"
+      onClose={busy ? () => {} : onClose}
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
+    >
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="max-h-[calc(100vh-2rem)] w-full min-w-0 max-w-xl overflow-x-hidden overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6">
+        <DialogPanel
+          transition
+          className="dialog-panel max-h-[calc(100vh-2rem)] w-full min-w-0 max-w-xl overflow-x-hidden overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6"
+        >
           <div className="flex items-center justify-between gap-3">
             <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-text-primary">
               {reviewing ? (
@@ -667,6 +678,6 @@ export function ImportExportDialog({
           </div>
         </DialogPanel>
       </div>
-    </Dialog>
+    </AnimatedDialog>
   );
 }

@@ -1,5 +1,6 @@
+import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useMemo, useState, type FormEvent } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import type { Group } from '../../core/types';
 import { getGroupLabels } from '../group-labels';
@@ -17,10 +18,12 @@ export function GroupDialog({
   groups,
   group,
   initialParentId,
-  onClose,
+  onClose: onClosed,
   onSave,
   onDelete,
 }: GroupDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onClose = dialogTransition.close;
   const [title, setTitle] = useState(group?.title ?? '');
   const [parentId, setParentId] = useState(group?.parentId ?? initialParentId ?? '');
   const [busy, setBusy] = useState(false);
@@ -76,10 +79,18 @@ export function GroupDialog({
   };
 
   return (
-    <Dialog className="relative z-50" onClose={onClose} open>
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+    <AnimatedDialog
+      className="relative z-50"
+      onClose={onClose}
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
+    >
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6">
+        <DialogPanel
+          transition
+          className="dialog-panel w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6"
+        >
           <DialogTitle className="text-lg font-semibold text-text-primary">
             {group ? 'Edit group' : 'New group'}
           </DialogTitle>
@@ -148,6 +159,6 @@ export function GroupDialog({
           </form>
         </DialogPanel>
       </div>
-    </Dialog>
+    </AnimatedDialog>
   );
 }

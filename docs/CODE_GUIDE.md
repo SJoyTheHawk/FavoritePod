@@ -1092,6 +1092,89 @@ console.timeEnd('[FavoritePod] Thumbnail capture');
 
 ---
 
+## Phase 10 Implementation Priorities (2026-11-07)
+
+After completing Phases 1-9, FavoritePod is functionally complete with robust sync, 
+optional features, and comprehensive testing. Phase 10 focuses on polish and 
+optimization before public launch. See `IMPLEMENTATION_PLAN.md` for full details.
+
+### HIGH Priority Tasks
+
+1. **Virtual Scrolling & Memory Optimization**
+   - **Issue**: Large collections (5,760+ items) consume 2GB memory
+   - **Root Cause**: All favorites mounted, duplicate thumbnail URLs, no resource sharing
+   - **Solution**: See `docs/future_plan/HIGH_MEMORY_INSPECTION.md` for detailed plan
+   - **Modules**: `FavoriteCard.tsx`, `DashboardApp.tsx`, new thumbnail resource manager
+   - **Impact**: Critical for users with 500+ items
+
+2. **Theme Toggle Implementation**
+   - **Implemented (10.1)**: `src/dashboard/hooks/use-theme.ts` runs at dashboard and popup startup
+   - **Storage**: `getThemePreference` / `setThemePreference` use the existing local settings table; `auto` means System
+   - **UI**: Settings uses native System/Light/Dark radios with semantic tokens and visible keyboard focus
+   - **Updates**: Dexie live queries propagate preference changes; System follows `matchMedia` and refreshes on focus
+   - **Reference**: See `DESIGN_GUIDE.md` Theme Switching and the Phase 10.1 manual checklist
+
+3. **Keyboard Shortcuts**
+   - **Implemented (10.1)**: Cmd/Ctrl+K focuses search; Escape clears search or closes the active overlay; arrows/Home/End navigate visible favorite open controls
+   - **Modules**: `DashboardApp.tsx`, `keyboard-navigation.ts`, and local overlay handlers
+   - **Guards**: Preserve text editing, modal/menu focus, composition, modifier combinations, and dragging
+
+4. **Accessibility Audit**
+   - **Check**: All interactive elements have ARIA labels
+   - **Add**: `aria-label` to icon-only buttons, `role="dialog"` to modals
+   - **Test**: VoiceOver (Mac) or NVDA (Windows) screen reader navigation
+   - **Reference**: DESIGN_GUIDE.md Accessibility section
+
+### MEDIUM Priority Tasks
+
+5. **Code Splitting**
+   - **Current**: Optional features always loaded (130KB optional-features.js)
+   - **Goal**: Lazy-load Discovery and Context Menu modules
+   - **Approach**: Use dynamic `import()` in `use-optional-features.ts`
+
+6. **Search Debouncing**
+   - **Current**: Search triggers on every keystroke
+   - **Goal**: Debounce 300ms to prevent lag
+   - **Pattern**: Use `useEffect` with cleanup timeout
+
+7. **Animation Polish**
+   - **Implemented (10.1)**: `AnimatedDialog` + `useDialogTransition` retain conditional editor mounts through a 200ms exit, then invoke the parent close callback
+   - **Pattern**: `DialogBackdrop` / `DialogPanel` use `transition` with `dialog-backdrop` / `dialog-panel` classes
+   - **Loading**: Shared `ThumbnailImage` handles decoding/failure; `ProgressBar` distinguishes known counts from indeterminate stages
+   - **Motion**: Reuse existing drag-stack/reorder feedback; global reduced-motion styles stop continuous animation and shorten transitions
+
+### Key Modules for Phase 10
+
+```
+Phase 10 Focus Areas:
+├── src/dashboard/hooks/
+│   └── use-theme.ts (implemented in 10.1)
+├── src/dashboard/components/
+│   ├── SettingsDialog.tsx (theme UI implemented in 10.1)
+│   ├── FavoriteCard.tsx (ADD virtual scrolling - HIGH)
+│   └── DashboardApp.tsx (ADD keyboard shortcuts - HIGH)
+├── src/core/
+│   └── thumbnail-resource-manager.ts (NEW - HIGH priority)
+└── src/styles/
+    ├── themes.css (COMPLETE ✅)
+    └── global.css (shared motion and reduced-motion rules)
+```
+
+### Testing Priorities
+
+- **Two-device Drive sync**: Validate concurrent editing, conflict resolution
+- **Large dataset**: Re-test after virtual scrolling implementation
+- **Accessibility**: Keyboard-only navigation, screen reader compatibility
+- **Performance profiling**: Measure load times, identify bottlenecks
+
+### Documentation Needed
+
+- User-facing README with screenshots (for Chrome Web Store)
+- Troubleshooting guide (file:// access, Drive auth, common errors)
+- Keyboard shortcuts reference (after implementing them)
+
+---
+
 ## Next Steps
 
 1. **Read DESIGN_GUIDE.md** for UI/UX patterns

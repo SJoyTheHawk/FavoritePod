@@ -11,6 +11,7 @@ import {
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { FaviconImage } from '../../components/FaviconImage';
+import { ThumbnailImage } from '../../components/ThumbnailImage';
 import { getThumbnail, type BookmarkSize } from '../../core/storage';
 import { getUrlLabel, parseSafeUrl } from '../../core/validation';
 import {
@@ -109,6 +110,7 @@ export function FavoriteCard({
   onDragEnd,
 }: FavoriteCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string>();
+  const [loadingPreviewHash, setLoadingPreviewHash] = useState<string | null>(null);
   const [fullThumbnailUrl, setFullThumbnailUrl] = useState<string>();
   const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
   const [fileAvailability, setFileAvailability] = useState<FileAvailability>('unknown');
@@ -243,6 +245,7 @@ export function FavoriteCard({
     let active = true;
     setThumbnailUrl(undefined);
     setFullThumbnailUrl(undefined);
+    setLoadingPreviewHash(item.previewHash ?? null);
     if (!item.previewHash) return () => undefined;
 
     void getThumbnail(item.previewHash)
@@ -255,6 +258,9 @@ export function FavoriteCard({
       })
       .catch(() => {
         if (active) setThumbnailUrl(undefined);
+      })
+      .finally(() => {
+        if (active) setLoadingPreviewHash(null);
       });
 
     return () => {
@@ -308,16 +314,14 @@ export function FavoriteCard({
     }
   };
 
-  const preview = thumbnailUrl ? (
-    <img
-      alt=""
-      className="h-full w-full object-cover"
-      loading="lazy"
-      draggable={false}
+  const preview = (
+    <ThumbnailImage
+      loading={!!item.previewHash && loadingPreviewHash === item.previewHash}
       src={thumbnailUrl}
+      fallback={
+        <FavoriteFallback item={item} compact={layout === 'list' || size !== 'large'} />
+      }
     />
-  ) : (
-    <FavoriteFallback item={item} compact={layout === 'list' || size !== 'large'} />
   );
   const isCompactGrid = layout === 'grid' && size === 'compact';
 
@@ -341,7 +345,18 @@ export function FavoriteCard({
         hidePreview();
       }}
       onKeyDown={(event) => {
+        if (
+          ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(
+            event.key,
+          )
+        ) {
+          if (previewTimer.current) window.clearTimeout(previewTimer.current);
+          previewTimer.current = undefined;
+          setHoverPreviewOpen(false);
+        }
         if (event.key === 'Escape' && hoverPreviewOpen) {
+          event.preventDefault();
+          event.stopPropagation();
           setHoverPreviewOpen(false);
           previewTriggerRef.current?.focus();
         }
@@ -491,6 +506,7 @@ export function FavoriteCard({
       }}
       data-layout={layout}
       data-size={size}
+      data-dragging={isDragging || undefined}
       className={`bookmark-card group relative flex min-w-0 self-start overflow-hidden rounded-lg border bg-background transition-shadow duration-200 hover:shadow-md ${groupLabel ? 'w-full' : ''} ${selected ? 'border-primary ring-1 ring-primary/40' : 'border-border'}`}
       aria-hidden={isDragging || undefined}
       style={{
@@ -513,6 +529,7 @@ export function FavoriteCard({
         <div className="bookmark-preview relative min-w-0 shrink-0 overflow-hidden">
           <button
             ref={previewTriggerRef}
+            data-favorite-open
             aria-label={`Open ${item.title}`}
             aria-expanded={hoverPreviewOpen}
             aria-haspopup="dialog"
@@ -607,6 +624,7 @@ export function FavoriteCard({
       >
         <button
           ref={size === 'compact' && !isCompactGrid ? previewTriggerRef : undefined}
+          data-favorite-open={size === 'compact' && !isCompactGrid ? '' : undefined}
           aria-label={`Open ${item.title}`}
           title={
             size === 'compact' ? `${item.title} — ${getUrlLabel(item.url)}` : undefined

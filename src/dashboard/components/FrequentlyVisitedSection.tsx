@@ -132,9 +132,12 @@ export function FrequentlyVisitedSection({
           aria-busy="true"
           aria-label="Loading frequently visited sites"
           className="flex flex-wrap justify-center gap-2"
+          role="status"
         >
+          <span className="sr-only">Loading frequently visited sites…</span>
           {Array.from({ length: 6 }, (_, index) => (
             <div
+              aria-hidden="true"
               className="flex h-24 w-[6.5rem] shrink-0 flex-col items-center justify-center gap-3"
               key={index}
             >

@@ -1,5 +1,6 @@
+import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useState } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { CloudIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import type {
   DriveAccount,
@@ -23,13 +24,15 @@ export function GoogleDriveSignInDialog({
   driveAccount,
   driveConnectionStatus,
   online,
-  onClose,
+  onClose: onClosed,
   onConnectDrive,
   onPrepareDriveConnection,
   onConfirmDriveConnection,
   onCancelDriveConnection,
   onSwitchDriveAccount,
 }: GoogleDriveSignInDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onClose = dialogTransition.close;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [candidate, setCandidate] = useState<DriveAccount>();
@@ -122,10 +125,18 @@ export function GoogleDriveSignInDialog({
       : 'Connect Google Drive';
 
   return (
-    <Dialog className="relative z-[60]" onClose={close} open>
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+    <AnimatedDialog
+      className="relative z-[60]"
+      onClose={close}
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
+    >
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="w-full max-w-md rounded-lg border border-border bg-background p-5 shadow-xl">
+        <DialogPanel
+          transition
+          className="dialog-panel w-full max-w-md rounded-lg border border-border bg-background p-5 shadow-xl"
+        >
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <CloudIcon aria-hidden="true" className="mt-0.5 h-6 w-6 text-primary" />
@@ -243,6 +254,6 @@ export function GoogleDriveSignInDialog({
           </div>
         </DialogPanel>
       </div>
-    </Dialog>
+    </AnimatedDialog>
   );
 }

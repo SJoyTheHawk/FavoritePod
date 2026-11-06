@@ -40,6 +40,57 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+select:focus-visible,
+[tabindex='-1']:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Shared dialog motion preserves Headless UI focus management during exit. */
+.dialog-backdrop {
+  transition: opacity 200ms ease-out;
+}
+
+.dialog-panel {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+.dialog-backdrop[data-closed],
+.dialog-panel[data-closed] {
+  opacity: 0;
+}
+
+.dialog-panel[data-closed] {
+  transform: translateY(0.5rem) scale(0.98);
+}
+
+.bookmark-card {
+  transition:
+    box-shadow 200ms ease-out,
+    border-color 200ms ease-out;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .bookmark-card:not([data-dragging]):hover {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+.progress-indeterminate {
+  animation: progress-indeterminate 1.4s ease-in-out infinite;
+}
+
 ::selection {
   background: var(--color-primary-light);
 }
@@ -233,6 +284,25 @@ input:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .dialog-panel[data-closed] {
+    transform: none;
+  }
+
+  .progress-indeterminate {
+    width: 100%;
+    opacity: 0.6;
+    animation: none;
+  }
+
   .toast-enter,
   .toast-exit {
     animation-duration: 1ms;

@@ -21,6 +21,7 @@ import {
   getRecentItems,
   getSidebarCollapsed,
   getShowPreview,
+  getThemePreference,
   listGroups,
   listItems,
   listSnapshots,
@@ -41,6 +42,7 @@ import {
   setSidebarCollapsed,
   setBookmarkSize,
   setShowPreview,
+  setThemePreference,
   updateGroup,
   updateItem,
   updateItemThumbnail,
@@ -56,6 +58,19 @@ afterAll(async () => {
 });
 
 describe('local library storage', () => {
+  it('defaults theme preference to auto and persists explicit overrides', async () => {
+    expect(await getThemePreference()).toBe('auto');
+    await setThemePreference('dark');
+    db.close();
+    await db.open();
+    expect(await getThemePreference()).toBe('dark');
+
+    await db.settings.put({ key: 'theme', value: 'invalid' });
+    expect(await getThemePreference()).toBe('auto');
+    await setThemePreference('light');
+    expect(await getThemePreference()).toBe('light');
+  });
+
   it('defaults grouping to hierarchical and persists the selected mode', async () => {
     expect(await getGroupingMode()).toBe('hierarchical');
     await setGroupingMode('labeled');

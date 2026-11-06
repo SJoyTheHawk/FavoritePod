@@ -1,5 +1,6 @@
+import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import {
   DocumentIcon,
   GlobeAltIcon,
@@ -31,11 +32,13 @@ export function FavoriteDialog({
   initialGroupId,
   initialUrl,
   initialTitle,
-  onClose,
+  onClose: onClosed,
   onSave,
   onDelete,
   onUpdateThumbnail,
 }: FavoriteDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onClose = dialogTransition.close;
   const [title, setTitle] = useState(item?.title ?? initialTitle ?? '');
   const [url, setUrl] = useState(item?.url ?? initialUrl ?? '');
   const [groupId, setGroupId] = useState(
@@ -127,10 +130,18 @@ export function FavoriteDialog({
   };
 
   return (
-    <Dialog className="relative z-50" onClose={onClose} open>
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+    <AnimatedDialog
+      className="relative z-50"
+      onClose={onClose}
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
+    >
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="w-full min-w-0 max-w-md overflow-x-hidden rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6">
+        <DialogPanel
+          transition
+          className="dialog-panel w-full min-w-0 max-w-md overflow-x-hidden rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6"
+        >
           <DialogTitle className="text-lg font-semibold text-text-primary">
             {item ? 'Edit favorite' : 'Add favorite'}
           </DialogTitle>
@@ -267,6 +278,6 @@ export function FavoriteDialog({
           </form>
         </DialogPanel>
       </div>
-    </Dialog>
+    </AnimatedDialog>
   );
 }

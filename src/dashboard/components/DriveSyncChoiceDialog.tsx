@@ -1,5 +1,6 @@
+import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useState } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import type { DriveSyncChoice, DriveSyncPreview } from '../../core/drive-sync';
 
 interface DriveSyncChoiceDialogProps {
@@ -35,16 +36,26 @@ export function DriveSyncChoiceDialog({
   preview,
   error,
   busy = false,
-  onCancel,
+  onCancel: onClosed,
   onContinue,
 }: DriveSyncChoiceDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onCancel = dialogTransition.close;
   const [choice, setChoice] = useState<DriveSyncChoice>('merge');
 
   return (
-    <Dialog className="relative z-[60]" onClose={busy ? () => undefined : onCancel} open>
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+    <AnimatedDialog
+      className="relative z-[60]"
+      onClose={busy ? () => undefined : onCancel}
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
+    >
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="w-full max-w-lg rounded-lg border border-border bg-background p-5 shadow-xl">
+        <DialogPanel
+          transition
+          className="dialog-panel w-full max-w-lg rounded-lg border border-border bg-background p-5 shadow-xl"
+        >
           <DialogTitle className="text-lg font-semibold text-text-primary">
             Sync with Google Drive
           </DialogTitle>
@@ -127,6 +138,6 @@ export function DriveSyncChoiceDialog({
           </div>
         </DialogPanel>
       </div>
-    </Dialog>
+    </AnimatedDialog>
   );
 }

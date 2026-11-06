@@ -1,5 +1,6 @@
+import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useMemo, useState, type FormEvent } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import type { Group, Item } from '../../core/types';
 import { getGroupLabels } from '../group-labels';
 
@@ -13,9 +14,11 @@ interface MoveFavoriteDialogProps {
 export function MoveFavoriteDialog({
   groups,
   item,
-  onClose,
+  onClose: onClosed,
   onMove,
 }: MoveFavoriteDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onClose = dialogTransition.close;
   const [groupId, setGroupId] = useState(item.groupId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -39,16 +42,20 @@ export function MoveFavoriteDialog({
   };
 
   return (
-    <Dialog
+    <AnimatedDialog
       className="relative z-50"
       onClose={() => {
         if (!busy) onClose();
       }}
-      open
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
     >
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="w-full max-w-md rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6">
+        <DialogPanel
+          transition
+          className="dialog-panel w-full max-w-md rounded-lg border border-border bg-background p-5 shadow-xl sm:p-6"
+        >
           <DialogTitle className="text-lg font-semibold text-text-primary">
             Move favorite
           </DialogTitle>
@@ -98,6 +105,6 @@ export function MoveFavoriteDialog({
           </form>
         </DialogPanel>
       </div>
-    </Dialog>
+    </AnimatedDialog>
   );
 }

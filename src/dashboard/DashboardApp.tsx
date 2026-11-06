@@ -75,6 +75,7 @@ import { parseSafeUrl } from '../core/validation';
 import { normalizeVisitedSiteUrl, type VisitedSiteSuggestion } from '../core/discovery';
 import { useOptionalFeatures } from './use-optional-features';
 import { useVisitedSites } from './use-visited-sites';
+import { useTheme } from './hooks/use-theme';
 import { useLibrary } from '../core/use-library';
 import type { Group, Item } from '../core/types';
 import {
@@ -138,6 +139,7 @@ import {
 } from './drag';
 import { getGroupLabels } from './group-labels';
 import { getGroupedFavoriteView, getItemsByGroupAndDescendants } from './grouped-view';
+import { getNavigationTarget } from './keyboard-navigation';
 
 installDriveSyncChangeHooks();
 
@@ -341,6 +343,7 @@ function errorMessage(cause: unknown): string {
 }
 
 export function DashboardApp() {
+  const theme = useTheme();
   const { groups, items, loading, error } = useLibrary();
   const optionalFeatures = useOptionalFeatures();
   const visitedSites = useVisitedSites(
@@ -391,6 +394,7 @@ export function DashboardApp() {
   const initialDriveSyncAccount = useRef<string>();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
   const [layout, setLayout] = useState<LibraryView>('grid');
   const [groupingMode, setGroupingModeState] = useState<GroupingMode>('hierarchical');
   const [collapsedGroups, setCollapsedGroupsState] = useState(getCollapsedGroups);
@@ -902,6 +906,18 @@ export function DashboardApp() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.altKey) return;
+      if (
+        document.querySelector('[role="dialog"][aria-modal="true"], [role="menu"]') ||
+        draggingFavoriteId
+      )
+        return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
       const target = event.target;
       if (
@@ -917,7 +933,7 @@ export function DashboardApp() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [redo, undo]);
+  }, [draggingFavoriteId, redo, undo]);
 
   const saveDefaultView = async (view: LibraryView) => {
     await setDefaultView(view);
@@ -1723,13 +1739,23 @@ export function DashboardApp() {
 
   return (
     <main className="min-h-screen bg-background text-text-primary">
+      <a
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-primary focus:shadow-lg"
+        href="#main-content"
+      >
+        Skip to favorites
+      </a>
       <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 sm:px-7">
         <div className="flex items-center gap-3">
           <img
             alt=""
             aria-hidden="true"
             className="h-9 w-9 rounded-lg object-cover"
-            src="/icons/icon_light.jpg"
+            src={
+              theme.appliedTheme === 'dark'
+                ? '/icons/icon_dark.jpg'
+                : '/icons/icon_light.jpg'
+            }
           />
           <span className="text-lg font-semibold">FavoritePod</span>
         </div>
@@ -1868,6 +1894,52 @@ export function DashboardApp() {
 
         <section
           className="min-w-0 flex-1 px-4 py-6 sm:px-7 sm:py-8"
+          id="main-content"
+          tabIndex={-1}
+          onKeyDown={(event) => {
+            if (
+              event.defaultPrevented ||
+              event.nativeEvent.isComposing ||
+              event.altKey ||
+              event.ctrlKey ||
+              event.metaKey ||
+              event.shiftKey ||
+              draggingFavoriteId ||
+              ![
+                'ArrowLeft',
+                'ArrowRight',
+                'ArrowUp',
+                'ArrowDown',
+                'Home',
+                'End',
+              ].includes(event.key)
+            )
+              return;
+            const target = event.target;
+            if (
+              !(target instanceof HTMLElement) ||
+              !target.matches('[data-favorite-open]')
+            )
+              return;
+            const triggers = Array.from(
+              event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                '[data-favorite-open]',
+              ),
+            ).filter(
+              (button) =>
+                button.getClientRects().length > 0 && !button.closest('[inert]'),
+            );
+            const index = triggers.indexOf(target as HTMLButtonElement);
+            const next = getNavigationTarget(
+              triggers.map((button) =>
+                button.closest('[data-favorite-id]')!.getBoundingClientRect(),
+              ),
+              index,
+              event.key,
+            );
+            event.preventDefault();
+            if (next !== undefined) triggers[next]?.focus();
+          }}
           onDragOver={(event) => {
             if (getActiveLibraryDragPayload()?.type !== 'item') return;
             event.preventDefault();
@@ -1948,9 +2020,18 @@ export function DashboardApp() {
                   />
                   <input
                     aria-label="Search favorites"
+                    ref={searchRef}
+                    aria-keyshortcuts="Meta+k Control+k"
                     className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-primary"
                     onChange={(event) => setSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+                        event.preventDefault();
+                        setSearch('');
+                      }
+                    }}
                     placeholder="Search favorites"
+                    title="Search favorites (⌘K / Ctrl+K)"
                     type="search"
                     value={search}
                   />
@@ -2050,15 +2131,18 @@ export function DashboardApp() {
                 data-size={bookmarkSize}
                 aria-label="Loading favorites"
                 aria-busy="true"
+                role="status"
               >
+                <span className="sr-only">Loading favorites…</span>
                 {Array.from({ length: 8 }, (_, index) => (
                   <div
+                    aria-hidden="true"
                     className="bookmark-card flex min-w-0 overflow-hidden rounded-lg border border-border"
                     data-layout={layout}
                     data-size={bookmarkSize}
                     key={index}
                   >
-                    {bookmarkSize !== 'compact' && (
+                    {(bookmarkSize !== 'compact' || layout === 'grid') && (
                       <div className="bookmark-preview shrink-0 animate-pulse bg-surface-hover" />
                     )}
                     <div className="bookmark-details flex min-w-0 flex-col justify-center gap-2">
@@ -2178,6 +2262,11 @@ export function DashboardApp() {
       {settingsOpen && (
         <SettingsDialog
           initialSection={settingsSection}
+          theme={theme.theme}
+          themeReady={theme.ready}
+          themeSaving={theme.saving}
+          themeError={theme.error}
+          onSaveTheme={theme.setTheme}
           defaultView={layout}
           driveAccount={driveAccount}
           driveConnectionStatus={driveConnection.status}

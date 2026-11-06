@@ -1,11 +1,6 @@
+import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Description,
-  Dialog,
-  DialogBackdrop,
-  DialogPanel,
-  DialogTitle,
-} from '@headlessui/react';
+import { Description, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import {
   ArrowPathIcon,
   ArrowDownTrayIcon,
@@ -27,10 +22,17 @@ import type {
   DriveSyncHistoryEntry,
 } from '../../core/drive-sync-history';
 import type { GroupingMode, LibraryView, OpenBehavior } from '../../core/storage';
+import type { Theme } from '../hooks/use-theme';
 import type { ArchiveDialogMode } from './ImportExportDialog';
+import { ProgressBar } from '../../components/ProgressBar';
 
 interface SettingsDialogProps {
   initialSection?: 'discovery';
+  theme: Theme;
+  themeReady: boolean;
+  themeSaving: boolean;
+  themeError?: string;
+  onSaveTheme: (theme: Theme) => Promise<void>;
   defaultView: LibraryView;
   groupingMode: GroupingMode;
   showPreview: boolean;
@@ -86,6 +88,11 @@ function syncStageLabel(progress?: DriveSyncProgress): string | undefined {
 
 export function SettingsDialog({
   initialSection,
+  theme,
+  themeReady,
+  themeSaving,
+  themeError,
+  onSaveTheme,
   defaultView,
   groupingMode,
   showPreview,
@@ -108,7 +115,7 @@ export function SettingsDialog({
   online,
   homePageAvailable,
   pathOverrides,
-  onClose,
+  onClose: onClosed,
   onSaveDefaultView,
   onSaveGroupingMode,
   onSaveShowPreview,
@@ -123,6 +130,8 @@ export function SettingsDialog({
   onSyncDrive,
   onArchiveAction,
 }: SettingsDialogProps) {
+  const dialogTransition = useDialogTransition(onClosed);
+  const onClose = dialogTransition.close;
   const [error, setError] = useState<string>();
   const [editedOverrides, setEditedOverrides] = useState(pathOverrides);
   const [driveError, setDriveError] = useState<string>();
@@ -177,6 +186,15 @@ export function SettingsDialog({
     setError(undefined);
     try {
       await onSaveDefaultView(view);
+    } catch {
+      setError('Could not save this preference.');
+    }
+  };
+
+  const saveTheme = async (value: Theme) => {
+    setError(undefined);
+    try {
+      await onSaveTheme(value);
     } catch {
       setError('Could not save this preference.');
     }
@@ -250,15 +268,19 @@ export function SettingsDialog({
   };
 
   return (
-    <Dialog
+    <AnimatedDialog
       className="relative z-50"
       initialFocus={initialSection === 'discovery' ? discoverySwitchRef : undefined}
       onClose={onClose}
-      open
+      open={dialogTransition.open}
+      afterLeave={dialogTransition.afterLeave}
     >
-      <DialogBackdrop className="fixed inset-0 bg-black/35" />
+      <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-        <DialogPanel className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl">
+        <DialogPanel
+          transition
+          className="dialog-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl"
+        >
           <div className="flex items-center justify-between">
             <DialogTitle className="text-lg font-semibold text-text-primary">
               Settings
@@ -273,6 +295,45 @@ export function SettingsDialog({
               <XMarkIcon aria-hidden="true" className="h-4 w-4" />
             </button>
           </div>
+
+          <fieldset className="mt-5">
+            <legend className="text-sm font-medium text-text-primary">Appearance</legend>
+            <div
+              aria-label="Theme"
+              className="mt-2 grid grid-cols-3 gap-1 rounded-md border border-border bg-surface p-1"
+            >
+              {(
+                [
+                  { value: 'auto', label: 'System' },
+                  { value: 'light', label: 'Light' },
+                  { value: 'dark', label: 'Dark' },
+                ] as const
+              ).map(({ value, label }) => (
+                <label
+                  className={`flex min-h-9 cursor-pointer items-center justify-center rounded px-2 text-sm transition ${theme === value ? 'bg-background font-medium text-text-primary shadow-sm' : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'} ${!themeReady || themeSaving ? 'cursor-wait opacity-60' : ''}`}
+                  key={value}
+                >
+                  <input
+                    checked={theme === value}
+                    className="peer sr-only"
+                    disabled={!themeReady || themeSaving}
+                    name="theme"
+                    onChange={() => void saveTheme(value)}
+                    type="radio"
+                    value={value}
+                  />
+                  <span className="rounded px-1 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-primary peer-focus-visible:outline-offset-2">
+                    {label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {themeError && (
+              <p className="mt-2 text-xs text-danger" role="alert">
+                {themeError}
+              </p>
+            )}
+          </fieldset>
 
           <div className="mt-5 flex items-center justify-between gap-4">
             <span className="text-sm font-medium text-text-primary">Show Preview</span>
@@ -597,25 +658,11 @@ export function SettingsDialog({
                               </span>
                             )}
                         </div>
-                        <div
-                          aria-label="Google Drive sync progress"
-                          aria-valuemax={driveSyncProgress?.total ?? 1}
-                          aria-valuemin={0}
-                          aria-valuenow={driveSyncProgress?.current ?? 0}
-                          className="h-1.5 overflow-hidden rounded-full bg-background"
-                          role="progressbar"
-                        >
-                          <div
-                            className={`h-full rounded-full bg-primary transition-[width] duration-200 ${driveSyncProgress?.total ? '' : 'w-1/3 animate-pulse'}`}
-                            style={
-                              driveSyncProgress?.total
-                                ? {
-                                    width: `${Math.min(100, (100 * (driveSyncProgress.current ?? 0)) / driveSyncProgress.total)}%`,
-                                  }
-                                : undefined
-                            }
-                          />
-                        </div>
+                        <ProgressBar
+                          label="Google Drive sync progress"
+                          current={driveSyncProgress?.current}
+                          total={driveSyncProgress?.total}
+                        />
                       </div>
                     ) : showDriveStorageWarning ? (
                       <div className="flex items-start gap-2.5" role="alert">
@@ -888,49 +935,55 @@ export function SettingsDialog({
           )}
         </DialogPanel>
       </div>
-      {confirmDisconnect && (
-        <Dialog className="relative z-[60]" onClose={dismissDisconnect} open>
-          <DialogBackdrop className="fixed inset-0 bg-black/35" />
-          <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
-            <DialogPanel
-              aria-busy={driveBusy}
-              className="w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl"
-            >
-              <DialogTitle className="text-lg font-semibold text-text-primary">
-                Disconnect Google Drive?
-              </DialogTitle>
-              <Description className="mt-2 text-sm text-text-secondary">
-                Disconnecting from Google Drive will stop syncing your favorites. Your
-                saved favorites will remain available locally.
-              </Description>
-              {driveError && (
-                <p className="mt-3 text-sm text-danger" role="alert">
-                  {driveError}
-                </p>
-              )}
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  className="min-h-10 rounded-md border border-border px-4 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:opacity-60"
-                  data-autofocus
-                  disabled={driveBusy}
-                  onClick={dismissDisconnect}
-                  type="button"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="min-h-10 rounded-md bg-danger px-4 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-                  disabled={driveBusy}
-                  onClick={() => void disconnectDrive()}
-                  type="button"
-                >
-                  {driveBusy ? 'Disconnecting…' : 'Disconnect'}
-                </button>
-              </div>
-            </DialogPanel>
-          </div>
-        </Dialog>
-      )}
-    </Dialog>
+      <AnimatedDialog
+        className="relative z-[60]"
+        onClose={dismissDisconnect}
+        open={confirmDisconnect}
+      >
+        <DialogBackdrop
+          transition
+          className="dialog-backdrop fixed inset-0 bg-black/35"
+        />
+        <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
+          <DialogPanel
+            transition
+            aria-busy={driveBusy}
+            className="dialog-panel w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl"
+          >
+            <DialogTitle className="text-lg font-semibold text-text-primary">
+              Disconnect Google Drive?
+            </DialogTitle>
+            <Description className="mt-2 text-sm text-text-secondary">
+              Disconnecting from Google Drive will stop syncing your favorites. Your saved
+              favorites will remain available locally.
+            </Description>
+            {driveError && (
+              <p className="mt-3 text-sm text-danger" role="alert">
+                {driveError}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="min-h-10 rounded-md border border-border px-4 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:opacity-60"
+                data-autofocus
+                disabled={driveBusy}
+                onClick={dismissDisconnect}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="min-h-10 rounded-md bg-danger px-4 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+                disabled={driveBusy}
+                onClick={() => void disconnectDrive()}
+                type="button"
+              >
+                {driveBusy ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+          </DialogPanel>
+        </div>
+      </AnimatedDialog>
+    </AnimatedDialog>
   );
 }

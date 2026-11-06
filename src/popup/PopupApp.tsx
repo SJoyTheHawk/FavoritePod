@@ -13,10 +13,12 @@ import { BookmarkDialog } from './BookmarkDialog';
 import { POPUP_PATH, readPopupSaveRequest } from '../core/popup-save-request';
 import { FaviconImage } from '../components/FaviconImage';
 import { installDriveSyncChangeHooks } from '../core/drive-sync-triggers';
+import { useTheme } from '../dashboard/hooks/use-theme';
 
 installDriveSyncChangeHooks();
 
 export function PopupApp() {
+  const { appliedTheme } = useTheme();
   const { groups, items, loading: libraryLoading, error: libraryError } = useLibrary();
   const { items: recentItems, loading: recentLoading } = useRecentItems(5);
   const [tab, setTab] = useState<chrome.tabs.Tab>();
@@ -128,7 +130,9 @@ export function PopupApp() {
               alt=""
               aria-hidden="true"
               className="h-8 w-8 rounded-md object-cover"
-              src="/icons/icon_light.jpg"
+              src={
+                appliedTheme === 'dark' ? '/icons/icon_dark.jpg' : '/icons/icon_light.jpg'
+              }
             />
             <h1 className="text-sm font-semibold">FavoritePod</h1>
           </header>

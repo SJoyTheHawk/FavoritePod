@@ -51,7 +51,11 @@ export async function canCaptureSaveRequest(request: PopupSaveRequest): Promise<
   try {
     const tab = await chrome.tabs.get(request.sourceTabId);
     return (
-      tab.active && tab.windowId === request.sourceWindowId && tab.url === request.url
+      tab.active &&
+      tab.windowId === request.sourceWindowId &&
+      tab.url === request.url &&
+      !tab.pendingUrl &&
+      tab.status !== 'loading'
     );
   } catch {
     return false;

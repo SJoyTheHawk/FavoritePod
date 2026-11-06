@@ -1,4 +1,6 @@
 import { liveQuery } from 'dexie';
+import { db } from '../core/db';
+import { isItemDeleted } from '../core/merge';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowPathIcon,
@@ -1390,8 +1392,10 @@ export function DashboardApp() {
     item: Item,
     thumbnail: Parameters<typeof updateItemThumbnail>[1],
   ) => {
-    const previousHash = item.previewHash;
-    const updated = await updateItemThumbnail(item.id, thumbnail);
+    const previous = await db.items.get(item.id);
+    if (!previous || isItemDeleted(previous)) throw new Error('Favorite not found.');
+    const previousHash = previous.previewHash;
+    const updated = await updateItemThumbnail(item.id, thumbnail, previous);
     if (updated.previewHash !== previousHash) {
       registerHistory({
         label: 'thumbnail update',
@@ -1606,106 +1610,116 @@ export function DashboardApp() {
     );
   };
 
-  const renderFavoriteCollection = (collectionItems: readonly Item[]) => (
-    <div
-      className="bookmark-collection relative"
-      data-layout={layout}
-      data-size={bookmarkSize}
-      onDragOver={(event) => {
-        const payload = getActiveLibraryDragPayload();
-        if (payload?.type !== 'item') return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        const collection = event.currentTarget;
-        const rect = collection.getBoundingClientRect();
-        const slots = Array.from(
-          collection.querySelectorAll<HTMLElement>('[data-favorite-id]'),
-        )
-          .filter((card) => !dragIdsRef.current.includes(card.dataset.favoriteId!))
-          .map((card) => ({
-            id: card.dataset.favoriteId!,
-            left: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetLeft,
-            top: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetTop,
-            width: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetWidth,
-            height: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetHeight,
-          }));
-        const target = getItemDropTarget(
-          event.clientX - rect.left + collection.scrollLeft,
-          event.clientY - rect.top + collection.scrollTop,
-          slots,
-          layout,
-        );
-        // Keep the previous destination over a gap or the stack placeholder.
-        if (target) previewFavoriteDrop(payload.id, target.targetId, target.placement);
-      }}
-    >
-      {collectionItems.map((item) => {
-        const siblings = items
-          .filter((candidate) => candidate.groupId === item.groupId)
-          .sort(compareOrder);
-        const index = siblings.findIndex((candidate) => candidate.id === item.id);
-        return (
-          <FavoriteCard
-            canMoveDown={index >= 0 && index < siblings.length - 1}
-            canMoveUp={index > 0}
-            item={item}
-            key={item.id}
-            groupLabel={
-              groupedView.mode === 'labeled' ? groupLabels.get(item.groupId) : undefined
-            }
-            layout={layout}
-            size={bookmarkSize}
-            showPreview={showPreview}
-            pathOverrides={pathOverrides}
-            sortOrder={
-              dragPreviewRank
-                ? (dragPreviewRank.get(item.id) ?? dragPreviewOrder?.length)
-                : undefined
-            }
-            isDragging={!!draggingFavoriteId && draggedIds.includes(item.id)}
-            dropOrigin={dropOrigin}
-            dragItemIds={
-              selectedIds.has(item.id)
-                ? visibleItems
-                    .filter((candidate) => selectedIds.has(candidate.id))
-                    .map((candidate) => candidate.id)
-                : [item.id]
-            }
-            onDragStart={startFavoriteDrag}
-            onDragEnd={finishFavoriteDrag}
-            onDelete={(selected) =>
-              void deleteFavorite(selected).catch((cause) =>
-                notifyError(errorMessage(cause)),
-              )
-            }
-            onEdit={(selected) => setDialog({ type: 'favorite', item: selected })}
-            onMove={(selected) => setDialog({ type: 'move-favorite', item: selected })}
-            onMoveDown={(selected) => reorderFavorite(selected, 1)}
-            onMoveUp={(selected) => reorderFavorite(selected, -1)}
-            onOpenError={notifyError}
-            onFileAccessDenied={handleFileAccessDenied}
-            onToggleSelected={toggleSelected}
-            selected={selectedIds.has(item.id)}
-          />
-        );
-      })}
-      {draggingFavoriteId &&
-        dragPreviewRank?.has(draggedIds[0]) &&
-        (groupedView.mode !== 'hierarchical' ||
-          favoritePreviewDestination.current?.groupId ===
-            collectionItems[0]?.groupId) && (
-          <div
-            ref={slotRef}
-            aria-hidden="true"
-            className="pointer-events-none min-w-0 rounded-lg border-2 border-dashed border-primary/70 bg-primary-light/35 shadow-sm"
-            style={{
-              order: dragPreviewRank.get(draggedIds[0]),
-              height: dragPlaceholderHeight,
-            }}
-          />
-        )}
-    </div>
-  );
+  const renderFavoriteCollection = (collectionItems: readonly Item[]) => {
+    const orderRevision = JSON.stringify(
+      collectionItems.map((item) => [
+        item.id,
+        item.orderKey,
+        dragPreviewRank?.get(item.id),
+      ]),
+    );
+    return (
+      <div
+        className="bookmark-collection relative"
+        data-layout={layout}
+        data-size={bookmarkSize}
+        onDragOver={(event) => {
+          const payload = getActiveLibraryDragPayload();
+          if (payload?.type !== 'item') return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+          const collection = event.currentTarget;
+          const rect = collection.getBoundingClientRect();
+          const slots = Array.from(
+            collection.querySelectorAll<HTMLElement>('[data-favorite-id]'),
+          )
+            .filter((card) => !dragIdsRef.current.includes(card.dataset.favoriteId!))
+            .map((card) => ({
+              id: card.dataset.favoriteId!,
+              left: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetLeft,
+              top: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetTop,
+              width: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetWidth,
+              height: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetHeight,
+            }));
+          const target = getItemDropTarget(
+            event.clientX - rect.left + collection.scrollLeft,
+            event.clientY - rect.top + collection.scrollTop,
+            slots,
+            layout,
+          );
+          // Keep the previous destination over a gap or the stack placeholder.
+          if (target) previewFavoriteDrop(payload.id, target.targetId, target.placement);
+        }}
+      >
+        {collectionItems.map((item) => {
+          const siblings = items
+            .filter((candidate) => candidate.groupId === item.groupId)
+            .sort(compareOrder);
+          const index = siblings.findIndex((candidate) => candidate.id === item.id);
+          return (
+            <FavoriteCard
+              orderRevision={orderRevision}
+              canMoveDown={index >= 0 && index < siblings.length - 1}
+              canMoveUp={index > 0}
+              item={item}
+              key={item.id}
+              groupLabel={
+                groupedView.mode === 'labeled' ? groupLabels.get(item.groupId) : undefined
+              }
+              layout={layout}
+              size={bookmarkSize}
+              showPreview={showPreview}
+              pathOverrides={pathOverrides}
+              sortOrder={
+                dragPreviewRank
+                  ? (dragPreviewRank.get(item.id) ?? dragPreviewOrder?.length)
+                  : undefined
+              }
+              isDragging={!!draggingFavoriteId && draggedIds.includes(item.id)}
+              dropOrigin={dropOrigin}
+              dragItemIds={
+                selectedIds.has(item.id)
+                  ? visibleItems
+                      .filter((candidate) => selectedIds.has(candidate.id))
+                      .map((candidate) => candidate.id)
+                  : [item.id]
+              }
+              onDragStart={startFavoriteDrag}
+              onDragEnd={finishFavoriteDrag}
+              onDelete={(selected) =>
+                void deleteFavorite(selected).catch((cause) =>
+                  notifyError(errorMessage(cause)),
+                )
+              }
+              onEdit={(selected) => setDialog({ type: 'favorite', item: selected })}
+              onMove={(selected) => setDialog({ type: 'move-favorite', item: selected })}
+              onMoveDown={(selected) => reorderFavorite(selected, 1)}
+              onMoveUp={(selected) => reorderFavorite(selected, -1)}
+              onOpenError={notifyError}
+              onFileAccessDenied={handleFileAccessDenied}
+              onToggleSelected={toggleSelected}
+              selected={selectedIds.has(item.id)}
+            />
+          );
+        })}
+        {draggingFavoriteId &&
+          dragPreviewRank?.has(draggedIds[0]) &&
+          (groupedView.mode !== 'hierarchical' ||
+            favoritePreviewDestination.current?.groupId ===
+              collectionItems[0]?.groupId) && (
+            <div
+              ref={slotRef}
+              aria-hidden="true"
+              className="pointer-events-none min-w-0 rounded-lg border-2 border-dashed border-primary/70 bg-primary-light/35 shadow-sm"
+              style={{
+                order: dragPreviewRank.get(draggedIds[0]),
+                height: dragPlaceholderHeight,
+              }}
+            />
+          )}
+      </div>
+    );
+  };
 
   return (
     <main className="min-h-screen bg-background text-text-primary">

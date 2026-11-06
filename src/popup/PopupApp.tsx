@@ -26,6 +26,18 @@ export function PopupApp() {
   const [error, setError] = useState<string>();
 
   useEffect(() => {
+    if (!dialogOpen) return;
+    const previous = document.documentElement.style.overflow;
+    const previousBody = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = previous;
+      document.body.style.overflow = previousBody;
+    };
+  }, [dialogOpen]);
+
+  useEffect(() => {
     let active = true;
     if (saveRequest) {
       // Consume this invocation so reloading/opening the toolbar never repeats it.
@@ -104,8 +116,8 @@ export function PopupApp() {
   return (
     <main
       className={
-        saveRequest
-          ? 'flex h-[480px] w-80 flex-col bg-background text-text-primary'
+        saveRequest || dialogOpen
+          ? 'flex h-[600px] w-80 flex-col overflow-hidden bg-background text-text-primary'
           : 'flex h-fit w-80 flex-col bg-background text-text-primary'
       }
     >

@@ -227,8 +227,10 @@ export default defineConfig({
 | `topSites` (optional) | Chrome-selected frequent-site shortcuts | Requested when enabled in Settings |
 | `contextMenus` (optional) | Save pages/links to selected groups from Chrome's menu | Requested when enabled in Settings |
 
-**Important**: Do not request `<all_urls>` host permissions. The `file:///*`
-host permission is limited to local files and is required for Phase 6 file
+**Do not request `<all_urls>` host permissions.** Popup thumbnail capture and
+refresh use the `activeTab` grant from invoking the extension on the current page.
+No background capture coordinator or temporary capture tabs are used. The
+`file:///*` host permission is limited to local files and is required for Phase 6
 availability checks. Users must still enable “Allow access to file URLs” in
 Chrome's extension details. The extension uses `activeTab` for the popup's
 active-tab workflow and stores data in IndexedDB, which does not require
@@ -916,25 +918,39 @@ const data = await chrome.storage.local.get('key');
 
 ### Pattern 1: Add Bookmark Review
 
-The toolbar popup keeps recent favorites on its home screen. Its **Add bookmark**
-action opens a review dialog for the active tab. When that dialog opens, look up
-the exact URL in the library; edit the existing favorite when found, otherwise
-capture a thumbnail when possible and create the favorite in the last-used
-folder. **Done** persists name and folder edits, while **Remove** deletes the
-favorite. Closing the dialog without either action leaves the default favorite
-in place when it was newly created.
+The toolbar popup keeps recent favorites on its home screen. **Add bookmark**
+immediately saves the active page. Match the exact URL first, then device file
+path overrides, to edit an existing favorite without rewriting its saved URL.
+For a new page, create the bookmark with its default title and last-used folder
+before capture. Persist the initial thumbnail when capture succeeds. A capture
+failure or popup closure must not lose the bookmark. Existing favorites show
+their saved image until the user chooses **Refresh**. **Remove** clears only the
+pending thumbnail. The toolbar footer has **Delete** and **Save**; Delete removes
+the saved bookmark. It cancels any pending capture before
+deleting so a late result cannot restore the image or bookmark. Closing the popup
+keeps the automatically saved bookmark and discards unconfirmed edits. Right-click
+save requests retain their draft-based **Cancel** and **Save** behavior.
+**Save** confirms edits to the same bookmark and its image (or explicit removal).
 
-The popup's recent-pages list uses `useRecentItems(5)` so updates from the review
-dialog appear without reloading the popup. `dismissRecentItem(id)` hides a row
-from this list without deleting its favorite; editing that favorite restores it
-to recent pages. `captureFavicon` reads the tab icon (then Chrome's `_favicon/`
-endpoint if necessary), decodes it, and stores a 32px PNG data URL in `faviconUrl`.
-The shared `FaviconImage` prefers saved pixels, then the cached Chrome icon, and
-finally a globe/file fallback. It is used by the popup, review dialog, and launcher.
-Reopening Add bookmark for an existing URL refreshes its icon without duplicating
-the favorite. A failed capture preserves the previous icon. The `faviconUrl` field
-has its own merge clock; database version 2 backfills clocks for legacy records.
-The `_favicon/` endpoint requires the manifest's `favicon` permission.
+`capturePopupThumbnail` captures only the invoking tab in its original window.
+It checks tab identity, URL, loading, activation and cancellation before capture,
+after the capture queue wait, and after capture/compression. A right-click link
+request cannot capture its containing page. File URLs require Chrome’s separate
+file-access switch. Refresh never creates or closes a tab or requests all-sites
+access. There is no artificial rendering delay; the shared capture queue respects
+Chrome’s rate limit.
+
+`updateItem` commits details and an optional thumbnail in one transaction with
+stale URL/preview clock checks. `undefined` leaves the saved image unchanged;
+`null` clears it and advances its sync clock. Toolbar additions use `createItem`
+before the dialog becomes ready. Only right-click drafts wait until Save.
+
+The popup uses `useRecentItems(5)` so saved changes appear without reloading.
+`dismissRecentItem(id)` hides a recent row without deleting its favorite.
+`captureFavicon` stores a 32px PNG for right-click saves; toolbar additions keep
+the invoking tab’s favicon. The shared
+`FaviconImage` prefers saved pixels, then Chrome’s cached icon, then a globe/file
+fallback. The `_favicon/` endpoint requires the manifest’s `favicon` permission.
 
 ### Pattern 2: Display Items with Thumbnails
 

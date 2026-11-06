@@ -33,6 +33,7 @@ interface FavoriteCardProps {
   pathOverrides: PathOverride[];
   groupLabel?: string;
   sortOrder?: number;
+  orderRevision: string;
   isDragging: boolean;
   dragItemIds: string[];
   dropOrigin: { left: number; top: number } | null;
@@ -89,6 +90,7 @@ export function FavoriteCard({
   pathOverrides,
   groupLabel,
   sortOrder,
+  orderRevision,
   isDragging,
   dragItemIds,
   dropOrigin,
@@ -123,6 +125,11 @@ export function FavoriteCard({
   const nativeDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const dragImageCleanup = useRef<(() => void) | null>(null);
   const previousPosition = useRef<{ left: number; top: number }>();
+  const previousLayout = useRef<{
+    orderRevision: string;
+    layout: string;
+    size: BookmarkSize;
+  }>();
   const wasDragging = useRef(false);
   const isLocalFile = parseSafeUrl(item.url)?.protocol === 'file:';
   const isMissingFile = isLocalFile && fileAvailability === 'missing';
@@ -181,7 +188,9 @@ export function FavoriteCard({
     const entry = card.closest<HTMLElement>('.favorite-entry') ?? card;
     const position = { left: entry.offsetLeft, top: entry.offsetTop };
     const previous = previousPosition.current;
+    const priorLayout = previousLayout.current;
     previousPosition.current = position;
+    previousLayout.current = { orderRevision, layout, size };
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (isDragging) {
       wasDragging.current = true;
@@ -204,7 +213,17 @@ export function FavoriteCard({
       }
       return;
     }
-    if (!previous || reducedMotion) {
+    // Hover, preview loading, and responsive reflow can all render this card
+    // with coordinates different from an earlier measurement. Only an actual
+    // collection-order change should replay the previous position.
+    if (
+      !previous ||
+      reducedMotion ||
+      !priorLayout ||
+      priorLayout.orderRevision === orderRevision ||
+      priorLayout.layout !== layout ||
+      priorLayout.size !== size
+    ) {
       return;
     }
 

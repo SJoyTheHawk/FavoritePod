@@ -26,15 +26,30 @@ _Screenshots show the current interface with sample content._
 
 1. Open a page you want to keep.
 2. Click **FavoritePod** in Chrome’s toolbar, then **Add bookmark**.
-3. Review the preview, name, and folder, then click **Done**.
+3. Review the preview, name, and folder, then click **Save**.
 
 Choose **Open launcher** from the popup to see your full library. You can also add
 an address directly from the launcher using **Add favorite**.
 
-<img src="docs/screenshots/popup.png" alt="FavoritePod's Add bookmark dialog with a page preview, name, folder, and Done button" width="360" />
+<img src="docs/screenshots/popup.png" alt="FavoritePod's Add bookmark dialog with a page preview, name, folder, and Save button" width="360" />
 
 Previews are saved images of a page when you capture it. They help you recognize
 favorites without loading every website in the background.
+
+**Add bookmark** saves the page immediately with its default name and folder,
+including an initial thumbnail when capture succeeds. Closing the popup keeps
+the bookmark. **Save** confirms changes to its name, folder, or thumbnail;
+**Delete** removes the bookmark. **Refresh** retakes the current page’s thumbnail,
+and **Remove** clears only the thumbnail when you confirm with Save.
+To update an existing bookmark, open its page,
+click FavoritePod in the toolbar, then **Add bookmark**. Its saved preview is
+shown first. **Upload image** is also available in the dashboard’s **Edit favorite**.
+
+Capture uses the temporary access from invoking FavoritePod on that page.
+There is no all-sites permission request and no temporary capture tab or window.
+Local files still require Chrome’s **Allow access to file URLs** setting.
+Device path overrides also identify existing bookmarks without rewriting their
+saved addresses. Saving a right-clicked link does not capture the containing page.
 
 ## Make the library your own
 
@@ -180,6 +195,11 @@ FavoritePod uses Chrome permissions to capture the page you choose to save, read
 its icon, store your library, and run optional Drive sign-in and background sync.
 Access to local file URLs is controlled by the separate switch in Chrome’s
 extension settings.
+
+Thumbnail refresh captures the visible page locally when you use Add bookmark.
+You can refresh the preview or remove it and confirm with Save.
+The initial preview is saved automatically; confirmed replacements and removals
+update the library and optional Drive sync.
 
 ## Common questions
 

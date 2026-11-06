@@ -62,7 +62,10 @@ async function resizeThumbnail(
   return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.75 });
 }
 
-export async function captureVisibleTab(windowId?: number): Promise<string> {
+export async function captureVisibleTab(
+  windowId?: number,
+  beforeCapture?: () => Promise<void>,
+): Promise<string> {
   let release = () => {};
   const previous = captureQueue;
   captureQueue = new Promise<void>((resolve) => {
@@ -74,6 +77,8 @@ export async function captureVisibleTab(windowId?: number): Promise<string> {
     if (lastCaptureAt && wait > 0) {
       await new Promise((resolve) => setTimeout(resolve, wait));
     }
+    // Validate after the queue/rate-limit wait, immediately before Chrome captures.
+    await beforeCapture?.();
     lastCaptureAt = Date.now();
     const options = { format: 'jpeg' as const, quality: 80 };
     return windowId === undefined
@@ -86,6 +91,10 @@ export async function captureVisibleTab(windowId?: number): Promise<string> {
 
 export async function captureThumbnail(windowId?: number): Promise<ThumbnailInput> {
   const dataUrl = await captureVisibleTab(windowId);
+  return thumbnailFromDataUrl(dataUrl);
+}
+
+export async function thumbnailFromDataUrl(dataUrl: string): Promise<ThumbnailInput> {
   const separator = dataUrl.indexOf(',');
   const metadata = dataUrl.slice(0, separator);
   if (separator < 0 || !metadata.endsWith(';base64')) {

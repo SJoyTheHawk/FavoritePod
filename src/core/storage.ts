@@ -326,35 +326,10 @@ export async function getThumbnail(hash: string) {
 export async function updateItemThumbnail(
   id: string,
   thumbnail: ThumbnailInput,
+  expected?: Item,
+  signal?: AbortSignal,
 ): Promise<Item> {
-  const hash = await hashBlob(thumbnail.blob);
-  return db.transaction('rw', db.items, db.thumbnails, db.syncMeta, async () => {
-    const item = await db.items.get(id);
-    if (!item || isItemDeleted(item)) throw new Error('Favorite not found.');
-    const existing = await db.thumbnails.get(hash);
-    if (!existing) {
-      await db.thumbnails.put({
-        hash,
-        blob: thumbnail.blob,
-        ...(thumbnail.smallBlob ? { smallBlob: thumbnail.smallBlob } : {}),
-        size: thumbnail.blob.size,
-        width: thumbnail.width,
-        height: thumbnail.height,
-        createdAt: Date.now(),
-      });
-    } else if (thumbnail.smallBlob && !existing.smallBlob) {
-      await db.thumbnails.put({ ...existing, smallBlob: thumbnail.smallBlob });
-    }
-    if (item.previewHash === hash) return item;
-    const clock = await nextClock();
-    const next: Item = {
-      ...item,
-      previewHash: hash,
-      clock: { ...item.clock, previewHash: clock },
-    };
-    await db.items.put(next);
-    return next;
-  });
+  return updateItem(id, {}, { thumbnail, expected, signal });
 }
 
 export async function getLastUsedGroupId(): Promise<string | undefined> {
@@ -624,41 +599,89 @@ export async function createItem(data: CreateItemInput): Promise<Item> {
 export async function updateItem(
   id: string,
   updates: Partial<Pick<Item, ItemField>>,
+  options?: { thumbnail?: ThumbnailInput | null; expected?: Item; signal?: AbortSignal },
 ): Promise<Item> {
   if (Object.hasOwn(updates, 'url') && updates.url && !isValidUrl(updates.url)) {
     throw new Error('Use a web address or a local file URL.');
   }
 
-  return db.transaction('rw', db.items, db.groups, db.syncMeta, db.settings, async () => {
-    const item = await db.items.get(id);
-    if (!item || isItemDeleted(item)) throw new Error('Favorite not found.');
+  const thumbnail = options?.thumbnail;
+  if (thumbnail !== undefined) {
+    updates = {
+      ...updates,
+      previewHash: thumbnail ? await hashBlob(thumbnail.blob) : undefined,
+    };
+  }
+  return db.transaction(
+    'rw',
+    db.items,
+    db.groups,
+    db.thumbnails,
+    db.syncMeta,
+    db.settings,
+    async () => {
+      const item = await db.items.get(id);
+      if (!item || isItemDeleted(item)) throw new Error('Favorite not found.');
+      options?.signal?.throwIfAborted();
+      const expected = options?.expected;
+      if (
+        expected &&
+        (item.url !== expected.url ||
+          item.previewHash !== expected.previewHash ||
+          item.clock.url !== expected.clock.url ||
+          item.clock.previewHash !== expected.clock.previewHash)
+      ) {
+        throw new Error(
+          'This favorite changed. Reopen it and review the thumbnail again.',
+        );
+      }
 
-    if (updates.groupId) {
-      const group = await db.groups.get(updates.groupId);
-      if (!group || isGroupDeleted(group))
-        throw new Error('The selected group is unavailable.');
-    }
+      if (updates.groupId) {
+        const group = await db.groups.get(updates.groupId);
+        if (!group || isGroupDeleted(group))
+          throw new Error('The selected group is unavailable.');
+      }
 
-    const changedFields = (Object.keys(updates) as ItemField[]).filter(
-      (field) => Object.hasOwn(updates, field) && updates[field] !== item[field],
-    );
-    const movedToGroup =
-      updates.groupId !== undefined && updates.groupId !== item.groupId;
-    if (movedToGroup && updates.orderKey === undefined) changedFields.push('orderKey');
-    await restoreRecentItem(id);
-    if (changedFields.length === 0) return item;
+      if (thumbnail && updates.previewHash) {
+        const existing = await db.thumbnails.get(updates.previewHash);
+        if (!existing) {
+          await db.thumbnails.put({
+            hash: updates.previewHash,
+            blob: thumbnail.blob,
+            ...(thumbnail.smallBlob ? { smallBlob: thumbnail.smallBlob } : {}),
+            size: thumbnail.blob.size,
+            width: thumbnail.width,
+            height: thumbnail.height,
+            createdAt: Date.now(),
+          });
+        } else if (thumbnail.smallBlob && !existing.smallBlob) {
+          await db.thumbnails.put({ ...existing, smallBlob: thumbnail.smallBlob });
+        }
+      }
 
-    const clock = await nextClock();
-    const next: Item = { ...item, ...updates, clock: { ...item.clock } };
-    if (movedToGroup && updates.orderKey === undefined) {
-      next.orderKey = await orderKeyForGroup(next.groupId);
-    }
-    for (const field of changedFields) next.clock[field] = clock;
-    if (updates.title !== undefined)
-      next.title = normalizedTitle(updates.title, next.url);
-    await db.items.put(next);
-    return next;
-  });
+      const changedFields = (Object.keys(updates) as ItemField[]).filter(
+        (field) => Object.hasOwn(updates, field) && updates[field] !== item[field],
+      );
+      const movedToGroup =
+        updates.groupId !== undefined && updates.groupId !== item.groupId;
+      if (movedToGroup && updates.orderKey === undefined) changedFields.push('orderKey');
+      await restoreRecentItem(id);
+      options?.signal?.throwIfAborted();
+      if (changedFields.length === 0) return item;
+
+      const clock = await nextClock();
+      const next: Item = { ...item, ...updates, clock: { ...item.clock } };
+      if (movedToGroup && updates.orderKey === undefined) {
+        next.orderKey = await orderKeyForGroup(next.groupId);
+      }
+      for (const field of changedFields) next.clock[field] = clock;
+      if (updates.title !== undefined)
+        next.title = normalizedTitle(updates.title, next.url);
+      options?.signal?.throwIfAborted();
+      await db.items.put(next);
+      return next;
+    },
+  );
 }
 
 export async function moveItem(

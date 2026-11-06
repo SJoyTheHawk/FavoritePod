@@ -185,7 +185,7 @@ export function FavoriteDialog({
                   type="button"
                 >
                   <PhotoIcon aria-hidden="true" className="h-4 w-4" />
-                  Update thumbnail
+                  Upload image
                 </button>
               </div>
             )}

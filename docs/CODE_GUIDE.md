@@ -207,7 +207,6 @@ export default defineConfig({
   ],
   
   "optional_permissions": [
-    "history",
     "topSites",
     "contextMenus"
   ],
@@ -225,7 +224,7 @@ export default defineConfig({
 | `activeTab` | Read the active tab, capture its screenshot, open its URL | Temporary when the popup is used |
 | `favicon` | Read Chrome’s cached website icons as a fallback | Reload the extension after manifest changes |
 | `unlimitedStorage` | Protect the IndexedDB library from normal quota eviction | No install warning |
-| `history`, `topSites` (optional) | Visited-site suggestions | Requested when enabled in Settings |
+| `topSites` (optional) | Chrome-selected frequent-site shortcuts | Requested when enabled in Settings |
 | `contextMenus` (optional) | Save pages/links to selected groups from Chrome's menu | Requested when enabled in Settings |
 
 **Important**: Do not request `<all_urls>` host permissions. The `file:///*`
@@ -355,28 +354,47 @@ management.
 Settings click handlers, before awaiting IndexedDB. Feature flags, hidden shortcut
 URLs, and `showFrequentlyVisited` live in profile-local `settings`; they do not
 enter exports or Drive state. Visibility defaults on; access remains opt-in.
-Hiding stops reads without revoking grants. Disabling access removes History and
-Top sites permissions; revocation is observed by open dashboards.
+Turning off both visibility options stops reads without revoking grants.
+Disabling access removes only Top sites permission; revocation is observed by
+open dashboards. The manifest no longer declares History. A native upgrade test
+confirmed Chrome drops the old History grant while retaining Top sites and
+contextMenus on unpacked reload; no additional cleanup was needed for that path.
 
-`core/discovery.ts` merges top sites with up to 500 history results from the last
-30 days, ranks frequent/recent pages, deduplicates URL fragments, and excludes
-hidden URLs. Saved sites remain available as shortcuts. Only http/https URLs
-qualify, with ten results by default.
-`dashboard/use-visited-sites.ts` owns in-memory browser results and does not
-persist raw history. `FrequentlyVisitedSection` appears only in All favorites
-outside search, using compact grid dimensions regardless of library view/size.
+`core/discovery.ts` only filters the response from `chrome.topSites.get()`:
+validate http/https URLs, deduplicate fragments, exclude locally hidden URLs,
+and cap at ten while retaining Chrome's source order. It does not rank sites,
+group by domain, query history, or backfill a short list. Saved sites remain
+available as shortcuts. Title fallback uses the hostname for a blank title.
+`dashboard/use-visited-sites.ts` keeps the top-sites response in memory and
+clears it when disabled; errors offer Retry without a history fallback.
+`FrequentlyVisitedSection` appears in All favorites and optionally the designated
+home group, outside search, using centered compact tiles in every library view.
 Clicking opens the site with `openSavedUrl`; accessible overflow menus provide
 Add to favorites, Edit favorite for normalized URL matches, and Hide shortcut.
-Saving reuses `FavoriteDialog` and undo/redo, keeping All favorites selected.
+Saving reuses `FavoriteDialog` and undo/redo, keeping the current view selected.
 
 `background/context-menus.ts` serializes native menu rebuilds and watches
-settings/groups with Dexie `liveQuery`. Click listeners are registered at worker
-startup (or when the optional API is first granted). Menu actions open the
-dashboard editor with validated URL/title/group parameters; the dashboard clears
-those parameters and reuses an existing favorite for an exact saved URL. Group
-labels use full » paths. Disabling the setting removes menus immediately while
-retaining the optional grant for re-enable. The service worker contains no DOM or
-localStorage calls.
+the context-menu setting with Dexie liveQuery. One **Save to FavoritePod** item
+handles page/link contexts; there are no page/group submenus or group-driven menu
+rebuilds. Click listeners register on worker startup and optional permission grant.
+A safe clicked link takes priority over the page URL. Each invocation passes its
+URL/title and source tab/window through a temporary per-tab popup URL, opens the
+native toolbar popup with chrome.action.openPopup(), and restores the default
+popup in finally. The popup also resets its entry point and consumes query
+parameters; no pending target is stored in shared settings or synced state.
+
+core/popup-save-request.ts validates the request and prevents capturing the
+containing page for a link or a different page after a tab switch/navigation.
+PopupApp opens BookmarkDialog directly in draft mode: Save commits the name/folder,
+Cancel/close/Escape makes no library changes, and existing exact URLs are edited.
+The regular toolbar Add bookmark action retains its immediate-save review flow.
+Folder options show full nested paths. Page captures are best-effort at Save;
+links use their own favicon/fallback, never the containing page's screenshot.
+
+If the native action popup is unavailable or fails, a small extension popup window
+shows the same form. No new permission or dashboard tab is needed. Disabling the
+setting removes menus while retaining the optional grant for re-enable. The
+service worker contains no DOM or localStorage calls.
 
 ### URL Validation
 

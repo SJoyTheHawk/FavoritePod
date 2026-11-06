@@ -5,9 +5,11 @@
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
 **Current status**: Phases 2-8.5 are implemented and covered by automated checks.
-Phases 9.1 and 9.2 are implemented as of 2026-11-06; Chrome permission prompts,
-native menus, and visual acceptance remain open in
-[`phase-9-manual-test.md`](./phase-9-manual-test.md).
+Phase 9.1, including its Chrome-top-sites-only revision, closed on 2026-11-07
+after user-reported manual checklist acceptance. Phase 9.2 was revised on
+2026-11-07 to a single right-click action opening the toolbar save popup;
+native-menu manual acceptance remains open. See
+[`phase-9-manual-test.md`](./manual_test/phase-9-manual-test.md).
 Phases 4 and 5 closed on 2026-11-03; Phase 7 closed on 2026-11-04 after
 automated and user-reported manual Chrome validation. Manual Chrome validation
 for extension loading, HMR, screenshots, nested drag-and-drop, keyboard
@@ -779,14 +781,16 @@ Automated verification: `npx vitest run --config vitest.config.ts src/core/__tes
 
 ## Phase 9: Optional Features (Week 13-14)
 
-### 9.1 Frequently Visited Shortcuts — Implementation Complete (2026-11-06)
+### 9.1 Frequently Visited Shortcuts — Complete (2026-11-07)
 **Goal**: Open frequently visited sites quickly from All favorites.
 
 This shortcut design supersedes the original separate save-suggestions view.
+Manual acceptance passed on 2026-11-07 according to the user, including the
+Chrome-top-sites-only revision, permission flow, and layout/accessibility checks.
 
 **Tasks**:
-- [x] Request optional History/Top sites access in Settings
-- [x] Merge Chrome top sites with recent history results
+- [x] Request optional Top sites access in Settings (History permission removed)
+- [x] Use only Chrome top sites, preserving Chrome selection and ordering
 - [x] Show up to ten shortcuts within All favorites, including already-saved sites
 - [x] Always use compact grid format, independent of library view and size
 - [x] Open the site on click; put Add/Edit favorite and Hide in its … menu
@@ -796,8 +800,8 @@ This shortcut design supersedes the original separate save-suggestions view.
 
 **Acceptance**:
 - Permission requests are explicit; denied/revoked access is handled
-- The section appears only in All favorites outside search
-- Saving keeps the shortcut and All favorites view; undo/redo works
+- The section appears in All favorites and optionally the home group, outside search
+- Saving keeps the shortcut and current view; undo/redo works
 - Hiding a shortcut does not delete a favorite or browser history
 - Visibility persists across reloads independently of access permissions
 - Keyboard, touch, desktop/narrow layouts, and light/dark themes work
@@ -805,48 +809,74 @@ This shortcut design supersedes the original separate save-suggestions view.
 Implementation notes:
 - Visibility defaults on. Browser access remains opt-in through **Settings →
   Optional features → Frequently visited access**. Hiding stops reads and clears
-  results; turning access off also removes both grants.
-- Top sites retain Chrome's order, followed by up to 500 history entries from the
-  last 30 days ranked by visits and recency. Only http/https URLs qualify; hidden
-  URLs and duplicate fragments are filtered. Already-saved sites remain visible.
+  results when both visibility options are off; turning access off removes Top
+  sites permission. History is no longer declared or requested.
+- Chrome selects and orders the sites. Only safe http/https URLs qualify; hidden
+  URLs and duplicate fragments are filtered. Show at most ten, without filling a
+  shorter list or applying custom ranking. Already-saved sites remain visible.
 - The section uses compact-grid spacing, centered labels, favicon fallbacks, and
   theme colors. Site menus use accessible Headless UI components.
 - Add to favorites opens the standard editor with URL/title filled in and a group
   selector. A normalized saved URL opens Edit favorite. Saves support undo/redo.
   History, visibility, hidden URLs, and grants never enter sync/exports.
 
-### 9.2 Context Menu Integration (Optional) — Implementation Complete (2026-11-06)
+#### Implemented revision: Chrome top sites only (2026-11-06)
+
+Chrome's top-sites response is now the sole shortcut source. History backfill,
+custom visit-count/recency ranking, and History permission are removed. See
+[Chrome Top Sites Shortcuts](./future_plan/Chrome%20Top%20Sites%20Shortcuts.md)
+for implementation verification and user-reported acceptance on 2026-11-07.
+
+### 9.2 Context Menu Integration (Optional) — Revised Implementation (2026-11-07)
 **Goal**: Right-click to save page/link
+
+**Next work**: Complete native Chrome manual acceptance of the single-action
+popup flow. Phase 9.2 is not included in the 2026-11-07 Phase 9.1 sign-off.
 
 **Tasks**:
 - [x] Add `contextMenus` permission (optional, requested from Settings)
 - [x] Create "Save to FavoritePod" menu item
 - [x] Handle page context (save current page)
 - [x] Handle link context (save linked page)
-- [x] Show group selection submenu
+- [x] Open the toolbar save popup from one direct Save to FavoritePod action
+- [x] Select the destination folder inside the popup, with full nested paths
+- [x] Confirm saves with Save; Cancel/close leaves the library unchanged
 - [x] Add a persistent Settings switch to enable/disable the right-click save menu
 
 **Acceptance**:
 - Right-click works on pages
 - Right-click works on links
-- Group selection is quick
+- Name and destination folder are editable inside the popup
+- No page/group submenus or dashboard tab are opened
 
 Implementation notes:
 - Off by default. Enable **Settings → Optional features → Right-click save menu**
   to request the optional permission. Disabling removes menu entries immediately;
   its permission can be reused on re-enable.
-- Page/link actions open the existing Add favorite dialog with the URL/title
-  filled in. Group actions preselect the destination. Saving confirms the edit;
-  Cancel does not add a favorite. Already-saved exact URLs open their editor.
-- The service worker rebuilds menus on startup, install, permission changes, and
-  library group changes, including import/sync. Group names use full » paths,
-  respect deletion/restoration clocks, and omit an empty group submenu.
-- Only safe http/https/file URLs enter the editor; no content script or broad
-  host permission is added. New saves use favicon fallback without a screenshot.
+- One **Save to FavoritePod** action opens the FavoritePod toolbar popup directly
+  to the shared bookmark form. A clicked link takes priority over the page URL.
+  Folder selection happens inside the form, using full nested paths.
+- Right-click opens a draft: Save creates or edits the favorite; Cancel, close,
+  and Escape make no library changes. Exact saved URLs prefill their existing
+  details. The toolbar button's original home/review behavior is retained.
+- The worker rebuilds the single menu on startup, install, permission changes,
+  and Settings changes. Library group changes no longer rebuild native menus.
+- A temporary per-tab popup URL carries the clicked target and is reset after
+  opening. No pending save state enters settings, sync, or exports. A small popup
+  window with the same form is the fallback if Chrome cannot open the toolbar popup.
+- Only safe http/https/file URLs qualify. No new permissions are added. Page
+  thumbnails are best-effort and require the source tab to still be active with
+  the same URL; link saves never capture the containing page.
+- Automated verification passes 177 tests in 21 suites, TypeScript, ESLint,
+  formatting, and production build. Isolated Chrome 157.0.8103.38 smoke checks
+  passed native toolbar opening, page/link targeting, nested folders, Save/Cancel,
+  existing edits, Escape, light/dark layout, normal toolbar reset, and popup-window
+  fallback. The harness invokes the installed menu listener with fixture click
+  data; actual native menu selection and permission prompts remain manual checks.
 
 Automated verification: `npm test`, `npm run type-check`, `npm run lint`,
 `npm run format:check`, and `npm run build`. Browser acceptance is tracked
-separately in [`phase-9-manual-test.md`](./phase-9-manual-test.md).
+separately in [`phase-9-manual-test.md`](./manual_test/phase-9-manual-test.md).
 
 ## Phase 10: Polish & Testing (Week 14-16)
 

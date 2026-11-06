@@ -19,8 +19,8 @@ _Screenshots show the current interface with sample content._
 - **Keep local tools handy.** Save links to local HTML pages and files alongside websites.
 - **Sync when you want.** Connect Google Drive to share your library across Chrome profiles and devices.
 - **Take a backup with you.** Export your library, including previews, to a ZIP file and import it later.
-- **Discover pages to keep.** Optionally suggest pages from Chrome top sites and recent history.
-- **Save from a right-click.** Enable page, link, and group actions in Chrome’s context menu.
+- **Open frequent sites quickly.** Use shortcuts selected and ordered by Chrome.
+- **Save from a right-click.** Use one “Save to FavoritePod” action for pages and links.
 
 ## Save your first favorite
 
@@ -56,20 +56,31 @@ offers **Add to favorites**, **Edit favorite** if already saved, and **Hide
 shortcut**. Saving opens the favorite editor so you can choose a group.
 
 The section is shown by default. Hide it using its **…** menu or turn off
-**Settings → Show frequently visited** for a cleaner layout. Showing it again
+**Settings → Show frequently visited → All favorites** for a cleaner layout. Showing it again
 restores your shortcuts without changing your favorites.
 
+Enable **Settings → Show frequently visited → Home page** to also show shortcuts
+above the group set as your home page. This option starts off and is independent
+of All favorites visibility. Hiding from a section's menu affects only that view.
+
 Chrome access is separate: enable **Settings → Optional features → Frequently
-visited access** to grant Top sites and History permissions. Shortcuts use top
-sites and up to 500 history entries from the last 30 days. Hiding stops reads;
-disabling access also removes those permissions. History stays in memory, and
-hidden shortcuts and visibility stay in this profile. Only explicitly saved
-favorites enter exports or Drive sync.
+visited access** to grant Top sites permission. Chrome selects and orders the
+sites; FavoritePod filters unsafe, duplicate, and locally hidden entries, then
+shows up to ten. A shorter list stays shorter—no browsing-history backfill or
+custom ranking is added. Chrome's manually customized New Tab shortcuts are not
+included in the Top sites API.
+
+Turning off both visibility options stops reads; disabling access also removes
+the Top sites grant. FavoritePod does not request History permission. Hidden
+shortcuts and visibility stay in this profile; only explicitly saved favorites
+enter exports or Drive sync.
 
 **Right-click save menu** adds **Save to FavoritePod** to page and link menus.
-Choose a page, link, or destination group to open the existing Add favorite
-dialog with its details filled in. Confirm to save, or Cancel to leave it out
-of your library. Disable the setting to remove the menu.
+Choose that single action to open the FavoritePod toolbar popup directly to its
+save form. A link click uses the link destination; otherwise it uses the page.
+Edit the name and choose a folder inside the popup, then Save or Cancel. Existing
+favorites open for editing. Disable the setting to remove the menu. If Chrome
+cannot open the toolbar popup, the same form opens in a small popup window.
 
 ## Use local files and tools
 

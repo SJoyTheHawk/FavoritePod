@@ -947,9 +947,22 @@ review dialog.
 
 ---
 
+## Right-click Save Popup
+
+Chrome exposes one **Save to FavoritePod** action for pages and links, with no
+submenu. Open the toolbar popup directly to the existing bookmark dialog layout:
+URL/favicon, Name, and Folder with nested paths. Use the same typography, spacing,
+colors, focus treatment, and 320px popup width. Right-click saves are drafts:
+**Save** commits; **Cancel**, close, and Escape leave the library unchanged.
+Existing favorites prefill their saved name/folder. The regular toolbar button
+keeps its Add bookmark/recent-pages home and immediate-save review behavior.
+If the toolbar popup cannot open, reuse the same form in a small popup window.
+
 ## Frequently Visited Shortcuts
 
 Show Frequently visited above the All favorites heading and toolbar, outside search.
+A separate default-off option shows the same section above the designated home group.
+Each view has independent visibility; hiding from its menu affects that view only.
 Use compact 6.5rem tiles and a 0.5rem gap in every library view. Center each row,
 including partially filled rows, and wrap on narrow screens. Each shortcut has
 a 24px favicon in a transparent 48px area and one truncated centered 12px label.

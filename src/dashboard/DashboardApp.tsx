@@ -146,7 +146,7 @@ type DialogState =
       groupId?: string;
       initialUrl?: string;
       initialTitle?: string;
-      stayOnAllFavorites?: boolean;
+      keepCurrentView?: boolean;
     }
   | { type: 'move-favorite'; item: Item }
   | { type: 'group'; group?: Group; parentId?: string | null }
@@ -343,7 +343,8 @@ export function DashboardApp() {
   const optionalFeatures = useOptionalFeatures();
   const visitedSites = useVisitedSites(
     optionalFeatures.ready &&
-      optionalFeatures.showFrequentlyVisited &&
+      (optionalFeatures.showFrequentlyVisited ||
+        optionalFeatures.showFrequentlyVisitedOnHome) &&
       optionalFeatures.discoveryEnabled,
   );
   const savedVisitedUrls = useMemo(
@@ -956,7 +957,7 @@ export function DashboardApp() {
       item,
       initialUrl: site.url,
       initialTitle: site.title,
-      stayOnAllFavorites: true,
+      keepCurrentView: true,
     });
   };
 
@@ -1308,7 +1309,7 @@ export function DashboardApp() {
     }
 
     const created = await createItem(value);
-    if (!dialog.stayOnAllFavorites) setSelectedGroupId(value.groupId ?? created.groupId);
+    if (!dialog.keepCurrentView) setSelectedGroupId(value.groupId ?? created.groupId);
     notify('Favorite added.');
     registerHistory({
       label: 'favorite added',
@@ -1874,9 +1875,11 @@ export function DashboardApp() {
                 settingsUrl={getExtensionSettingsUrl()}
               />
             )}
-            {selectedGroupId === null &&
-              !searching &&
-              optionalFeatures.showFrequentlyVisited && (
+            {!searching &&
+              (selectedGroupId === null
+                ? optionalFeatures.showFrequentlyVisited
+                : selectedGroupId === homePageGroupId &&
+                  optionalFeatures.showFrequentlyVisitedOnHome) && (
                 <FrequentlyVisitedSection
                   enabled={optionalFeatures.discoveryEnabled}
                   sites={visitedSites.suggestions}
@@ -1895,8 +1898,11 @@ export function DashboardApp() {
                     );
                   }}
                   onHideSection={() => {
-                    void optionalFeatures
-                      .saveShowFrequentlyVisited(false)
+                    const saveVisibility =
+                      selectedGroupId === null
+                        ? optionalFeatures.saveShowFrequentlyVisited
+                        : optionalFeatures.saveShowFrequentlyVisitedOnHome;
+                    void saveVisibility(false)
                       .then(() =>
                         notify('Frequently visited hidden. Show it again in Settings.'),
                       )
@@ -2173,6 +2179,10 @@ export function DashboardApp() {
           openBehavior={openBehavior}
           showPreview={showPreview}
           showFrequentlyVisited={optionalFeatures.showFrequentlyVisited}
+          showFrequentlyVisitedOnHome={optionalFeatures.showFrequentlyVisitedOnHome}
+          onSaveShowFrequentlyVisitedOnHome={
+            optionalFeatures.saveShowFrequentlyVisitedOnHome
+          }
           onSaveShowFrequentlyVisited={optionalFeatures.saveShowFrequentlyVisited}
           siteDiscoveryEnabled={optionalFeatures.discoveryEnabled}
           siteDiscoveryPermissionGranted={optionalFeatures.discoveryPermissionGranted}

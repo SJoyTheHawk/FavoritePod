@@ -1,15 +1,10 @@
 import { liveQuery } from 'dexie';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  buildVisitedSiteSuggestions,
-  type HistorySiteEntry,
-  type TopSiteEntry,
-} from '../core/discovery';
+import { buildVisitedSiteSuggestions, type TopSiteEntry } from '../core/discovery';
 import { getHiddenVisitedSiteUrls } from '../core/storage';
 
 export function useVisitedSites(enabled: boolean) {
   const [topSites, setTopSites] = useState<TopSiteEntry[]>([]);
-  const [history, setHistory] = useState<HistorySiteEntry[]>([]);
   const [hiddenUrls, setHiddenUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -33,31 +28,20 @@ export function useVisitedSites(enabled: boolean) {
   useEffect(() => {
     let active = true;
     setTopSites([]);
-    setHistory([]);
     setError(undefined);
     setLoading(enabled);
     if (!enabled) return;
 
     void (async () => {
-      if (
-        !(await chrome.permissions.contains({ permissions: ['history', 'topSites'] }))
-      ) {
+      if (!(await chrome.permissions.contains({ permissions: ['topSites'] }))) {
         throw new Error(
-          'Allow history and top sites access in Settings to see suggestions.',
+          'Allow Chrome top sites access in Settings to see your shortcuts.',
         );
       }
       if (!active) return;
-      const [top, recent] = await Promise.all([
-        chrome.topSites.get(),
-        chrome.history.search({
-          text: '',
-          startTime: Date.now() - 30 * 24 * 60 * 60 * 1000,
-          maxResults: 500,
-        }),
-      ]);
+      const top = await chrome.topSites.get();
       if (!active) return;
       setTopSites(top);
-      setHistory(recent);
     })()
       .catch((cause: unknown) => {
         if (active)
@@ -77,9 +61,9 @@ export function useVisitedSites(enabled: boolean) {
   const suggestions = useMemo(
     () =>
       enabled && hiddenReady && !hiddenError
-        ? buildVisitedSiteSuggestions(topSites, history, hiddenUrls)
+        ? buildVisitedSiteSuggestions(topSites, hiddenUrls)
         : [],
-    [enabled, hiddenError, hiddenReady, history, hiddenUrls, topSites],
+    [enabled, hiddenError, hiddenReady, hiddenUrls, topSites],
   );
   return {
     suggestions,

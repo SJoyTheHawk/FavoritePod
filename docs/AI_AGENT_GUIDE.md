@@ -362,9 +362,10 @@ If you're choosing what to work on, prioritize in this order:
 
 **Implemented in v1**: Google Drive sync, profile-local connection recovery,
 sync status/history, quota reporting, optional visited-site discovery, and
-right-click saving (Phases 9.1/9.2). Discovery/history access and context menus
+right-click saving (Phases 9.1/9.2). Top sites access and context menus
 are opt-in from Settings. Frequently visited shortcuts appear by default in All
-favorites; visibility and hidden shortcuts stay local. **Defer to v2**:
+favorites; Chrome supplies their order, without history reads or custom ranking.
+Visibility and hidden shortcuts stay local. **Defer to v2**:
 optional visual polish, and other features not listed in the implementation plan.
 
 ---

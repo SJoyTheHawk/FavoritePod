@@ -146,8 +146,8 @@ export function FrequentlyVisitedSection({
       ) : !enabled ? (
         <div className="flex flex-wrap items-center justify-between gap-3 py-2">
           <p className="max-w-lg text-sm leading-relaxed text-text-secondary">
-            Open your most-visited sites in one click. Allow Chrome top sites and history
-            access to show your shortcuts.
+            Open your most-visited sites in one click. Allow Chrome top sites access to
+            show your shortcuts.
           </p>
           <button
             className="min-h-9 shrink-0 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover"

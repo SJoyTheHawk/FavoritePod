@@ -32,6 +32,15 @@ export async function setShowFrequentlyVisited(show: boolean): Promise<void> {
   await db.settings.put({ key: 'showFrequentlyVisited', value: show });
 }
 
+export async function getShowFrequentlyVisitedOnHome(): Promise<boolean> {
+  const record = await db.settings.get('showFrequentlyVisitedOnHome');
+  return record?.value === true;
+}
+
+export async function setShowFrequentlyVisitedOnHome(show: boolean): Promise<void> {
+  await db.settings.put({ key: 'showFrequentlyVisitedOnHome', value: show });
+}
+
 export async function getSiteDiscoveryEnabled(): Promise<boolean> {
   const record = await db.settings.get('siteDiscoveryEnabled');
   return record?.value === true;

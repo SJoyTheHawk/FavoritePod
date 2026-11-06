@@ -10,6 +10,8 @@ import {
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { captureFavicon } from '../core/favicon';
 import { captureThumbnail } from '../core/thumbnail';
+import { canCaptureSaveRequest, type PopupSaveRequest } from '../core/popup-save-request';
+import { getGroupLabels } from '../dashboard/group-labels';
 import {
   createItem,
   deleteItem,
@@ -29,6 +31,7 @@ interface BookmarkDialogProps {
   items: Item[];
   libraryLoading: boolean;
   tab: chrome.tabs.Tab;
+  saveRequest?: PopupSaveRequest;
   onClose: () => void;
 }
 
@@ -37,10 +40,13 @@ export function BookmarkDialog({
   items,
   libraryLoading,
   tab,
+  saveRequest,
   onClose,
 }: BookmarkDialogProps) {
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const groupsRef = useRef(groups);
+  groupsRef.current = groups;
   const attemptedUrl = useRef<string>();
   const [status, setStatus] = useState<DialogStatus>('loading');
   const [favorite, setFavorite] = useState<Item>();
@@ -56,6 +62,7 @@ export function BookmarkDialog({
   const currentUrl = tab.url ?? '';
   const parsedCurrentUrl = parseSafeUrl(currentUrl);
   const pageTitle = tab.title?.trim() || getDefaultTitle(currentUrl) || 'Untitled page';
+  const groupLabels = getGroupLabels(groups);
 
   useEffect(() => {
     if (libraryLoading) return;
@@ -72,6 +79,19 @@ export function BookmarkDialog({
       setPreviewUnavailable(false);
       try {
         let item = itemsRef.current.find((candidate) => candidate.url === currentUrl);
+        if (saveRequest) {
+          const lastGroupId = await getLastUsedGroupId();
+          if (!active) return;
+          setFavorite(item);
+          setIsExisting(Boolean(item));
+          setName(item?.title ?? pageTitle);
+          const defaultGroup =
+            groupsRef.current.find((group) => group.id === lastGroupId) ??
+            groupsRef.current[0];
+          setGroupId(item?.groupId ?? defaultGroup?.id ?? '');
+          setStatus('ready');
+          return;
+        }
         const faviconUrl = await captureFavicon(currentUrl, tab.favIconUrl);
         if (item) {
           if (faviconUrl) item = await updateItem(item.id, { faviconUrl });
@@ -110,7 +130,7 @@ export function BookmarkDialog({
     return () => {
       active = false;
     };
-  }, [currentUrl, libraryLoading, pageTitle, retryCount, tab]);
+  }, [currentUrl, libraryLoading, pageTitle, retryCount, saveRequest, tab]);
 
   useEffect(() => {
     let active = true;
@@ -142,12 +162,36 @@ export function BookmarkDialog({
   }, [favorite?.previewHash]);
 
   const confirmChanges = async () => {
-    if (!favorite) return;
+    if ((!favorite && !saveRequest) || busy) return;
     setBusy(true);
     setError(undefined);
     try {
-      await updateItem(favorite.id, { title: name, groupId });
-      await setLastUsedGroupId(groupId);
+      // Recheck live items before committing a draft to avoid duplicate saves.
+      const existing =
+        favorite ?? itemsRef.current.find((item) => item.url === currentUrl);
+      if (existing) {
+        await updateItem(existing.id, { title: name, groupId });
+        await setLastUsedGroupId(groupId);
+      } else if (saveRequest) {
+        const faviconUrl = await captureFavicon(currentUrl);
+        let thumbnail: ThumbnailInput | undefined;
+        if (await canCaptureSaveRequest(saveRequest)) {
+          try {
+            thumbnail = await captureThumbnail(saveRequest.sourceWindowId);
+          } catch {
+            /* Save without preview. */
+          }
+        }
+        const created = await createItem({
+          url: currentUrl,
+          title: name,
+          groupId: groupId || undefined,
+          faviconUrl,
+          thumbnail,
+        });
+        setFavorite(created);
+        await setLastUsedGroupId(created.groupId);
+      }
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not update this page.');
@@ -178,17 +222,24 @@ export function BookmarkDialog({
   };
 
   return (
-    <Dialog className="relative z-50" onClose={onClose} open>
+    <Dialog
+      className="relative z-50"
+      onClose={() => {
+        if (!busy) onClose();
+      }}
+      open
+    >
       <DialogBackdrop className="fixed inset-0 bg-black/35" />
       <div className="fixed inset-0 flex items-center justify-center p-3">
         <DialogPanel className="flex max-h-[calc(100vh-24px)] w-full min-w-0 max-w-72 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
           <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
             <DialogTitle className="text-sm font-semibold text-text-primary">
-              Add bookmark
+              {saveRequest ? 'Save to FavoritePod' : 'Add bookmark'}
             </DialogTitle>
             <button
               aria-label="Close dialog"
               className="flex h-8 w-8 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
+              disabled={busy}
               onClick={onClose}
               title="Close dialog"
               type="button"
@@ -197,12 +248,20 @@ export function BookmarkDialog({
             </button>
           </header>
 
-          {status === 'ready' && favorite ? (
+          {status === 'ready' && (favorite || saveRequest) ? (
             <>
               <section className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3">
                 <div className="flex h-6 shrink-0 items-center gap-1.5 text-xs font-medium text-success">
-                  <CheckCircleIcon aria-hidden="true" className="h-4 w-4" />
-                  {isExisting ? 'Already in Favorites' : 'Added to Favorites'}
+                  {saveRequest && !isExisting ? (
+                    <BookmarkIcon aria-hidden="true" className="h-4 w-4" />
+                  ) : (
+                    <CheckCircleIcon aria-hidden="true" className="h-4 w-4" />
+                  )}
+                  {isExisting
+                    ? 'Already in Favorites'
+                    : saveRequest
+                      ? 'Choose a name and folder'
+                      : 'Added to Favorites'}
                 </div>
 
                 <div className="shrink-0 overflow-hidden rounded-md border border-border">
@@ -231,7 +290,7 @@ export function BookmarkDialog({
                             <GlobeAltIcon aria-hidden="true" className="h-3.5 w-3.5" />
                           )
                         }
-                        faviconUrl={favorite.faviconUrl ?? tab.favIconUrl}
+                        faviconUrl={favorite?.faviconUrl ?? tab.favIconUrl}
                         url={currentUrl}
                       />
                     </span>
@@ -253,6 +312,7 @@ export function BookmarkDialog({
                   Name
                   <input
                     autoFocus
+                    disabled={busy}
                     className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2.5 text-sm font-normal text-text-primary outline-none transition focus:border-primary"
                     onChange={(event) => setName(event.target.value)}
                     value={name}
@@ -263,19 +323,20 @@ export function BookmarkDialog({
                   Folder
                   <select
                     className="h-9 w-full min-w-0 max-w-full truncate rounded-md border border-border bg-background px-2.5 text-sm font-normal text-text-primary outline-none transition focus:border-primary disabled:opacity-60"
-                    disabled={groups.length === 0}
+                    disabled={busy || groups.length === 0}
                     onChange={(event) => setGroupId(event.target.value)}
                     value={groupId}
                   >
+                    {groups.length === 0 && <option value="">Favorites</option>}
                     {groups.map((group) => (
                       <option key={group.id} value={group.id}>
-                        {group.title}
+                        {groupLabels.get(group.id) ?? group.title}
                       </option>
                     ))}
                   </select>
                 </label>
 
-                {previewUnavailable && (
+                {previewUnavailable && !saveRequest && (
                   <p className="text-xs text-text-tertiary">Page preview unavailable.</p>
                 )}
                 {error && (
@@ -287,13 +348,17 @@ export function BookmarkDialog({
 
               <footer className="flex h-[60px] shrink-0 items-center justify-between border-t border-border px-4">
                 <button
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-danger transition hover:bg-danger-light disabled:opacity-60"
+                  className={
+                    saveRequest
+                      ? 'inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-text-secondary transition hover:bg-surface-hover disabled:opacity-60'
+                      : 'inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-danger transition hover:bg-danger-light disabled:opacity-60'
+                  }
                   disabled={busy}
-                  onClick={() => void removeFavorite()}
+                  onClick={() => (saveRequest ? onClose() : void removeFavorite())}
                   type="button"
                 >
-                  <TrashIcon aria-hidden="true" className="h-4 w-4" />
-                  Remove
+                  {!saveRequest && <TrashIcon aria-hidden="true" className="h-4 w-4" />}
+                  {saveRequest ? 'Cancel' : 'Remove'}
                 </button>
                 <button
                   className="min-h-9 min-w-20 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
@@ -301,7 +366,7 @@ export function BookmarkDialog({
                   onClick={() => void confirmChanges()}
                   type="button"
                 >
-                  {busy ? 'Saving…' : 'Done'}
+                  {busy ? 'Saving…' : saveRequest ? 'Save' : 'Done'}
                 </button>
               </footer>
             </>

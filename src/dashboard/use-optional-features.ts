@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react';
 import {
   getContextMenuEnabled,
   getShowFrequentlyVisited,
+  getShowFrequentlyVisitedOnHome,
   getSiteDiscoveryEnabled,
   setShowFrequentlyVisited,
+  setShowFrequentlyVisitedOnHome,
 } from '../core/storage';
 import {
   saveContextMenuEnabled,
@@ -14,6 +16,7 @@ import {
 export function useOptionalFeatures() {
   const [preferences, setPreferences] = useState({
     showFrequentlyVisited: true,
+    showFrequentlyVisitedOnHome: false,
     discovery: false,
     contextMenu: false,
   });
@@ -31,7 +34,7 @@ export function useOptionalFeatures() {
     const refreshPermissions = () => {
       const current = ++revision;
       void Promise.all([
-        chrome.permissions.contains({ permissions: ['history', 'topSites'] }),
+        chrome.permissions.contains({ permissions: ['topSites'] }),
         chrome.permissions.contains({ permissions: ['contextMenus'] }),
       ])
         .then(([discovery, contextMenu]) => {
@@ -48,6 +51,7 @@ export function useOptionalFeatures() {
     };
     const subscription = liveQuery(async () => ({
       showFrequentlyVisited: await getShowFrequentlyVisited(),
+      showFrequentlyVisitedOnHome: await getShowFrequentlyVisitedOnHome(),
       discovery: await getSiteDiscoveryEnabled(),
       contextMenu: await getContextMenuEnabled(),
     })).subscribe({
@@ -78,6 +82,8 @@ export function useOptionalFeatures() {
     error,
     showFrequentlyVisited: preferences.showFrequentlyVisited,
     saveShowFrequentlyVisited: setShowFrequentlyVisited,
+    showFrequentlyVisitedOnHome: preferences.showFrequentlyVisitedOnHome,
+    saveShowFrequentlyVisitedOnHome: setShowFrequentlyVisitedOnHome,
     discoveryEnabled: preferences.discovery && permissions.discovery,
     discoveryPermissionGranted: permissions.discovery,
     contextMenuEnabled: preferences.contextMenu && permissions.contextMenu,

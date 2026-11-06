@@ -5,10 +5,12 @@ import {
   getHiddenVisitedSiteUrls,
   getSiteDiscoveryEnabled,
   getShowFrequentlyVisited,
+  getShowFrequentlyVisitedOnHome,
   hideVisitedSiteUrl,
   setContextMenuEnabled,
   setSiteDiscoveryEnabled,
   setShowFrequentlyVisited,
+  setShowFrequentlyVisitedOnHome,
 } from '../storage';
 import { saveContextMenuEnabled, saveSiteDiscoveryEnabled } from '../optional-features';
 
@@ -30,6 +32,22 @@ afterAll(async () => {
 });
 
 describe('optional features', () => {
+  it('persists home-page visibility independently of All favorites and permissions', async () => {
+    expect(await getShowFrequentlyVisitedOnHome()).toBe(false);
+    await setShowFrequentlyVisitedOnHome(true);
+    await setShowFrequentlyVisited(false);
+    db.close();
+    await db.open();
+    expect(await getShowFrequentlyVisitedOnHome()).toBe(true);
+    expect(await getShowFrequentlyVisited()).toBe(false);
+    expect(await getSiteDiscoveryEnabled()).toBe(false);
+    await setShowFrequentlyVisitedOnHome(false);
+    await setShowFrequentlyVisited(true);
+    expect(await getShowFrequentlyVisitedOnHome()).toBe(false);
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
+    expect(await db.syncMeta.count()).toBe(0);
+  });
+
   it('shows shortcuts by default and persists hiding independently of access', async () => {
     expect(await getShowFrequentlyVisited()).toBe(true);
     expect(await getSiteDiscoveryEnabled()).toBe(false);
@@ -60,23 +78,43 @@ describe('optional features', () => {
     expect(await getContextMenuEnabled()).toBe(false);
   });
 
-  it('keeps discovery off when permission is denied without reading history', async () => {
+  it('keeps discovery off when Top sites permission is denied', async () => {
     vi.mocked(chrome.permissions.request).mockImplementation(async () => false);
     const request = saveSiteDiscoveryEnabled(true);
     // The permission prompt is invoked synchronously in the click call stack.
     expect(chrome.permissions.request).toHaveBeenCalledWith({
-      permissions: ['history', 'topSites'],
+      permissions: ['topSites'],
     });
     await expect(request).rejects.toThrow('permission was not granted');
     expect(await getSiteDiscoveryEnabled()).toBe(false);
   });
 
-  it('requests discovery access on enable and revokes it on disable', async () => {
+  it('enables with only Top sites available and preserves local preferences', async () => {
+    vi.mocked(chrome.permissions.request).mockImplementation(
+      async (request) =>
+        request.permissions?.length === 1 && request.permissions[0] === 'topSites',
+    );
+    await setShowFrequentlyVisited(false);
+    await setShowFrequentlyVisitedOnHome(true);
+    await hideVisitedSiteUrl('https://hidden.example/');
+    await setContextMenuEnabled(true);
     await saveSiteDiscoveryEnabled(true);
     expect(await getSiteDiscoveryEnabled()).toBe(true);
+    expect(await getShowFrequentlyVisited()).toBe(false);
+    expect(await getShowFrequentlyVisitedOnHome()).toBe(true);
+    expect(await getHiddenVisitedSiteUrls()).toEqual(['https://hidden.example/']);
+    expect(await getContextMenuEnabled()).toBe(true);
+  });
+
+  it('requests only Top sites on enable and removes only that grant on disable', async () => {
+    await saveSiteDiscoveryEnabled(true);
+    expect(chrome.permissions.request).toHaveBeenCalledExactlyOnceWith({
+      permissions: ['topSites'],
+    });
+    expect(await getSiteDiscoveryEnabled()).toBe(true);
     await saveSiteDiscoveryEnabled(false);
-    expect(chrome.permissions.remove).toHaveBeenCalledWith({
-      permissions: ['history', 'topSites'],
+    expect(chrome.permissions.remove).toHaveBeenCalledExactlyOnceWith({
+      permissions: ['topSites'],
     });
     expect(await getSiteDiscoveryEnabled()).toBe(false);
   });

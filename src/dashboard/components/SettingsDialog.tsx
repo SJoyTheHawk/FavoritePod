@@ -35,6 +35,7 @@ interface SettingsDialogProps {
   groupingMode: GroupingMode;
   showPreview: boolean;
   showFrequentlyVisited: boolean;
+  showFrequentlyVisitedOnHome: boolean;
   siteDiscoveryEnabled: boolean;
   siteDiscoveryPermissionGranted: boolean;
   contextMenuEnabled: boolean;
@@ -57,6 +58,7 @@ interface SettingsDialogProps {
   onSaveGroupingMode: (mode: GroupingMode) => Promise<void>;
   onSaveShowPreview: (showPreview: boolean) => Promise<void>;
   onSaveShowFrequentlyVisited: (show: boolean) => Promise<void>;
+  onSaveShowFrequentlyVisitedOnHome: (show: boolean) => Promise<void>;
   onSaveSiteDiscoveryEnabled: (enabled: boolean) => Promise<void>;
   onSaveContextMenuEnabled: (enabled: boolean) => Promise<void>;
   onSaveOpenBehavior: (behavior: OpenBehavior) => Promise<void>;
@@ -88,6 +90,7 @@ export function SettingsDialog({
   groupingMode,
   showPreview,
   showFrequentlyVisited,
+  showFrequentlyVisitedOnHome,
   siteDiscoveryEnabled,
   siteDiscoveryPermissionGranted,
   contextMenuEnabled,
@@ -110,6 +113,7 @@ export function SettingsDialog({
   onSaveGroupingMode,
   onSaveShowPreview,
   onSaveShowFrequentlyVisited,
+  onSaveShowFrequentlyVisitedOnHome,
   onSaveSiteDiscoveryEnabled,
   onSaveContextMenuEnabled,
   onSaveOpenBehavior,
@@ -187,10 +191,12 @@ export function SettingsDialog({
     }
   };
 
-  const saveFrequentlyVisitedVisibility = async (show: boolean) => {
+  const saveFrequentlyVisitedVisibility = async (show: boolean, onHome = false) => {
     setError(undefined);
     try {
-      await onSaveShowFrequentlyVisited(show);
+      await (onHome ? onSaveShowFrequentlyVisitedOnHome : onSaveShowFrequentlyVisited)(
+        show,
+      );
     } catch {
       setError('Could not save this preference.');
     }
@@ -285,29 +291,58 @@ export function SettingsDialog({
             </button>
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-text-primary">
-                Show frequently visited
-              </p>
-              <p className="mt-1 text-xs text-text-secondary">
-                Show compact site shortcuts in All favorites.
-              </p>
-            </div>
-            <button
-              aria-checked={showFrequentlyVisited}
-              aria-label="Show frequently visited"
-              className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-60 ${showFrequentlyVisited ? 'bg-primary' : 'bg-border'}`}
-              disabled={!optionalFeaturesReady}
-              onClick={() => void saveFrequentlyVisitedVisibility(!showFrequentlyVisited)}
-              role="switch"
-              type="button"
+          <div
+            aria-labelledby="frequently-visited-visibility-label"
+            className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4"
+            role="group"
+          >
+            <span
+              className="pt-1 text-sm font-medium text-text-primary"
+              id="frequently-visited-visibility-label"
             >
-              <span
-                aria-hidden="true"
-                className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${showFrequentlyVisited ? 'translate-x-6' : 'translate-x-1'}`}
-              />
-            </button>
+              Show frequently visited
+            </span>
+            <div className="grid gap-3">
+              {[
+                { label: 'All favorites', enabled: showFrequentlyVisited, onHome: false },
+                {
+                  label: 'Home page',
+                  enabled: showFrequentlyVisitedOnHome,
+                  onHome: true,
+                },
+              ].map(({ label, enabled, onHome }) => (
+                <label
+                  className="flex min-h-8 items-center justify-between gap-3 text-sm text-text-secondary"
+                  key={label}
+                >
+                  <span>{label}</span>
+                  <button
+                    aria-checked={enabled}
+                    aria-label={
+                      onHome
+                        ? 'Show frequently visited on Home page'
+                        : 'Show frequently visited in All favorites'
+                    }
+                    className={
+                      'relative flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-60 ' +
+                      (enabled ? 'bg-primary' : 'bg-border')
+                    }
+                    disabled={!optionalFeaturesReady}
+                    onClick={() => void saveFrequentlyVisitedVisibility(!enabled, onHome)}
+                    role="switch"
+                    type="button"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={
+                        'h-4 w-4 rounded-full bg-white shadow transition-transform ' +
+                        (enabled ? 'translate-x-6' : 'translate-x-1')
+                      }
+                    />
+                  </button>
+                </label>
+              ))}
+            </div>
           </div>
 
           <fieldset className="mt-6">
@@ -415,11 +450,11 @@ export function SettingsDialog({
                     Frequently visited access
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                    Use Chrome top sites and recent history for your shortcuts. Hidden
-                    shortcuts stay on this device.
+                    Show the sites selected by Chrome. Hidden shortcuts stay on this
+                    device.
                     {!siteDiscoveryPermissionGranted && (
                       <span className="block text-text-tertiary">
-                        Chrome will ask for History and Top sites access when enabled.
+                        Chrome will ask for Top sites access when enabled.
                       </span>
                     )}
                   </p>
@@ -448,7 +483,7 @@ export function SettingsDialog({
                     Right-click save menu
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                    Add page, link, and group save actions to Chrome’s context menu.
+                    Add “Save to FavoritePod” to Chrome’s right-click menu.
                     {!contextMenuPermissionGranted && (
                       <span className="block text-text-tertiary">
                         Chrome will ask for context menu access when enabled.

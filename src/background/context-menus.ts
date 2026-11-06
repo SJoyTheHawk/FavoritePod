@@ -1,13 +1,8 @@
 import { liveQuery } from 'dexie';
-import { db } from '../core/db';
-import { getContextMenuEnabled, listGroups } from '../core/storage';
+import { getContextMenuEnabled } from '../core/storage';
+import { buildSavePopupUrl, POPUP_PATH } from '../core/popup-save-request';
 import { getDefaultTitle, parseSafeUrl } from '../core/validation';
-import {
-  buildContextMenuEntries,
-  CONTEXT_MENU_GROUP_PREFIX,
-  CONTEXT_MENU_LINK_ID,
-  CONTEXT_MENU_PAGE_ID,
-} from './context-menu-items';
+import { buildContextMenuEntries, CONTEXT_MENU_ROOT_ID } from './context-menu-items';
 
 function createMenu(entry: chrome.contextMenus.CreateProperties): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -27,7 +22,7 @@ export function refreshContextMenus(): Promise<void> {
     if (!(await chrome.permissions.contains({ permissions: ['contextMenus'] }))) return;
     await chrome.contextMenus.removeAll();
     if (!(await getContextMenuEnabled())) return;
-    for (const entry of buildContextMenuEntries(await listGroups())) {
+    for (const entry of buildContextMenuEntries()) {
       await createMenu({
         ...entry,
         contexts: entry.contexts as ['page' | 'link', ...('page' | 'link')[]],
@@ -39,36 +34,50 @@ export function refreshContextMenus(): Promise<void> {
   return next;
 }
 
-export async function handleContextMenuClick(
+let popupQueue: Promise<void> = Promise.resolve();
+
+export function handleContextMenuClick(
   info: chrome.contextMenus.OnClickData,
   tab?: chrome.tabs.Tab,
 ): Promise<void> {
-  if (!(await getContextMenuEnabled())) return;
-  const id = String(info.menuItemId);
-  if (
-    id !== CONTEXT_MENU_PAGE_ID &&
-    id !== CONTEXT_MENU_LINK_ID &&
-    !id.startsWith(CONTEXT_MENU_GROUP_PREFIX)
-  )
-    return;
-  const isLink =
-    id === CONTEXT_MENU_LINK_ID ||
-    (id.startsWith(CONTEXT_MENU_GROUP_PREFIX) && Boolean(info.linkUrl));
-  const parsed = parseSafeUrl((isLink ? info.linkUrl : (info.pageUrl ?? tab?.url)) ?? '');
-  if (!parsed) return;
-  const url = new URL(chrome.runtime.getURL('src/dashboard/dashboard.html'));
-  url.searchParams.set('addFavoriteUrl', parsed.href);
-  url.searchParams.set(
-    'addFavoriteTitle',
-    isLink ? getDefaultTitle(parsed.href) : tab?.title || getDefaultTitle(parsed.href),
-  );
-  if (id.startsWith(CONTEXT_MENU_GROUP_PREFIX)) {
-    url.searchParams.set(
-      'addFavoriteGroupId',
-      id.slice(CONTEXT_MENU_GROUP_PREFIX.length),
+  const next = popupQueue.then(async () => {
+    if (
+      String(info.menuItemId) !== CONTEXT_MENU_ROOT_ID ||
+      tab?.id === undefined ||
+      tab.windowId < 0 ||
+      !(await getContextMenuEnabled()) ||
+      !(await chrome.permissions.contains({ permissions: ['contextMenus'] }))
+    )
+      return;
+    const isLink = Boolean(info.linkUrl);
+    const parsed = parseSafeUrl(
+      (isLink ? info.linkUrl : (info.pageUrl ?? tab.url)) ?? '',
     );
-  }
-  await chrome.tabs.create({ url: url.href });
+    if (!parsed) return;
+    const url = buildSavePopupUrl({
+      url: parsed.href,
+      title: isLink
+        ? getDefaultTitle(parsed.href)
+        : tab.title || getDefaultTitle(parsed.href),
+      sourceTabId: tab.id,
+      sourceWindowId: tab.windowId,
+      capturePage: !isLink,
+    });
+    try {
+      // Scope the temporary entry point to this tab; other windows keep their popup.
+      await chrome.action.setPopup({ tabId: tab.id, popup: url });
+      await chrome.action.openPopup({ windowId: tab.windowId });
+    } catch {
+      // Older Chrome or a toolbar popup that cannot open still gets the same form.
+      await chrome.windows.create({ url, type: 'popup', width: 360, height: 560 });
+    } finally {
+      await chrome.action
+        .setPopup({ tabId: tab.id, popup: POPUP_PATH })
+        .catch(() => undefined);
+    }
+  });
+  popupQueue = next.catch(() => undefined);
+  return next;
 }
 
 export function installContextMenus(): void {
@@ -93,10 +102,7 @@ export function installContextMenus(): void {
   chrome.runtime.onInstalled.addListener(refresh);
   chrome.runtime.onStartup.addListener(refresh);
 
-  // Re-read persisted preferences and groups on every worker wake, including
-  // group changes from popup, import, and Drive sync. No DOM APIs are used.
-  liveQuery(async () => ({
-    enabled: await getContextMenuEnabled(),
-    groups: await db.groups.toArray(),
-  })).subscribe({ next: refresh, error: reportError });
+  // Re-read the persisted preference on every worker wake, including
+  // setting changes from open extension pages. Group selection lives in the popup.
+  liveQuery(getContextMenuEnabled).subscribe({ next: refresh, error: reportError });
 }

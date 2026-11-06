@@ -4,14 +4,11 @@ export const CONTEXT_MENUS_REFRESH_MESSAGE = 'favoritepod.contextMenus.refresh';
 
 export async function saveSiteDiscoveryEnabled(enabled: boolean): Promise<void> {
   // Request before any storage awaits so Chrome retains the Settings user gesture.
-  if (
-    enabled &&
-    !(await chrome.permissions.request({ permissions: ['history', 'topSites'] }))
-  ) {
+  if (enabled && !(await chrome.permissions.request({ permissions: ['topSites'] }))) {
     throw new Error('Discovery stays off because Chrome permission was not granted.');
   }
   await setSiteDiscoveryEnabled(enabled);
-  if (!enabled) await chrome.permissions.remove({ permissions: ['history', 'topSites'] });
+  if (!enabled) await chrome.permissions.remove({ permissions: ['topSites'] });
 }
 
 export async function saveContextMenuEnabled(enabled: boolean): Promise<void> {

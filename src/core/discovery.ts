@@ -5,19 +5,7 @@ export interface TopSiteEntry {
   title: string;
 }
 
-export interface HistorySiteEntry {
-  url?: string;
-  title?: string;
-  visitCount?: number;
-  lastVisitTime?: number;
-}
-
-export interface VisitedSiteSuggestion {
-  url: string;
-  title: string;
-  visitCount?: number;
-  lastVisitTime?: number;
-}
+export type VisitedSiteSuggestion = TopSiteEntry;
 
 export function normalizeVisitedSiteUrl(value: string): string | undefined {
   const parsed = parseSafeUrl(value);
@@ -30,7 +18,6 @@ export function normalizeVisitedSiteUrl(value: string): string | undefined {
 
 export function buildVisitedSiteSuggestions(
   topSites: readonly TopSiteEntry[],
-  history: readonly HistorySiteEntry[],
   hiddenUrls: readonly string[],
   limit = 10,
 ): VisitedSiteSuggestion[] {
@@ -40,7 +27,6 @@ export function buildVisitedSiteSuggestions(
       .filter((url): url is string => url !== undefined),
   );
   const top = new Map<string, VisitedSiteSuggestion>();
-  const recent = new Map<string, VisitedSiteSuggestion>();
 
   for (const site of topSites) {
     const url = normalizeVisitedSiteUrl(site.url);
@@ -48,35 +34,6 @@ export function buildVisitedSiteSuggestions(
     top.set(url, { url, title: site.title.trim() || new URL(url).hostname });
   }
 
-  for (const site of history) {
-    if (!site.url) continue;
-    const url = normalizeVisitedSiteUrl(site.url);
-    if (!url || excluded.has(url)) continue;
-    const title = site.title?.trim() || new URL(url).hostname;
-    const existing = top.get(url) ?? recent.get(url);
-    if (existing) {
-      existing.visitCount = Math.max(existing.visitCount ?? 0, site.visitCount ?? 0);
-      existing.lastVisitTime = Math.max(
-        existing.lastVisitTime ?? 0,
-        site.lastVisitTime ?? 0,
-      );
-      if (!existing.title || existing.title === new URL(url).hostname) {
-        existing.title = title;
-      }
-      continue;
-    }
-    recent.set(url, {
-      url,
-      title,
-      visitCount: site.visitCount,
-      lastVisitTime: site.lastVisitTime,
-    });
-  }
-
-  const rankedRecent = [...recent.values()].sort(
-    (left, right) =>
-      (right.visitCount ?? 0) - (left.visitCount ?? 0) ||
-      (right.lastVisitTime ?? 0) - (left.lastVisitTime ?? 0),
-  );
-  return [...top.values(), ...rankedRecent].slice(0, Math.max(0, limit));
+  // Chrome owns selection and ranking; never fill gaps with browsing history.
+  return [...top.values()].slice(0, Math.max(0, limit));
 }

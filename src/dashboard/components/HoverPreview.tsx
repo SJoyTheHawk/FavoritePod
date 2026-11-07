@@ -157,7 +157,10 @@ export function HoverPreview({
         <button
           aria-label="Close preview"
           className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/55 text-white transition hover:bg-black/75"
-          onClick={onClose}
+          onClick={() => {
+            onClose();
+            anchorRef.current?.focus();
+          }}
           type="button"
         >
           <XMarkIcon aria-hidden="true" className="h-4 w-4" />

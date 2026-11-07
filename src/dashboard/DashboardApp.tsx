@@ -115,6 +115,7 @@ import {
   installDriveSyncChangeHooks,
 } from '../core/drive-sync-triggers';
 import { FavoriteCard } from './components/FavoriteCard';
+import { getFavoriteOrderRevision } from './favorite-motion';
 import { BookmarkSizeControl } from './components/BookmarkSizeControl';
 import { FavoriteDialog } from './components/FavoriteDialog';
 import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
@@ -1238,8 +1239,6 @@ export function DashboardApp() {
     favoriteDropPending.current = pendingDestination;
     const rect = slotRef.current?.getBoundingClientRect();
     setDropOrigin(rect ? { left: rect.left, top: rect.top } : null);
-    setDraggingFavoriteId(null);
-    setDragPlaceholderHeight(0);
     try {
       await moveDraggedFavorites(
         pendingDestination.itemIds,
@@ -1257,15 +1256,23 @@ export function DashboardApp() {
     const payload = getActiveLibraryDragPayload();
     if (payload?.type !== 'item') return;
     const ids = dragIdsRef.current.length ? [...dragIdsRef.current] : [payload.id];
-    clearFavoriteDrag();
+    const destination = { itemId: payload.id, itemIds: ids, groupId };
+    favoriteDropPending.current = destination;
+    favoritePreviewDestination.current = destination;
+    setDropOrigin(null);
+    setDragPreviewOrder(null);
     clearLibraryDragData();
     void moveDraggedFavorites(ids, groupId)
-      .then(() =>
+      .then(() => {
+        if (isFavoriteAtDestination(items, destination)) clearFavoriteDrag();
         notify(
           `Moved ${ids.length} ${ids.length === 1 ? 'favorite' : 'favorites'} to ${groupLabels.get(groupId) ?? 'the selected group'}.`,
-        ),
-      )
-      .catch((cause) => notifyError(errorMessage(cause)));
+        );
+      })
+      .catch((cause) => {
+        clearFavoriteDrag();
+        notifyError(errorMessage(cause));
+      });
   };
 
   const selectedVisibleItems = visibleItems.filter((item) => selectedIds.has(item.id));
@@ -1423,7 +1430,7 @@ export function DashboardApp() {
         },
       });
     }
-    notify('Thumbnail updated.');
+    notify(thumbnail ? 'Thumbnail updated.' : 'Image removed.');
     return updated;
   };
 
@@ -1627,13 +1634,17 @@ export function DashboardApp() {
   };
 
   const renderFavoriteCollection = (collectionItems: readonly Item[]) => {
-    const orderRevision = JSON.stringify(
-      collectionItems.map((item) => [
-        item.id,
-        item.orderKey,
-        dragPreviewRank?.get(item.id),
-      ]),
+    const collectionRevision = JSON.stringify(
+      collectionItems
+        .map((item) => [item.id, item.groupId])
+        .sort(([left], [right]) => left.localeCompare(right)),
     );
+    const animateReorder =
+      !draggingFavoriteId ||
+      items
+        .filter((item) => draggedIds.includes(item.id))
+        .every((item) => item.groupId === favoritePreviewDestination.current?.groupId);
+    const orderRevision = getFavoriteOrderRevision(collectionItems, dragPreviewRank);
     return (
       <div
         className="bookmark-collection relative"
@@ -1675,6 +1686,8 @@ export function DashboardApp() {
           return (
             <FavoriteCard
               orderRevision={orderRevision}
+              collectionRevision={collectionRevision}
+              animateReorder={animateReorder}
               canMoveDown={index >= 0 && index < siblings.length - 1}
               canMoveUp={index > 0}
               item={item}
@@ -1684,7 +1697,7 @@ export function DashboardApp() {
               }
               layout={layout}
               size={bookmarkSize}
-              showPreview={showPreview}
+              showPreview={showPreview && !dialog}
               pathOverrides={pathOverrides}
               sortOrder={
                 dragPreviewRank

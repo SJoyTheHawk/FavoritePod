@@ -1204,7 +1204,7 @@ The dashboard owns the hook for the page lifetime and passes its `theme`, `ready
 
 - Use `AnimatedDialog` and `useDialogTransition` from `src/components/AnimatedDialog.tsx` for conditionally mounted dialogs. Route dismissal through the transition hook; the parent unmount callback runs after exit. Keep operation-specific busy/cancel guards.
 - Keep Headless UI `DialogBackdrop` and `DialogPanel` with `transition` and the shared `dialog-backdrop` / `dialog-panel` CSS classes. The 200ms fade and small panel movement use the guide's timing. Preserve existing widths, padding, backdrop, and focus traps.
-- Preserve existing drag-stack ghosts, placement highlights, and reorder/drop animations. Card hover changes the established shadow without adding transforms that conflict with drag geometry.
+- Preserve existing drag-stack ghosts, placement highlights, and same-group reorder/drop animations. Adding, removing, or transferring favorites between groups must not replay neighboring cards' old positions. Keep the drag placeholder until the saved destination is rendered, and replace active motion when retargeting. Card hover changes the established shadow without adding transforms that conflict with drag geometry.
 - Use `ThumbnailImage` to hold image space while storage/decode is pending, fade in decoded previews, and fall back if an image fails. Existing object-URL cleanup remains with the owning card.
 - Use `ProgressBar` for real counts. Unknown counts remain indeterminate; never invent an overall sync percentage. Existing sync stage text remains visible.
 - Reuse initial skeletons in the current collection layout and size. Announce a single loading status and hide decorative placeholders from assistive technology.

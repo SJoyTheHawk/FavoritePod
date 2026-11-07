@@ -1027,6 +1027,13 @@ actions in the menus: favorites can move to a group or move up/down, and groups
 can change parent or move up/down. This keeps ordering available without a
 pointer and avoids putting ordering logic in the React components.
 
+`dashboard/favorite-motion.ts` derives animation revisions from visible item order.
+Adding/removing favorites, group transfers, and size/layout changes do not replay
+neighbor movement. Same-collection reordering retains motion, replacing an active
+animation from its current visual position. Keep the dragged card hidden and its
+placeholder visible until the saved destination is observed by the library query;
+revealing it earlier briefly puts it back in the source group.
+
 ---
 
 ## Debugging Guide

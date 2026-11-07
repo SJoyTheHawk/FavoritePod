@@ -23,7 +23,7 @@ interface FavoriteDialogProps {
   onClose: () => void;
   onSave: (value: { title: string; url: string; groupId?: string }) => Promise<Item>;
   onDelete?: (item: Item) => Promise<boolean>;
-  onUpdateThumbnail?: (item: Item, thumbnail: ThumbnailInput) => Promise<Item>;
+  onUpdateThumbnail?: (item: Item, thumbnail: ThumbnailInput | null) => Promise<Item>;
 }
 
 export function FavoriteDialog({
@@ -87,6 +87,20 @@ export function FavoriteDialog({
     } finally {
       setBusy(false);
       if (fileInput.current) fileInput.current.value = '';
+    }
+  };
+
+  const removeThumbnail = async () => {
+    if (!item || !previewHash || !onUpdateThumbnail) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const updated = await onUpdateThumbnail(item, null);
+      setPreviewHash(updated.previewHash);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not remove this image.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -189,21 +203,33 @@ export function FavoriteDialog({
                   ref={fileInput}
                   type="file"
                 />
-                <button
-                  className="inline-flex h-9 w-fit items-center justify-center gap-2 justify-self-center rounded-md px-3 text-sm font-medium text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
-                  disabled={busy || !onUpdateThumbnail}
-                  onClick={() => fileInput.current?.click()}
-                  type="button"
-                >
-                  <PhotoIcon aria-hidden="true" className="h-4 w-4" />
-                  Upload image
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-1">
+                  <button
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
+                    disabled={busy || !onUpdateThumbnail}
+                    onClick={() => fileInput.current?.click()}
+                    type="button"
+                  >
+                    <PhotoIcon aria-hidden="true" className="h-4 w-4" />
+                    Upload image
+                  </button>
+                  <button
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-danger transition hover:bg-danger-light disabled:opacity-50"
+                    disabled={busy || !previewHash || !onUpdateThumbnail}
+                    onClick={() => void removeThumbnail()}
+                    type="button"
+                  >
+                    <TrashIcon aria-hidden="true" className="h-4 w-4" />
+                    Remove image
+                  </button>
+                </div>
               </div>
             )}
             <label className="grid min-w-0 gap-1.5 text-sm font-medium text-text-primary">
               Title
               <input
                 autoFocus={!item}
+                data-autofocus
                 className="h-10 w-full min-w-0 rounded-md border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary"
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Favorite title"

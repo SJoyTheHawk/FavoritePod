@@ -335,7 +335,7 @@ export async function getThumbnail(hash: string) {
 
 export async function updateItemThumbnail(
   id: string,
-  thumbnail: ThumbnailInput,
+  thumbnail: ThumbnailInput | null,
   expected?: Item,
   signal?: AbortSignal,
 ): Promise<Item> {

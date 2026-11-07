@@ -25,6 +25,7 @@ import type { Item } from '../../core/types';
 import { FavoriteFallback } from './FavoriteFallback';
 import { HoverPreview } from './HoverPreview';
 import { clearLibraryDragData, setLibraryDragData } from '../drag';
+import { getFavoriteReorderOffset, type FavoriteLayout } from '../favorite-motion';
 
 interface FavoriteCardProps {
   item: Item;
@@ -35,6 +36,8 @@ interface FavoriteCardProps {
   groupLabel?: string;
   sortOrder?: number;
   orderRevision: string;
+  collectionRevision: string;
+  animateReorder: boolean;
   isDragging: boolean;
   dragItemIds: string[];
   dropOrigin: { left: number; top: number } | null;
@@ -92,6 +95,8 @@ export function FavoriteCard({
   groupLabel,
   sortOrder,
   orderRevision,
+  collectionRevision,
+  animateReorder,
   isDragging,
   dragItemIds,
   dropOrigin,
@@ -126,12 +131,8 @@ export function FavoriteCard({
   const dragImageRef = useRef<HTMLElement | null>(null);
   const nativeDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const dragImageCleanup = useRef<(() => void) | null>(null);
-  const previousPosition = useRef<{ left: number; top: number }>();
-  const previousLayout = useRef<{
-    orderRevision: string;
-    layout: string;
-    size: BookmarkSize;
-  }>();
+  const previousLayout = useRef<FavoriteLayout>();
+  const motion = useRef<Animation>();
   const wasDragging = useRef(false);
   const isLocalFile = parseSafeUrl(item.url)?.protocol === 'file:';
   const isMissingFile = isLocalFile && fileAvailability === 'missing';
@@ -165,6 +166,7 @@ export function FavoriteCard({
   };
 
   useEffect(() => removeDragImage, []);
+  useEffect(() => () => motion.current?.cancel(), []);
 
   useEffect(() => {
     return () => {
@@ -188,12 +190,32 @@ export function FavoriteCard({
     card.inert = isDragging;
 
     const entry = card.closest<HTMLElement>('.favorite-entry') ?? card;
-    const position = { left: entry.offsetLeft, top: entry.offsetTop };
-    const previous = previousPosition.current;
+    const currentLayout = {
+      left: entry.offsetLeft,
+      top: entry.offsetTop,
+      width: entry.offsetWidth,
+      height: entry.offsetHeight,
+      orderRevision,
+      collectionRevision,
+      animateReorder,
+      layout,
+      size,
+    };
     const priorLayout = previousLayout.current;
-    previousPosition.current = position;
-    previousLayout.current = { orderRevision, layout, size };
+    previousLayout.current = currentLayout;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (
+      reducedMotion ||
+      isDragging ||
+      !animateReorder ||
+      priorLayout?.collectionRevision !== collectionRevision ||
+      priorLayout.layout !== layout ||
+      priorLayout.size !== size ||
+      priorLayout.width !== currentLayout.width ||
+      priorLayout.height !== currentLayout.height
+    ) {
+      motion.current?.cancel();
+    }
     if (isDragging) {
       wasDragging.current = true;
       return;
@@ -205,7 +227,8 @@ export function FavoriteCard({
         const translate = dropOrigin
           ? `${dropOrigin.left - rect.left}px ${dropOrigin.top - rect.top}px`
           : '0px 0px';
-        card.animate(
+        motion.current?.cancel();
+        motion.current = card.animate(
           [
             { opacity: 0.65, scale: '0.97', translate },
             { opacity: 1, scale: '1', translate: '0px 0px' },
@@ -215,28 +238,20 @@ export function FavoriteCard({
       }
       return;
     }
-    // Hover, preview loading, and responsive reflow can all render this card
-    // with coordinates different from an earlier measurement. Only an actual
-    // collection-order change should replay the previous position.
-    if (
-      !previous ||
-      reducedMotion ||
-      !priorLayout ||
-      priorLayout.orderRevision === orderRevision ||
-      priorLayout.layout !== layout ||
-      priorLayout.size !== size
-    ) {
-      return;
-    }
-
-    const x = previous.left - position.left;
-    const y = previous.top - position.top;
-    if (x === 0 && y === 0) return;
-
-    card.animate([{ translate: `${x}px ${y}px` }, { translate: '0px 0px' }], {
-      duration: 220,
-      easing: 'cubic-bezier(0.2, 0, 0, 1)',
-    });
+    const offset = getFavoriteReorderOffset(priorLayout, currentLayout);
+    if (reducedMotion || !offset) return;
+    // Continue from the visible position when a fast drag retargets mid-animation.
+    const translate = getComputedStyle(card).translate.split(' ').map(parseFloat);
+    const x = offset.x + (Number.isFinite(translate[0]) ? translate[0] : 0);
+    const y = offset.y + (Number.isFinite(translate[1]) ? translate[1] : 0);
+    motion.current?.cancel();
+    motion.current = card.animate(
+      [{ translate: `${x}px ${y}px` }, { translate: '0px 0px' }],
+      {
+        duration: 220,
+        easing: 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    );
   });
 
   useEffect(() => {
@@ -272,6 +287,15 @@ export function FavoriteCard({
 
   const cancelPreviewHide = () => {
     if (previewHideTimer.current) window.clearTimeout(previewHideTimer.current);
+  };
+
+  const editItem = () => {
+    if (previewTimer.current) window.clearTimeout(previewTimer.current);
+    if (previewHideTimer.current) window.clearTimeout(previewHideTimer.current);
+    previewTimer.current = undefined;
+    previewHideTimer.current = undefined;
+    setHoverPreviewOpen(false);
+    onEdit(item);
   };
 
   const schedulePreview = () => {
@@ -592,7 +616,7 @@ export function FavoriteCard({
           <MenuAction
             icon={<PencilSquareIcon className="h-4 w-4" />}
             label="Edit"
-            onClick={() => onEdit(item)}
+            onClick={editItem}
           />
           <MenuAction
             icon={<ArrowsRightLeftIcon className="h-4 w-4" />}
@@ -682,12 +706,8 @@ export function FavoriteCard({
         item={item}
         onClose={() => {
           setHoverPreviewOpen(false);
-          previewTriggerRef.current?.focus();
         }}
-        onEdit={() => {
-          setHoverPreviewOpen(false);
-          onEdit(item);
-        }}
+        onEdit={editItem}
         onOpen={() => {
           setHoverPreviewOpen(false);
           void openItem();

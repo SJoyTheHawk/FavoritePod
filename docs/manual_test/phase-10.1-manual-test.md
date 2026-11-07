@@ -17,6 +17,19 @@ Unit coverage includes theme persistence/invalid defaults, responsive navigation
 geometry, and determinate/indeterminate progress semantics. These checks do not
 replace the native interactions below.
 
+Edit-favorite follow-up checks also pass in the isolated production extension:
+pressing Edit in the hover preview or card menu immediately closes the preview,
+keeps focus in the editor, and allows one Escape to dismiss the editor. Image
+removal, undo/redo, persistence after reload, upload after removal, and side-by-side
+image controls in dark desktop/light narrow layouts pass without runtime errors.
+
+Bookmark motion regression checks cover group transfers in both directions,
+group-header drops, multi-selection transfers and undo, add/delete/undo, same-group
+reordering, Escape cancellation, reduced motion, and narrow layouts. Group changes
+do not replay neighboring cards' positions; same-group reordering keeps its motion
+without stacking animations. The source card stays hidden until persistence is
+reflected in the destination.
+
 ## Setup
 
 1. Build the extension with `npm run build`.
@@ -41,7 +54,10 @@ replace the native interactions below.
 - [ ] Confirm Escape closes only the active overlay and focus returns to its trigger. Check nested sign-in and disconnect dialogs.
 - [ ] Confirm save/import/sync controls retain their existing busy/cancel behavior.
 - [ ] Drag one favorite, a multi-selection, and a nested group. Confirm existing ghost stacks, placement highlights, drop animation, and Escape cancellation still work.
+- [ ] Add/remove favorites and drag between groups in both directions (including onto a group header). Neighboring cards must not bounce or replay an old position; the moved card must not flash back in its source group. Repeat with multi-selection, Undo/Redo, small grid/list layouts, and a narrow window. Same-group reordering should retain smooth motion without overlapping animations.
 - [ ] Hover cards and open previews; confirm hover shadows do not move/reorder the grid.
+- [ ] With a preview open, press Edit in the preview and in the card action menu. Confirm the preview closes immediately, stays closed while editing, and focus moves to Title. Repeat with a pending hover timer; Escape dismisses the editor directly.
+- [ ] In Edit favorite, use Remove image beside Upload image. Confirm the favorite remains, its fallback appears, removal is disabled without an image, and the change persists after reopening. Check Undo/Redo and upload another image.
 - [ ] Enable the OS Reduce Motion preference. Confirm no repeating pulse/spinner/indeterminate motion, no dialog movement, and no drag animation.
 
 ## Loading States

@@ -16,6 +16,28 @@ const preview = {
 };
 
 describe('atomic thumbnail storage', () => {
+  it('removes an image through the thumbnail API and retains it for undo', async () => {
+    const item = await createItem({
+      title: 'Saved favorite',
+      url: 'file:///saved-page.html',
+      thumbnail: preview,
+    });
+    const updated = await updateItemThumbnail(item.id, null, item);
+    expect(updated.previewHash).toBeUndefined();
+    expect(updated.clock.previewHash).not.toBe(item.clock.previewHash);
+    expect(updated.title).toBe(item.title);
+    expect(updated.url).toBe(item.url);
+    expect(updated.groupId).toBe(item.groupId);
+    expect(updated.deleted).toBeUndefined();
+    expect(await db.items.get(item.id)).toEqual(updated);
+    expect(await db.thumbnails.get(item.previewHash!)).toBeDefined();
+
+    const restored = await updateItem(item.id, { previewHash: item.previewHash });
+    expect(restored.previewHash).toBe(item.previewHash);
+    const removedAgain = await updateItemThumbnail(item.id, null, restored);
+    expect(removedAgain.previewHash).toBeUndefined();
+  });
+
   it('removes only the thumbnail and advances its sync clock', async () => {
     const item = await createItem({ url: 'https://example.com', thumbnail: preview });
     const updated = await updateItem(

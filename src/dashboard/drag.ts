@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import type { Group } from '../core/types';
 
 export const LIBRARY_DRAG_TYPE = 'application/x-favoritepod-record';
@@ -11,6 +12,50 @@ export function getActiveLibraryDragPayload(): LibraryDragPayload | null {
 
 export function clearLibraryDragData(): void {
   activePayload = null;
+}
+
+const dragEndSubscriptions = new WeakMap<
+  EventTarget,
+  { callbacks: Set<() => void>; dispose: () => void }
+>();
+
+/** Reset all drag feedback in one commit before the native event returns. */
+export function listenForLibraryDragEnd(
+  onEnd: () => void,
+  target: EventTarget = window,
+): () => void {
+  let subscription = dragEndSubscriptions.get(target);
+  if (!subscription) {
+    const callbacks = new Set<() => void>();
+    const finish = () => {
+      // Native drag feedback is removed imperatively. Flush the React layout and
+      // destination highlights together so they cannot paint in separate frames.
+      flushSync(() => [...callbacks].forEach((callback) => callback()));
+    };
+    const onKeyDown = (event: Event) => {
+      if ((event as KeyboardEvent).key === 'Escape') finish();
+    };
+    const options = { capture: true };
+    target.addEventListener('dragend', finish, options);
+    target.addEventListener('keydown', onKeyDown, options);
+    subscription = {
+      callbacks,
+      dispose: () => {
+        target.removeEventListener('dragend', finish, options);
+        target.removeEventListener('keydown', onKeyDown, options);
+      },
+    };
+    dragEndSubscriptions.set(target, subscription);
+  }
+  const callback = () => onEnd();
+  subscription.callbacks.add(callback);
+  return () => {
+    subscription.callbacks.delete(callback);
+    if (subscription.callbacks.size === 0) {
+      subscription.dispose();
+      dragEndSubscriptions.delete(target);
+    }
+  };
 }
 
 export function getItemDropPlacement(

@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import type { Group } from '../../core/types';
-import { getActiveLibraryDragPayload, readLibraryDragData } from '../drag';
+import {
+  getActiveLibraryDragPayload,
+  listenForLibraryDragEnd,
+  readLibraryDragData,
+} from '../drag';
 
 interface GroupHeaderProps {
   group: Group;
@@ -19,6 +23,8 @@ export function GroupHeader({
   onDrop,
 }: GroupHeaderProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+
+  useEffect(() => listenForLibraryDragEnd(() => setIsDragOver(false)), []);
 
   return (
     <button

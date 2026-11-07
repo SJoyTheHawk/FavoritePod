@@ -1,13 +1,83 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Group } from '../core/types';
 import {
   getGroupDropPlacement,
   getItemDropPlacement,
   getItemDropTarget,
+  listenForLibraryDragEnd,
   previewItemOrder,
   resolveGroupDrop,
   resolveItemDropDestination,
 } from './drag';
+
+describe('drag cancellation', () => {
+  const keyDown = (key: string) => Object.assign(new Event('keydown'), { key });
+
+  it('shares native listeners and preserves remaining subscribers during cleanup', () => {
+    const target = new EventTarget();
+    const add = vi.spyOn(target, 'addEventListener');
+    const first = vi.fn();
+    const second = vi.fn();
+    const stopFirst = listenForLibraryDragEnd(first, target);
+    const stopSecond = listenForLibraryDragEnd(second, target);
+    expect(add).toHaveBeenCalledTimes(2);
+    stopFirst();
+    target.dispatchEvent(keyDown('Escape'));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledOnce();
+    stopSecond();
+    const third = vi.fn();
+    const stopThird = listenForLibraryDragEnd(third, target);
+    target.dispatchEvent(new Event('dragend'));
+    expect(second).toHaveBeenCalledOnce();
+    expect(third).toHaveBeenCalledOnce();
+    stopThird();
+  });
+
+  it('lets a drag preview unsubscribe itself without skipping layout cleanup', () => {
+    const target = new EventTarget();
+    const clearLayout = vi.fn();
+    const stopPreview = listenForLibraryDragEnd(() => stopPreview(), target);
+    const stopLayout = listenForLibraryDragEnd(clearLayout, target);
+    target.dispatchEvent(keyDown('Escape'));
+    expect(clearLayout).toHaveBeenCalledOnce();
+    stopLayout();
+  });
+
+  it('clears source and destination feedback together on Escape', () => {
+    const target = new EventTarget();
+    const callbacks = [vi.fn(), vi.fn(), vi.fn()];
+    const unsubscribe = callbacks.map((callback) =>
+      listenForLibraryDragEnd(callback, target),
+    );
+    target.dispatchEvent(keyDown('ArrowRight'));
+    callbacks.forEach((callback) => expect(callback).not.toHaveBeenCalled());
+    target.dispatchEvent(keyDown('Escape'));
+    callbacks.forEach((callback) => expect(callback).toHaveBeenCalledOnce());
+    unsubscribe.forEach((stop) => stop());
+  });
+
+  it('cleans up on native dragend without needing a delivered Escape key', () => {
+    const target = new EventTarget();
+    const clear = vi.fn();
+    const stop = listenForLibraryDragEnd(clear, target);
+    target.dispatchEvent(new Event('dragend'));
+    expect(clear).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('lets drop handlers commit before dragend and removes listeners on cleanup', () => {
+    const target = new EventTarget();
+    const clear = vi.fn();
+    const stop = listenForLibraryDragEnd(clear, target);
+    target.dispatchEvent(new Event('drop'));
+    expect(clear).not.toHaveBeenCalled();
+    stop();
+    target.dispatchEvent(keyDown('Escape'));
+    target.dispatchEvent(new Event('dragend'));
+    expect(clear).not.toHaveBeenCalled();
+  });
+});
 
 function group(id: string, parentId: string | null, orderKey: string): Group {
   return {

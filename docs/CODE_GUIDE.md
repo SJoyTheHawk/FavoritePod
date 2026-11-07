@@ -1034,6 +1034,25 @@ animation from its current visual position. Keep the dragged card hidden and its
 placeholder visible until the saved destination is observed by the library query;
 revealing it earlier briefly puts it back in the source group.
 
+Use the shared listenForLibraryDragEnd() helper for drag-preview and
+destination-highlight cleanup. Its capture listeners cover both Escape and native
+dragend, including an inert source and a target in another group. Destination
+components cannot rely on their own onDragEnd: that event belongs to the source.
+Do not clear a favorite drop already saving; keep the existing pending-destination
+guard until persistence is observed. Remove shared listeners on unmount.
+
+Drag-end subscribers share one native listener pair and one synchronous React
+commit, including removal of the imperative drag ghost. Cancellation increments a
+motion revision so cards stop active animations and restore their positions without
+replaying reorder/drop motion. Skip layout measurements on that reset. Cache saved
+sibling move availability per library update and selected drag IDs per selection;
+do not filter and sort the entire library separately for every card on drag renders.
+
+FavoriteCard uses the same finishDrag handler for its native onDragEnd and its
+shared Escape subscription. That handler removes drag images, clears the payload,
+resets both temporary card/entry sizes, and invokes the parent completion callback.
+Do not subscribe only image removal to Escape; it must run the full release cleanup.
+
 ---
 
 ## Debugging Guide

@@ -8,6 +8,7 @@ export interface FavoriteLayout {
   orderRevision: string;
   collectionRevision: string;
   animateReorder: boolean;
+  cancellationRevision: number;
 }
 
 /** A drag rank or persisted key changing is not itself a visible reorder. */
@@ -34,6 +35,7 @@ export function getFavoriteReorderOffset(
     !previous ||
     !previous.animateReorder ||
     !current.animateReorder ||
+    previous.cancellationRevision !== current.cancellationRevision ||
     previous.orderRevision === current.orderRevision ||
     previous.collectionRevision !== current.collectionRevision ||
     previous.layout !== current.layout ||

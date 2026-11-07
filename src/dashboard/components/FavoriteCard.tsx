@@ -24,7 +24,11 @@ import {
 import type { Item } from '../../core/types';
 import { FavoriteFallback } from './FavoriteFallback';
 import { HoverPreview } from './HoverPreview';
-import { clearLibraryDragData, setLibraryDragData } from '../drag';
+import {
+  clearLibraryDragData,
+  listenForLibraryDragEnd,
+  setLibraryDragData,
+} from '../drag';
 import { getFavoriteReorderOffset, type FavoriteLayout } from '../favorite-motion';
 
 interface FavoriteCardProps {
@@ -38,6 +42,7 @@ interface FavoriteCardProps {
   orderRevision: string;
   collectionRevision: string;
   animateReorder: boolean;
+  cancellationRevision: number;
   isDragging: boolean;
   dragItemIds: string[];
   dropOrigin: { left: number; top: number } | null;
@@ -105,6 +110,7 @@ export function FavoriteCard({
   orderRevision,
   collectionRevision,
   animateReorder,
+  cancellationRevision,
   isDragging,
   dragItemIds,
   dropOrigin,
@@ -173,6 +179,14 @@ export function FavoriteCard({
     nativeDragImageRef.current = null;
   };
 
+  const finishDrag = () => {
+    removeDragImage();
+    clearLibraryDragData();
+    setDragSize(undefined);
+    setDragEntrySize(undefined);
+    onDragEnd();
+  };
+
   useEffect(() => removeDragImage, []);
   useEffect(() => () => motion.current?.cancel(), []);
 
@@ -195,7 +209,15 @@ export function FavoriteCard({
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!card) return;
-    card.inert = isDragging;
+    if (card.inert !== isDragging) card.inert = isDragging;
+
+    const priorLayout = previousLayout.current;
+    if (priorLayout && priorLayout.cancellationRevision !== cancellationRevision) {
+      motion.current?.cancel();
+      wasDragging.current = false;
+      previousLayout.current = undefined;
+      return;
+    }
 
     const entry = card.closest<HTMLElement>('.favorite-entry') ?? card;
     const currentLayout = {
@@ -206,10 +228,10 @@ export function FavoriteCard({
       orderRevision,
       collectionRevision,
       animateReorder,
+      cancellationRevision,
       layout,
       size,
     };
-    const priorLayout = previousLayout.current;
     previousLayout.current = currentLayout;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (
@@ -493,20 +515,15 @@ export function FavoriteCard({
         const hideOutside = (dragEvent: DragEvent) => {
           if (!dragEvent.relatedTarget) dragImage.style.visibility = 'hidden';
         };
-        const cancelPreview = (keyEvent: KeyboardEvent) => {
-          if (keyEvent.key === 'Escape') removeDragImage();
-        };
+        const stopListening = listenForLibraryDragEnd(finishDrag);
         document.addEventListener('dragover', followCursor, true);
         document.addEventListener('dragleave', hideOutside, true);
         document.addEventListener('drop', removeDragImage, true);
-        document.addEventListener('dragend', removeDragImage, true);
-        window.addEventListener('keydown', cancelPreview, true);
         dragImageCleanup.current = () => {
           document.removeEventListener('dragover', followCursor, true);
           document.removeEventListener('dragleave', hideOutside, true);
           document.removeEventListener('drop', removeDragImage, true);
-          document.removeEventListener('dragend', removeDragImage, true);
-          window.removeEventListener('keydown', cancelPreview, true);
+          stopListening();
         };
         setDragSize({ width, height });
         if (groupLabel && entryBounds) {
@@ -531,13 +548,7 @@ export function FavoriteCard({
         event.dataTransfer.setDragImage(emptyImage, 0, 0);
         onDragStart(item.id, entryBounds?.height ?? height);
       }}
-      onDragEnd={() => {
-        removeDragImage();
-        clearLibraryDragData();
-        setDragSize(undefined);
-        setDragEntrySize(undefined);
-        onDragEnd();
-      }}
+      onDragEnd={finishDrag}
       data-layout={layout}
       data-size={size}
       data-dragging={isDragging || undefined}

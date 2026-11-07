@@ -24,6 +24,7 @@ import {
   getActiveLibraryDragPayload,
   getGroupDropPlacement,
   hasLibraryDragData,
+  listenForLibraryDragEnd,
   readLibraryDragData,
   resolveGroupDrop,
   setLibraryDragData,
@@ -370,10 +371,10 @@ export function GroupTree(props: GroupTreeProps) {
       clearLibraryDragData();
       setDropTarget(null);
     };
-    window.addEventListener('dragend', clear);
+    const stopListening = listenForLibraryDragEnd(clear);
     window.addEventListener('drop', clear);
     return () => {
-      window.removeEventListener('dragend', clear);
+      stopListening();
       window.removeEventListener('drop', clear);
     };
   }, []);

@@ -133,6 +133,7 @@ import {
   clearLibraryDragData,
   getActiveLibraryDragPayload,
   getItemDropTarget,
+  listenForLibraryDragEnd,
   readLibraryDragData,
   previewItemOrder,
   resolveItemDropDestination,
@@ -417,6 +418,7 @@ export function DashboardApp() {
   const [dragPlaceholderHeight, setDragPlaceholderHeight] = useState(0);
   const [draggedIds, setDraggedIds] = useState<string[]>([]);
   const dragIdsRef = useRef<string[]>([]);
+  const dragCancellationRevision = useRef(0);
   const slotRef = useRef<HTMLDivElement>(null);
   const [dropOrigin, setDropOrigin] = useState<{ left: number; top: number } | null>(
     null,
@@ -431,6 +433,27 @@ export function DashboardApp() {
     () => new Map(groups.map((group) => [group.id, group])),
     [groups],
   );
+  // Drag feedback rerenders the cards without changing their saved sibling order.
+  // Build menu availability once per library update, not once per card/render.
+  const favoriteMoveAvailability = useMemo(() => {
+    const siblingsByGroup = new Map<string, Item[]>();
+    for (const item of items) {
+      const siblings = siblingsByGroup.get(item.groupId);
+      if (siblings) siblings.push(item);
+      else siblingsByGroup.set(item.groupId, [item]);
+    }
+    const result = new Map<string, { canMoveUp: boolean; canMoveDown: boolean }>();
+    for (const siblings of siblingsByGroup.values()) {
+      siblings.sort(compareOrder);
+      siblings.forEach((item, index) => {
+        result.set(item.id, {
+          canMoveUp: index > 0,
+          canMoveDown: index < siblings.length - 1,
+        });
+      });
+    }
+    return result;
+  }, [items]);
   const selectedGroup = selectedGroupId ? groupsById.get(selectedGroupId) : undefined;
   const hasLocalFiles = useMemo(
     () => items.some((item) => parseSafeUrl(item.url)?.protocol === 'file:'),
@@ -536,20 +559,14 @@ export function DashboardApp() {
     setDragPlaceholderHeight(0);
   }, []);
 
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      if (
-        event.key !== 'Escape' ||
-        !dragIdsRef.current.length ||
-        favoriteDropPending.current
-      )
-        return;
-      clearLibraryDragData();
-      clearFavoriteDrag();
-    };
-    window.addEventListener('keydown', cancel, true);
-    return () => window.removeEventListener('keydown', cancel, true);
+  const cancelFavoriteDrag = useCallback(() => {
+    if (!dragIdsRef.current.length || favoriteDropPending.current) return;
+    dragCancellationRevision.current += 1;
+    clearLibraryDragData();
+    clearFavoriteDrag();
   }, [clearFavoriteDrag]);
+
+  useEffect(() => listenForLibraryDragEnd(cancelFavoriteDrag), [cancelFavoriteDrag]);
 
   useEffect(() => {
     if (error) notifyError(error);
@@ -1107,6 +1124,10 @@ export function DashboardApp() {
     () => getGroupedFavoriteView(groups, visibleItems, selectedGroupId, groupingMode),
     [groups, visibleItems, selectedGroupId, groupingMode],
   );
+  const selectedDragIds = useMemo(
+    () => visibleItems.filter((item) => selectedIds.has(item.id)).map((item) => item.id),
+    [selectedIds, visibleItems],
+  );
   const itemsByGroup = useMemo(
     () => getItemsByGroupAndDescendants(groups, visibleItems),
     [groups, visibleItems],
@@ -1169,11 +1190,6 @@ export function DashboardApp() {
         ? current
         : next,
     );
-  };
-
-  const finishFavoriteDrag = () => {
-    if (favoriteDropPending.current) return;
-    clearFavoriteDrag();
   };
 
   const startFavoriteDrag = (itemId: string, height: number) => {
@@ -1688,17 +1704,15 @@ export function DashboardApp() {
         }}
       >
         {collectionItems.map((item) => {
-          const siblings = items
-            .filter((candidate) => candidate.groupId === item.groupId)
-            .sort(compareOrder);
-          const index = siblings.findIndex((candidate) => candidate.id === item.id);
+          const moveAvailability = favoriteMoveAvailability.get(item.id)!;
           return (
             <FavoriteCard
               orderRevision={orderRevision}
               collectionRevision={collectionRevision}
               animateReorder={animateReorder}
-              canMoveDown={index >= 0 && index < siblings.length - 1}
-              canMoveUp={index > 0}
+              cancellationRevision={dragCancellationRevision.current}
+              canMoveDown={moveAvailability.canMoveDown}
+              canMoveUp={moveAvailability.canMoveUp}
               item={item}
               key={item.id}
               groupLabel={
@@ -1715,15 +1729,9 @@ export function DashboardApp() {
               }
               isDragging={!!draggingFavoriteId && draggedIds.includes(item.id)}
               dropOrigin={dropOrigin}
-              dragItemIds={
-                selectedIds.has(item.id)
-                  ? visibleItems
-                      .filter((candidate) => selectedIds.has(candidate.id))
-                      .map((candidate) => candidate.id)
-                  : [item.id]
-              }
+              dragItemIds={selectedIds.has(item.id) ? selectedDragIds : [item.id]}
               onDragStart={startFavoriteDrag}
-              onDragEnd={finishFavoriteDrag}
+              onDragEnd={cancelFavoriteDrag}
               onDelete={(selected) =>
                 void deleteFavorite(selected).catch((cause) =>
                   notifyError(errorMessage(cause)),

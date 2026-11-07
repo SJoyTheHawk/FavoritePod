@@ -11,6 +11,7 @@ const layout = {
   orderRevision: 'before',
   collectionRevision: 'same cards and groups',
   animateReorder: true,
+  cancellationRevision: 0,
 };
 const reordered = { ...layout, left: 0, top: 200, orderRevision: 'after' };
 
@@ -45,6 +46,14 @@ describe('favorite visible order', () => {
 });
 
 describe('favorite reorder motion', () => {
+  it('restores cancelled drags immediately and allows the next reorder to animate', () => {
+    const cancelled = { ...reordered, cancellationRevision: 1 };
+    expect(getFavoriteReorderOffset(layout, cancelled)).toBeNull();
+    expect(
+      getFavoriteReorderOffset(cancelled, { ...layout, cancellationRevision: 1 }),
+    ).toEqual({ x: -200, y: 100 });
+  });
+
   it('animates a moved card when reordering the same collection', () => {
     expect(getFavoriteReorderOffset(layout, reordered)).toEqual({ x: 200, y: -100 });
   });

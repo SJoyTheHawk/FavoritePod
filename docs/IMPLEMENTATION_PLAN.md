@@ -18,6 +18,10 @@ navigation, thumbnail previews, and `file://` access remains open; see
 on 2026-11-05 after user validation. Phase 8.5 closed on 2026-11-06 after all
 manual Chrome checks passed; see [`phase-8.5-manual-test.md`](./phase-8.5-manual-test.md).
 
+Phase 10.1 closed on 2026-11-07 after user-reported manual acceptance and a verified
+fix for drag cancellation leaving stale background/drop highlights; see
+[Phase 10.1 manual tests](./manual_test/phase-10.1-manual-test.md).
+
 ## Architecture Overview
 
 ```
@@ -887,12 +891,18 @@ separately in [`phase-9-manual-test.md`](./manual_test/phase-9-manual-test.md).
 - ✅ Robust HLC-based sync, offline support, comprehensive Drive integration
 - ✅ Optional features (Frequently Visited, Context Menus) implemented
 - ⚠️ Bundle sizes need optimization (231KB dashboard, 200KB global libs)
-- ✅ Phase 10.1 theme, motion, loading, and keyboard implementation added; manual acceptance pending
+- ✅ Phase 10.1 theme, motion, loading, and keyboard work closed after user manual acceptance; drag cancellation note resolved
 - ⚠️ Performance untested with large collections (1000+ items)
 - ⚠️ Accessibility incomplete (keyboard shortcuts, ARIA labels need work)
 
 ### 10.1 Design System Finalization
 **Goal**: Consistent, polished UI (see DESIGN_GUIDE.md)
+
+**Status (2026-11-07)**: Closed at the user's request after all manual acceptance
+checkboxes were checked. The reported Escape-during-drag background issue is fixed:
+shared capture-phase cleanup clears destination highlights and restores the grid on
+Escape or native dragend, while allowing pending drops to finish saving. Isolated
+Chrome checks verify cancellation and subsequent persisted native drag/drop.
 
 **Current Status**:
 - ✅ CSS variables and color system defined in global.css
@@ -933,9 +943,14 @@ Automated checks: `npm test`, `npm run test:coverage`, `npm run type-check`,
 `npm run lint`, `npm run format:check`, and `npm run build`. Isolated Chrome
 157.0.8103.38 checks cover theme persistence, live system changes, cross-page
 preferences, dialog transitions and focus, search/arrows, reduced motion, thumbnail
-decoding, and 375px layouts. Actual OS, native toolbar/drag, screen-reader, and
-live Drive acceptance remains open in
+decoding, and 375px layouts. Closure and follow-up verification passes 233 tests across 26 files,
+the configured merge coverage thresholds, TypeScript compilation, lint, formatting,
+and the production build. The user has accepted actual OS, native toolbar/drag,
+screen-reader, and live Drive checks in
 [`phase-10.1-manual-test.md`](./manual_test/phase-10.1-manual-test.md).
+
+The cancellation follow-up is documented as resolved; deferred polish and
+phases 10.2–10.4 remain separate work.
 
 ### 10.2 Performance Optimization
 **Goal**: Fast and smooth experience

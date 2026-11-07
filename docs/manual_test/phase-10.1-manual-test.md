@@ -30,6 +30,22 @@ do not replay neighboring cards' positions; same-group reordering keeps its moti
 without stacking animations. The source card stays hidden until persistence is
 reflected in the destination.
 
+Drag accessibility follow-up checks reproduce an attempt to apply `aria-hidden`
+while a card button is focused, including a focused sibling in a multi-selection.
+The fix moves focus to the content area before hiding the selected cards, relies
+on their existing `inert` state, and makes the visual drag copies inert. Isolated
+Chrome checks pass for both selection cases, Escape cleanup, native mouse
+drag/drop persistence, and card focusability after dropping, with no focused
+`aria-hidden` mutations or related console warnings in the fixed build.
+
+The recorded open-menu drag regression is also reproduced in isolated Chrome:
+the action menu stayed visible after its anchor card moved offscreen. The menu
+now closes on drag while its button remains mounted, portal focus is moved to
+the content area, and hover previews stay closed during dragging. Browser checks
+cover focused card/menu drag starts, cancellation, reopening the menu and Edit,
+plus a separate native mouse reorder with persisted order and restored card
+focusability. No related accessibility warnings or runtime exceptions appeared.
+
 ## Setup
 
 1. Build the extension with `npm run build`.
@@ -50,39 +66,42 @@ reflected in the destination.
 
 ## Motion and Dialogs
 
-- [ ] Open/close Settings, favorite, group, move, import/export, and Google Drive sign-in dialogs; confirm a subtle 200ms fade/scale without layout jumps.
-- [ ] Confirm Escape closes only the active overlay and focus returns to its trigger. Check nested sign-in and disconnect dialogs.
-- [ ] Confirm save/import/sync controls retain their existing busy/cancel behavior.
-- [ ] Drag one favorite, a multi-selection, and a nested group. Confirm existing ghost stacks, placement highlights, drop animation, and Escape cancellation still work.
-- [ ] Add/remove favorites and drag between groups in both directions (including onto a group header). Neighboring cards must not bounce or replay an old position; the moved card must not flash back in its source group. Repeat with multi-selection, Undo/Redo, small grid/list layouts, and a narrow window. Same-group reordering should retain smooth motion without overlapping animations.
-- [ ] Hover cards and open previews; confirm hover shadows do not move/reorder the grid.
-- [ ] With a preview open, press Edit in the preview and in the card action menu. Confirm the preview closes immediately, stays closed while editing, and focus moves to Title. Repeat with a pending hover timer; Escape dismisses the editor directly.
-- [ ] In Edit favorite, use Remove image beside Upload image. Confirm the favorite remains, its fallback appears, removal is disabled without an image, and the change persists after reopening. Check Undo/Redo and upload another image.
-- [ ] Enable the OS Reduce Motion preference. Confirm no repeating pulse/spinner/indeterminate motion, no dialog movement, and no drag animation.
+- [x] Open/close Settings, favorite, group, move, import/export, and Google Drive sign-in dialogs; confirm a subtle 200ms fade/scale without layout jumps.
+- [x] Confirm Escape closes only the active overlay and focus returns to its trigger. Check nested sign-in and disconnect dialogs.
+- [x] Confirm save/import/sync controls retain their existing busy/cancel behavior.
+- [x] Drag one favorite, a multi-selection, and a nested group. Confirm existing ghost stacks, placement highlights, drop animation, and Escape cancellation still work.
+    - Note: Pressing Esc when doing bookmark dragging will dismiss the bookmark, but the background does not return to the state of mouse release
+- [ ] Focus a favorite's open button, then drag that favorite. Repeat with multiple selected favorites while focus is in a different selected card. Focus should move to the main content area before the cards hide; no `Blocked aria-hidden` warning should appear. Drag copies must not receive keyboard focus. Cancel with Escape and complete a drop; the restored cards must be focusable again.
+- [x] Add/remove favorites and drag between groups in both directions (including onto a group header). Neighboring cards must not bounce or replay an old position; the moved card must not flash back in its source group. Repeat with multi-selection, Undo/Redo, small grid/list layouts, and a narrow window. Same-group reordering should retain smooth motion without overlapping animations.
+- [x] Hover cards and open previews; confirm hover shadows do not move/reorder the grid.
+- [ ] Open a favorite's action menu, then drag the card. The menu and hover preview must close without jumping to the window edge. After dropping or cancelling, the menu must stay closed and reopen normally; Edit must still work.
+- [x] With a preview open, press Edit in the preview and in the card action menu. Confirm the preview closes immediately, stays closed while editing, and focus moves to Title. Repeat with a pending hover timer; Escape dismisses the editor directly.
+- [x] In Edit favorite, use Remove image beside Upload image. Confirm the favorite remains, its fallback appears, removal is disabled without an image, and the change persists after reopening. Check Undo/Redo and upload another image.
+- [x] Enable the OS Reduce Motion preference. Confirm no repeating pulse/spinner/indeterminate motion, no dialog movement, and no drag animation.
 
 ## Loading States
 
-- [ ] Reopen a populated launcher with CPU throttling; confirm skeletons match the chosen grid/list size, including compact grid, and resolve to favorites without changing layout.
-- [ ] Check favorites with saved thumbnails, missing blobs, and no thumbnail. Pending images have stable placeholders, decoded images fade in, and unavailable images use the existing fallback.
-- [ ] With an authorized Drive account, sync a library with previews. Counted stages display actual progress; checking/merging/unknown-count stages remain indeterminate.
-- [ ] Verify offline, failed sync, and completed sync replace progress with the existing correct status.
-- [ ] Use a screen reader to confirm a single loading status, labeled progress, native theme radios, and named icon buttons.
+- [x] Reopen a populated launcher with CPU throttling; confirm skeletons match the chosen grid/list size, including compact grid, and resolve to favorites without changing layout.
+- [x] Check favorites with saved thumbnails, missing blobs, and no thumbnail. Pending images have stable placeholders, decoded images fade in, and unavailable images use the existing fallback.
+- [x] With an authorized Drive account, sync a library with previews. Counted stages display actual progress; checking/merging/unknown-count stages remain indeterminate.
+- [x] Verify offline, failed sync, and completed sync replace progress with the existing correct status.
+- [x] Use a screen reader to confirm a single loading status, labeled progress, native theme radios, and named icon buttons.
 
 ## Keyboard Navigation
 
-- [ ] Cmd+K on macOS / Ctrl+K on other platforms focuses and selects search. Type a query; Escape clears it.
-- [ ] Focus a favorite's open control. Left/right move to adjacent favorites; up/down follow the nearest visual row/column. Home/End move to first/last visible favorite.
-- [ ] Repeat in list, compact grid/list, other card sizes, filtered search, expanded groups, and a narrow window. Collapsed groups are skipped.
-- [ ] Confirm arrows still work normally in text fields, select menus, native theme radios, and action menus. Modified shortcuts and input composition are not captured.
-- [ ] Confirm Cmd/Ctrl+K cannot pull focus out of a modal; Cmd/Ctrl+Z still edits text inside fields and performs library undo outside fields.
-- [ ] Tab to Skip to favorites and activate it; confirm focus moves to the content area.
+- [x] Cmd+K on macOS / Ctrl+K on other platforms focuses and selects search. Type a query; Escape clears it.
+- [x] Focus a favorite's open control. Left/right move to adjacent favorites; up/down follow the nearest visual row/column. Home/End move to first/last visible favorite.
+- [x] Repeat in list, compact grid/list, other card sizes, filtered search, expanded groups, and a narrow window. Collapsed groups are skipped.
+- [x] Confirm arrows still work normally in text fields, select menus, native theme radios, and action menus. Modified shortcuts and input composition are not captured.
+- [x] Confirm Cmd/Ctrl+K cannot pull focus out of a modal; Cmd/Ctrl+Z still edits text inside fields and performs library undo outside fields.
+- [x] Tab to Skip to favorites and activate it; confirm focus moves to the content area.
 
 ## Manual Acceptance
 
-- [ ] Real OS light/dark changes and persistent override accepted.
-- [ ] Native toolbar popup, drag/drop, busy actions, and nested dialogs accepted.
-- [ ] Live Drive progress and screen-reader behavior accepted.
-- [ ] Light/dark and desktop/narrow layouts accepted.
+- [x] Real OS light/dark changes and persistent override accepted.
+- [x] Native toolbar popup, drag/drop, busy actions, and nested dialogs accepted.
+- [x] Live Drive progress and screen-reader behavior accepted.
+- [x] Light/dark and desktop/narrow layouts accepted.
 
 ## Expected Results
 

@@ -86,6 +86,14 @@ function MenuAction({
   );
 }
 
+function CloseMenuOnDrag({ dragging, close }: { dragging: boolean; close: () => void }) {
+  // Close the portal without removing its button, which can be the drag source.
+  useLayoutEffect(() => {
+    if (dragging) close();
+  }, [dragging, close]);
+  return null;
+}
+
 export function FavoriteCard({
   item,
   layout,
@@ -446,6 +454,8 @@ export function FavoriteCard({
           });
           dragImage.appendChild(badge);
         }
+        // Cloned controls are visual only and must never receive keyboard focus.
+        dragImage.inert = true;
         dragImage.setAttribute('aria-hidden', 'true');
         dragImage.removeAttribute('id');
         dragImage.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
@@ -532,7 +542,6 @@ export function FavoriteCard({
       data-size={size}
       data-dragging={isDragging || undefined}
       className={`bookmark-card group relative flex min-w-0 self-start overflow-hidden rounded-lg border bg-background transition-shadow duration-200 hover:shadow-md ${groupLabel ? 'w-full' : ''} ${selected ? 'border-primary ring-1 ring-primary/40' : 'border-border'}`}
-      aria-hidden={isDragging || undefined}
       style={{
         ...(!groupLabel && sortOrder !== undefined ? { order: sortOrder } : {}),
         ...(isDragging && !groupLabel
@@ -597,51 +606,57 @@ export function FavoriteCard({
         />
       </label>
       <Menu>
-        <MenuButton
-          aria-label={`Actions for ${item.title}`}
-          className="bookmark-actions absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-text-primary opacity-0 shadow-md transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-hover hover:text-primary data-[open]:bg-surface-hover data-[open]:opacity-100"
-          title="Favorite actions"
-          type="button"
-        >
-          <EllipsisHorizontalIcon
-            aria-hidden="true"
-            className="h-5 w-5"
-            strokeWidth={2}
-          />
-        </MenuButton>
-        <MenuItems
-          anchor="bottom end"
-          className="z-40 min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
-        >
-          <MenuAction
-            icon={<PencilSquareIcon className="h-4 w-4" />}
-            label="Edit"
-            onClick={editItem}
-          />
-          <MenuAction
-            icon={<ArrowsRightLeftIcon className="h-4 w-4" />}
-            label="Move to…"
-            onClick={() => onMove(item)}
-          />
-          <MenuAction
-            icon={<ChevronUpIcon className="h-4 w-4" />}
-            label="Move up"
-            onClick={() => onMoveUp(item)}
-            disabled={!canMoveUp}
-          />
-          <MenuAction
-            icon={<ChevronDownIcon className="h-4 w-4" />}
-            label="Move down"
-            onClick={() => onMoveDown(item)}
-            disabled={!canMoveDown}
-          />
-          <MenuAction
-            icon={<TrashIcon className="h-4 w-4" />}
-            label="Delete"
-            onClick={() => onDelete(item)}
-            danger
-          />
-        </MenuItems>
+        {({ close }) => (
+          <>
+            <CloseMenuOnDrag dragging={isDragging} close={close} />
+            <MenuButton
+              aria-label={`Actions for ${item.title}`}
+              className="bookmark-actions absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-text-primary opacity-0 shadow-md transition group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-hover hover:text-primary data-[open]:bg-surface-hover data-[open]:opacity-100"
+              title="Favorite actions"
+              type="button"
+            >
+              <EllipsisHorizontalIcon
+                aria-hidden="true"
+                className="h-5 w-5"
+                strokeWidth={2}
+              />
+            </MenuButton>
+            <MenuItems
+              data-favorite-menu={item.id}
+              anchor="bottom end"
+              className="z-40 min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
+            >
+              <MenuAction
+                icon={<PencilSquareIcon className="h-4 w-4" />}
+                label="Edit"
+                onClick={editItem}
+              />
+              <MenuAction
+                icon={<ArrowsRightLeftIcon className="h-4 w-4" />}
+                label="Move to…"
+                onClick={() => onMove(item)}
+              />
+              <MenuAction
+                icon={<ChevronUpIcon className="h-4 w-4" />}
+                label="Move up"
+                onClick={() => onMoveUp(item)}
+                disabled={!canMoveUp}
+              />
+              <MenuAction
+                icon={<ChevronDownIcon className="h-4 w-4" />}
+                label="Move down"
+                onClick={() => onMoveDown(item)}
+                disabled={!canMoveDown}
+              />
+              <MenuAction
+                icon={<TrashIcon className="h-4 w-4" />}
+                label="Delete"
+                onClick={() => onDelete(item)}
+                danger
+              />
+            </MenuItems>
+          </>
+        )}
       </Menu>
       <div
         className={`bookmark-details flex min-w-0 items-center justify-between gap-3 ${isMissingFile ? 'opacity-60' : ''}`}

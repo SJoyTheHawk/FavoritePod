@@ -1182,6 +1182,15 @@ export function DashboardApp() {
         selectedIds.has(itemId) ? selectedIds.has(item.id) : item.id === itemId,
       )
       .map((item) => item.id);
+    // Move focus before React hides any selected card, including focused siblings.
+    const focusedOwner = document.activeElement?.closest<HTMLElement>(
+      '[data-favorite-id], [data-favorite-menu]',
+    );
+    const focusedId =
+      focusedOwner?.dataset.favoriteId ?? focusedOwner?.dataset.favoriteMenu;
+    if (focusedId && ids.includes(focusedId)) {
+      document.getElementById('main-content')?.focus({ preventScroll: true });
+    }
     dragIdsRef.current = ids;
     setDraggedIds(ids);
     setDropOrigin(null);
@@ -1697,7 +1706,7 @@ export function DashboardApp() {
               }
               layout={layout}
               size={bookmarkSize}
-              showPreview={showPreview && !dialog}
+              showPreview={showPreview && !dialog && !draggingFavoriteId}
               pathOverrides={pathOverrides}
               sortOrder={
                 dragPreviewRank
@@ -1751,7 +1760,7 @@ export function DashboardApp() {
   };
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
+    <main className="flex min-h-screen flex-col bg-background text-text-primary">
       <a
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-primary focus:shadow-lg"
         href="#main-content"
@@ -1828,7 +1837,7 @@ export function DashboardApp() {
         </div>
       </header>
 
-      <div className="flex min-h-[calc(100vh-4rem)] flex-col md:flex-row">
+      <div className="flex flex-1 flex-col md:flex-row">
         <aside
           className={`border-b border-border py-3 md:shrink-0 md:border-b-0 md:border-r md:transition-[width] md:duration-200 ${sidebarCollapsed ? 'px-3 md:w-14 md:px-2' : 'px-3 md:w-64 md:px-4 md:py-6'}`}
         >

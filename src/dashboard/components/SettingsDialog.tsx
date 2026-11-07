@@ -276,7 +276,7 @@ export function SettingsDialog({
       afterLeave={dialogTransition.afterLeave}
     >
       <DialogBackdrop transition className="dialog-backdrop fixed inset-0 bg-black/35" />
-      <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
+      <div className="fixed inset-0 flex items-center justify-center overflow-hidden p-4">
         <DialogPanel
           transition
           className="dialog-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl"

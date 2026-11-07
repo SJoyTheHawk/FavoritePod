@@ -1053,6 +1053,14 @@ shared Escape subscription. That handler removes drag images, clears the payload
 resets both temporary card/entry sizes, and invokes the parent completion callback.
 Do not subscribe only image removal to Escape; it must run the full release cleanup.
 
+Virtualize row positions, but render favorite slots as direct collection children
+with stable favorite-ID keys. Never reparent or remount the native drag source
+when a placeholder appears or a preview crosses rows. Keep that source mounted
+outside the layout slots until drag completion, including while scrolling; Chrome
+may consume Escape and only dispatch dragend to the original source element.
+Use the slot's position for reorder motion and drop hit testing so card animation
+does not change its logical destination.
+
 ---
 
 ## Debugging Guide
@@ -1126,12 +1134,11 @@ optimization before public launch. See `IMPLEMENTATION_PLAN.md` for full details
 
 ### HIGH Priority Tasks
 
-1. **Virtual Scrolling & Memory Optimization**
-   - **Issue**: Large collections (5,760+ items) consume 2GB memory
-   - **Root Cause**: All favorites mounted, duplicate thumbnail URLs, no resource sharing
-   - **Solution**: See `docs/future_plan/HIGH_MEMORY_INSPECTION.md` for detailed plan
-   - **Modules**: `FavoriteCard.tsx`, `DashboardApp.tsx`, new thumbnail resource manager
-   - **Impact**: Critical for users with 500+ items
+1. **Large Collection Rendering & Memory (implemented in 10.2)**
+   - `FavoriteCollection.tsx` virtualizes measured rows with two rows of overscan.
+   - `thumbnail-visibility.ts` pools one IntersectionObserver; `thumbnail-resources.ts` shares object URLs by hash and size, reference-counts active cards, and bounds the unused small-preview cache to 64 entries / 16 MiB.
+   - Dashboard selection stays keyed by item ID. Favorite slots keep stable parents, the native drag source stays mounted, and the keyboard target row stays pinned; logical geometry keeps arrow/Home/End navigation working across unmounted rows.
+   - The isolated 5,760-item profile and pending manual checks are recorded in `docs/manual_test/phase-10.2-manual-test.md`.
 
 2. **Theme Toggle Implementation**
    - **Implemented (10.1)**: `src/dashboard/hooks/use-theme.ts` runs at dashboard and popup startup
@@ -1154,14 +1161,12 @@ optimization before public launch. See `IMPLEMENTATION_PLAN.md` for full details
 ### MEDIUM Priority Tasks
 
 5. **Code Splitting**
-   - **Current**: Optional features always loaded (130KB optional-features.js)
-   - **Goal**: Lazy-load Discovery and Context Menu modules
-   - **Approach**: Use dynamic `import()` in `use-optional-features.ts`
+   - **Implemented (10.2)**: Discovery loads after Top sites permission is confirmed; Context Menu code is a dynamic service-worker chunk loaded for refresh, click, or enabled startup.
+   - **Modules**: `use-visited-sites.ts`, `service-worker.ts`
 
 6. **Search Debouncing**
-   - **Current**: Search triggers on every keystroke
-   - **Goal**: Debounce 300ms to prevent lag
-   - **Pattern**: Use `useEffect` with cleanup timeout
+   - **Implemented (10.2)**: Search filtering waits 300ms after the last input event and resets the window to the start of the result set.
+   - **Module**: `DashboardApp.tsx`
 
 7. **Animation Polish**
    - **Implemented (10.1)**: `AnimatedDialog` + `useDialogTransition` retain conditional editor mounts through a 200ms exit, then invoke the parent close callback
@@ -1177,10 +1182,11 @@ Phase 10 Focus Areas:
 │   └── use-theme.ts (implemented in 10.1)
 ├── src/dashboard/components/
 │   ├── SettingsDialog.tsx (theme UI implemented in 10.1)
-│   ├── FavoriteCard.tsx (ADD virtual scrolling - HIGH)
-│   └── DashboardApp.tsx (ADD keyboard shortcuts - HIGH)
+│   ├── FavoriteCollection.tsx (row virtualization, implemented in 10.2)
+│   ├── FavoriteCard.tsx (lazy shared thumbnails, implemented in 10.2)
+│   └── DashboardApp.tsx (search debounce and logical navigation)
 ├── src/core/
-│   └── thumbnail-resource-manager.ts (NEW - HIGH priority)
+│   └── discovery-url.ts (shared URL normalization for optional lazy chunks)
 └── src/styles/
     ├── themes.css (COMPLETE ✅)
     └── global.css (shared motion and reduced-motion rules)
@@ -1189,9 +1195,9 @@ Phase 10 Focus Areas:
 ### Testing Priorities
 
 - **Two-device Drive sync**: Validate concurrent editing, conflict resolution
-- **Large dataset**: Re-test after virtual scrolling implementation
+- **Large dataset**: Automated 5,760-item profile passes; see `docs/manual_test/phase-10.2-manual-test.md` for real-profile scroll, drag, and memory checks
 - **Accessibility**: Keyboard-only navigation, screen reader compatibility
-- **Performance profiling**: Measure load times, identify bottlenecks
+- **Performance profiling**: Initial profile measured; repeat on the user's normal Chrome profile and target hardware
 
 ### Documentation Needed
 

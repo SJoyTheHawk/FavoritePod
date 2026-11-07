@@ -6,9 +6,56 @@ import {
 } from '../core/drive-sync';
 import { DRIVE_LIBRARY_CHANGED_MESSAGE } from '../core/drive-sync-triggers';
 import { CONTEXT_MENUS_REFRESH_MESSAGE } from '../core/optional-features';
-import { installContextMenus, refreshContextMenus } from './context-menus';
+import { getContextMenuEnabled } from '../core/storage';
+import type * as ContextMenuModuleType from './context-menus';
 
-installContextMenus();
+type ContextMenuModule = typeof ContextMenuModuleType;
+let contextMenuModule: Promise<ContextMenuModule> | undefined;
+
+function loadContextMenuModule(): Promise<ContextMenuModule> {
+  contextMenuModule ??= import('./context-menus');
+  return contextMenuModule;
+}
+
+async function installContextMenusIfEnabled(): Promise<void> {
+  if (
+    !chrome.permissions ||
+    !(await chrome.permissions.contains({ permissions: ['contextMenus'] })) ||
+    !(await getContextMenuEnabled())
+  ) {
+    return;
+  }
+  (await loadContextMenuModule()).installContextMenus();
+}
+
+function handleContextMenuClick(
+  info: chrome.contextMenus.OnClickData,
+  tab?: chrome.tabs.Tab,
+): void {
+  void loadContextMenuModule()
+    .then((module) => module.handleContextMenuClick(info, tab))
+    .catch((cause: unknown) =>
+      console.error('FavoritePod context-menu action failed.', cause),
+    );
+}
+
+function registerContextMenuClickListener(): void {
+  const clickEvent = chrome.contextMenus?.onClicked;
+  if (!clickEvent || clickEvent.hasListener(handleContextMenuClick)) return;
+  try {
+    clickEvent.addListener(handleContextMenuClick);
+  } catch {
+    // Optional permission may be absent until Chrome reports it as added.
+  }
+}
+
+registerContextMenuClickListener();
+chrome.permissions?.onAdded.addListener((permissions) => {
+  if (!permissions.permissions?.includes('contextMenus')) return;
+  registerContextMenuClickListener();
+  void installContextMenusIfEnabled();
+});
+void installContextMenusIfEnabled();
 
 const PERIODIC_SYNC_ALARM = 'favoritepod-drive-periodic-sync';
 const DEBOUNCED_SYNC_ALARM = 'favoritepod-drive-debounced-sync';
@@ -23,9 +70,13 @@ function registerPeriodicSync(): void {
 chrome.runtime.onInstalled.addListener(() => {
   console.info('FavoritePod installed.');
   registerPeriodicSync();
+  void installContextMenusIfEnabled();
 });
 
-chrome.runtime.onStartup.addListener(registerPeriodicSync);
+chrome.runtime.onStartup.addListener(() => {
+  registerPeriodicSync();
+  void installContextMenusIfEnabled();
+});
 
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (typeof message !== 'object' || message === null || !('type' in message)) {
@@ -46,10 +97,16 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
     message.type === CONTEXT_MENUS_REFRESH_MESSAGE &&
     sender.id === chrome.runtime.id
   ) {
-    void refreshContextMenus().then(
-      () => sendResponse({ ok: true }),
-      () => sendResponse({ error: 'Could not update the right-click menu. Try again.' }),
-    );
+    void loadContextMenuModule()
+      .then((module) => {
+        module.installContextMenus();
+        return module.refreshContextMenus();
+      })
+      .then(
+        () => sendResponse({ ok: true }),
+        () =>
+          sendResponse({ error: 'Could not update the right-click menu. Try again.' }),
+      );
     return true;
   } else if (
     message.type === 'favoritepod.sync.completed' ||

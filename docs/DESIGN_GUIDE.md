@@ -1228,53 +1228,33 @@ See [Phase 10.1 manual checks](./manual_test/phase-10.1-manual-test.md). Browser
 
 ### Image Loading
 
-```tsx
-// Lazy load thumbnails with Intersection Observer
-function ItemCard({ item }: { item: Item }) {
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const imgRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    if (!item.previewHash || !imgRef.current) return;
-    
-    const observer = new IntersectionObserver(
-      async ([entry]) => {
-        if (entry.isIntersecting) {
-          const blob = await getThumbnail(item.previewHash!);
-          if (blob) {
-            setThumbnailUrl(URL.createObjectURL(blob));
-          }
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '100px' } // Load 100px before visible
-    );
-    
-    observer.observe(imgRef.current);
-    
-    return () => {
-      observer.disconnect();
-      if (thumbnailUrl) {
-        URL.revokeObjectURL(thumbnailUrl);
-      }
-    };
-  }, [item.previewHash]);
-  
-  return (
-    <div ref={imgRef} className="...">
-      {thumbnailUrl && <img src={thumbnailUrl} alt={item.title} />}
-    </div>
-  );
-}
-```
+The dashboard uses `ThumbnailImage` for stable sizing, decode feedback, and
+fallbacks. `thumbnail-visibility.ts` shares one IntersectionObserver across
+cards and starts loading 240px before a card enters view. Keep full-size previews
+closed until the hover preview opens.
 
-### Virtual Scrolling (if needed for large collections)
+`thumbnail-resources.ts` keys object URLs by preview hash and size, deduplicates
+parallel reads, and reference-counts mounted cards. Release full-size URLs when
+the preview closes. Keep at most 64 unused small previews and 16 MiB of cached
+small blobs; always revoke a URL when its cache entry is evicted.
 
-Consider `react-window` or `react-virtual` for 1000+ items:
+### Large Collections
 
-```bash
-npm install react-window
-```
+`FavoriteCollection` uses `@tanstack/react-virtual` to mount visible rows plus two
+rows of overscan while preserving the full document scroll height. The row count
+follows responsive grid columns and the existing card dimensions for each size.
+Keep selection in dashboard state by favorite ID; do not tie it to mounted cards.
+
+Render visible favorite slots directly under the collection with stable item keys;
+moving between rows must retain the same card element. Keep the native drag source
+mounted outside the layout slots and pin the keyboard-focused row in the virtual range.
+Register logical item geometry so arrows, Home, and End can move focus beyond
+mounted DOM nodes. Keep drop hit testing based on mounted visible slots, and
+measure positions relative to the full virtualized collection. Search waits 300ms
+after the last keystroke and resets scrolling to the start of the result set.
+
+The 5,760-item isolated profile and the remaining real-profile acceptance checks
+are tracked in [`phase-10.2-manual-test.md`](./manual_test/phase-10.2-manual-test.md).
 
 ---
 

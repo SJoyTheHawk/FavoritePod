@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { Group, Item } from '../../core/types';
 import { GroupHeader } from './GroupHeader';
+
+const noItems: readonly Item[] = [];
 
 interface GroupedFavoriteSectionProps {
   group: Group;
@@ -26,12 +28,22 @@ export function GroupedFavoriteSection({
   nested = false,
 }: GroupedFavoriteSectionProps) {
   const collapsed = collapsedGroups.has(group.id);
-  const descendants = itemsByGroup.get(group.id) ?? [];
-  const directItems = descendants.filter((item) => item.groupId === group.id);
-  const childGroups = groups.filter((child) => child.parentId === group.id);
-  const visibleChildGroups = searching
-    ? childGroups.filter((child) => (itemsByGroup.get(child.id)?.length ?? 0) > 0)
-    : childGroups;
+  const descendants = itemsByGroup.get(group.id) ?? noItems;
+  const directItems = useMemo(
+    () => descendants.filter((item) => item.groupId === group.id),
+    [descendants, group.id],
+  );
+  const childGroups = useMemo(
+    () => groups.filter((child) => child.parentId === group.id),
+    [group.id, groups],
+  );
+  const visibleChildGroups = useMemo(
+    () =>
+      searching
+        ? childGroups.filter((child) => (itemsByGroup.get(child.id)?.length ?? 0) > 0)
+        : childGroups,
+    [childGroups, itemsByGroup, searching],
+  );
 
   return (
     <section

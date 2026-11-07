@@ -11,19 +11,79 @@ export interface FavoriteLayout {
   cancellationRevision: number;
 }
 
+interface FavoriteRevisionCache {
+  collection?: string;
+  originalOrder?: string;
+  previewOrder: WeakMap<ReadonlyMap<string, number>, string>;
+}
+
+const favoriteRevisionCache = new WeakMap<readonly object[], FavoriteRevisionCache>();
+
+function getRevisionCache(items: readonly object[]): FavoriteRevisionCache {
+  let cache = favoriteRevisionCache.get(items);
+  if (!cache) {
+    cache = { previewOrder: new WeakMap() };
+    favoriteRevisionCache.set(items, cache);
+  }
+  return cache;
+}
+
+export function getFavoriteCollectionRevision(
+  items: readonly { id: string; groupId: string }[],
+): string {
+  const cache = getRevisionCache(items);
+  if (cache.collection !== undefined) return cache.collection;
+  cache.collection = JSON.stringify(
+    [...items]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map(({ id, groupId }) => [id, groupId]),
+  );
+  return cache.collection;
+}
+
 /** A drag rank or persisted key changing is not itself a visible reorder. */
 export function getFavoriteOrderRevision(
   items: readonly { id: string }[],
   previewRank: ReadonlyMap<string, number> | null,
 ): string {
-  const ordered = previewRank
-    ? [...items].sort(
-        (left, right) =>
-          (previewRank.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
-          (previewRank.get(right.id) ?? Number.MAX_SAFE_INTEGER),
-      )
-    : items;
-  return JSON.stringify(ordered.map((item) => item.id));
+  const cache = getRevisionCache(items);
+  if (!previewRank) {
+    if (cache.originalOrder === undefined) {
+      cache.originalOrder = JSON.stringify(items.map((item) => item.id));
+    }
+    return cache.originalOrder;
+  }
+  const cached = cache.previewOrder.get(previewRank);
+  if (cached !== undefined) return cached;
+
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const orderedIds: string[] = [];
+  let previousRank = -1;
+  let orderedKeys = true;
+  for (const id of previewRank.keys()) {
+    const rank = previewRank.get(id)!;
+    if (rank <= previousRank) orderedKeys = false;
+    previousRank = rank;
+    if (byId.delete(id)) orderedIds.push(id);
+  }
+  if (!orderedKeys) {
+    orderedIds.splice(
+      0,
+      orderedIds.length,
+      ...[...items]
+        .sort(
+          (left, right) =>
+            (previewRank.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+            (previewRank.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+        )
+        .map((item) => item.id),
+    );
+  } else {
+    orderedIds.push(...byId.keys());
+  }
+  const revision = JSON.stringify(orderedIds);
+  cache.previewOrder.set(previewRank, revision);
+  return revision;
 }
 
 /** Animate reordering the same cards, never collection membership or size changes. */

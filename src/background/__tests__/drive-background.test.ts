@@ -11,11 +11,16 @@ vi.mock('../../core/drive-sync', async (importOriginal) => {
 vi.mock('../context-menus', () => ({
   installContextMenus: vi.fn(),
   refreshContextMenus: vi.fn().mockResolvedValue(undefined),
+  handleContextMenuClick: vi.fn().mockResolvedValue(undefined),
 }));
 
 const listeners: {
   alarm?: (alarm: { name: string }) => void;
-  message?: (message: unknown) => void;
+  message?: (
+    message: unknown,
+    sender: { id?: string },
+    sendResponse: (response: unknown) => void,
+  ) => void;
 } = {};
 const clearAlarm = vi.fn().mockResolvedValue(true);
 
@@ -25,6 +30,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   vi.stubGlobal('chrome', {
     runtime: {
+      id: 'test-extension',
       onInstalled: { addListener: vi.fn() },
       onStartup: { addListener: vi.fn() },
       onMessage: {
@@ -134,7 +140,22 @@ describe('Drive background connection gates', () => {
   });
 
   it('clears the pending debounce when connection state changes', () => {
-    listeners.message?.({ type: DRIVE_CONNECTION_CHANGED, status: 'disconnected' });
+    listeners.message?.(
+      { type: DRIVE_CONNECTION_CHANGED, status: 'disconnected' },
+      {},
+      () => undefined,
+    );
     expect(clearAlarm).toHaveBeenCalledWith('favoritepod-drive-debounced-sync');
+  });
+
+  it('loads the optional context-menu feature when Chrome requests a refresh', async () => {
+    const sendResponse = vi.fn();
+    listeners.message?.(
+      { type: 'favoritepod.contextMenus.refresh' },
+      { id: 'test-extension' },
+      sendResponse,
+    );
+
+    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledWith({ ok: true }));
   });
 });

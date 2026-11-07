@@ -1,10 +1,18 @@
 import { liveQuery } from 'dexie';
 import { useEffect, useMemo, useState } from 'react';
-import { buildVisitedSiteSuggestions, type TopSiteEntry } from '../core/discovery';
+import type { TopSiteEntry, VisitedSiteSuggestion } from '../core/discovery';
 import { getHiddenVisitedSiteUrls } from '../core/storage';
+
+type SuggestionBuilder = (
+  topSites: readonly TopSiteEntry[],
+  hiddenUrls: readonly string[],
+) => VisitedSiteSuggestion[];
 
 export function useVisitedSites(enabled: boolean) {
   const [topSites, setTopSites] = useState<TopSiteEntry[]>([]);
+  const [buildSuggestions, setBuildSuggestions] = useState<SuggestionBuilder | null>(
+    null,
+  );
   const [hiddenUrls, setHiddenUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -28,6 +36,7 @@ export function useVisitedSites(enabled: boolean) {
   useEffect(() => {
     let active = true;
     setTopSites([]);
+    setBuildSuggestions(null);
     setError(undefined);
     setLoading(enabled);
     if (!enabled) return;
@@ -39,6 +48,9 @@ export function useVisitedSites(enabled: boolean) {
         );
       }
       if (!active) return;
+      const discovery = await import('../core/discovery');
+      if (!active) return;
+      setBuildSuggestions(() => discovery.buildVisitedSiteSuggestions);
       const top = await chrome.topSites.get();
       if (!active) return;
       setTopSites(top);
@@ -61,9 +73,9 @@ export function useVisitedSites(enabled: boolean) {
   const suggestions = useMemo(
     () =>
       enabled && hiddenReady && !hiddenError
-        ? buildVisitedSiteSuggestions(topSites, hiddenUrls)
+        ? (buildSuggestions?.(topSites, hiddenUrls) ?? [])
         : [],
-    [enabled, hiddenError, hiddenReady, hiddenUrls, topSites],
+    [buildSuggestions, enabled, hiddenError, hiddenReady, hiddenUrls, topSites],
   );
   return {
     suggestions,

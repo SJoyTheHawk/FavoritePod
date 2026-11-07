@@ -1,7 +1,14 @@
 import { liveQuery } from 'dexie';
 import { db } from '../core/db';
 import { isItemDeleted } from '../core/merge';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ArrowPathIcon,
   ArrowUturnLeftIcon,
@@ -72,7 +79,8 @@ import {
   type PathOverride,
 } from '../core/file-links';
 import { parseSafeUrl } from '../core/validation';
-import { normalizeVisitedSiteUrl, type VisitedSiteSuggestion } from '../core/discovery';
+import { normalizeVisitedSiteUrl } from '../core/discovery-url';
+import type { VisitedSiteSuggestion } from '../core/discovery';
 import { useOptionalFeatures } from './use-optional-features';
 import { useVisitedSites } from './use-visited-sites';
 import { useTheme } from './hooks/use-theme';
@@ -115,7 +123,15 @@ import {
   installDriveSyncChangeHooks,
 } from '../core/drive-sync-triggers';
 import { FavoriteCard } from './components/FavoriteCard';
-import { getFavoriteOrderRevision } from './favorite-motion';
+import { FavoriteCollection } from './components/FavoriteCollection';
+import {
+  getFavoriteCollectionRevision,
+  getFavoriteOrderRevision,
+} from './favorite-motion';
+import {
+  getFavoriteNavigationGeometry,
+  type FavoriteCollectionMetrics,
+} from './favorite-collection-layout';
 import { BookmarkSizeControl } from './components/BookmarkSizeControl';
 import { FavoriteDialog } from './components/FavoriteDialog';
 import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
@@ -396,6 +412,7 @@ export function DashboardApp() {
   const initialDriveSyncAccount = useRef<string>();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const [layout, setLayout] = useState<LibraryView>('grid');
   const [groupingMode, setGroupingModeState] = useState<GroupingMode>('hierarchical');
@@ -415,6 +432,7 @@ export function DashboardApp() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [dragPreviewOrder, setDragPreviewOrder] = useState<string[] | null>(null);
   const [draggingFavoriteId, setDraggingFavoriteId] = useState<string | null>(null);
+  const [focusedFavoriteId, setFocusedFavoriteId] = useState<string | null>(null);
   const [dragPlaceholderHeight, setDragPlaceholderHeight] = useState(0);
   const [draggedIds, setDraggedIds] = useState<string[]>([]);
   const dragIdsRef = useRef<string[]>([]);
@@ -427,6 +445,12 @@ export function DashboardApp() {
   const favoriteDropPending = useRef<FavoriteDropDestination | null>(null);
   const favoritePreviewDestination = useRef<FavoriteDropDestination | null>(null);
   const history = useRef<HistoryStack>({ past: [], future: [] });
+  const favoriteCollections = useRef(
+    new Map<
+      HTMLDivElement,
+      { items: readonly Item[]; metrics: FavoriteCollectionMetrics }
+    >(),
+  );
   const [historyVersion, setHistoryVersion] = useState(0);
   const groupLabels = useMemo(() => getGroupLabels(groups), [groups]);
   const groupsById = useMemo(
@@ -454,6 +478,7 @@ export function DashboardApp() {
     }
     return result;
   }, [items]);
+  const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const selectedGroup = selectedGroupId ? groupsById.get(selectedGroupId) : undefined;
   const hasLocalFiles = useMemo(
     () => items.some((item) => parseSafeUrl(item.url)?.protocol === 'file:'),
@@ -468,6 +493,38 @@ export function DashboardApp() {
     (message: string) => notify(message, 'error'),
     [notify],
   );
+  const registerFavoriteCollection = useCallback(
+    (
+      node: HTMLDivElement,
+      collectionItems: readonly Item[],
+      metrics: FavoriteCollectionMetrics,
+    ) => {
+      favoriteCollections.current.set(node, { items: collectionItems, metrics });
+      return () => favoriteCollections.current.delete(node);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useLayoutEffect(() => {
+    if (!focusedFavoriteId) return;
+    const trigger = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[data-favorite-open]'),
+    ).find(
+      (button) =>
+        button.closest<HTMLElement>('[data-favorite-id]')?.dataset.favoriteId ===
+        focusedFavoriteId,
+    );
+    trigger?.focus();
+  }, [focusedFavoriteId]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [debouncedSearch, groupingMode, layout, selectedGroupId]);
   const runDriveSync = useCallback(
     async (
       choice?: DriveSyncChoice,
@@ -1112,13 +1169,13 @@ export function DashboardApp() {
         }
       }
     }
-    const searchTerm = search.trim().toLocaleLowerCase();
+    const searchTerm = debouncedSearch.trim().toLocaleLowerCase();
     return items.filter((item) => {
       if (selectedGroupId && !scope.has(item.groupId)) return false;
       if (!searchTerm) return true;
       return `${item.title} ${item.url}`.toLocaleLowerCase().includes(searchTerm);
     });
-  }, [groups, items, search, selectedGroupId]);
+  }, [debouncedSearch, groups, items, selectedGroupId]);
 
   const groupedView = useMemo(
     () => getGroupedFavoriteView(groups, visibleItems, selectedGroupId, groupingMode),
@@ -1132,7 +1189,7 @@ export function DashboardApp() {
     () => getItemsByGroupAndDescendants(groups, visibleItems),
     [groups, visibleItems],
   );
-  const searching = search.trim().length > 0;
+  const searching = debouncedSearch.trim().length > 0;
   const sectionGroups =
     groupedView.mode === 'hierarchical'
       ? groupedView.groups.filter(
@@ -1300,7 +1357,10 @@ export function DashboardApp() {
       });
   };
 
-  const selectedVisibleItems = visibleItems.filter((item) => selectedIds.has(item.id));
+  const selectedVisibleItems = useMemo(
+    () => visibleItems.filter((item) => selectedIds.has(item.id)),
+    [selectedIds, visibleItems],
+  );
   const allVisibleSelected =
     visibleItems.length > 0 && selectedVisibleItems.length === visibleItems.length;
   const canUndo = history.current.past.length > 0;
@@ -1659,22 +1719,41 @@ export function DashboardApp() {
   };
 
   const renderFavoriteCollection = (collectionItems: readonly Item[]) => {
-    const collectionRevision = JSON.stringify(
-      collectionItems
-        .map((item) => [item.id, item.groupId])
-        .sort(([left], [right]) => left.localeCompare(right)),
-    );
     const animateReorder =
       !draggingFavoriteId ||
-      items
-        .filter((item) => draggedIds.includes(item.id))
-        .every((item) => item.groupId === favoritePreviewDestination.current?.groupId);
+      draggedIds.every(
+        (id) =>
+          itemsById.get(id)?.groupId === favoritePreviewDestination.current?.groupId,
+      );
+    const collectionRevision = getFavoriteCollectionRevision(collectionItems);
     const orderRevision = getFavoriteOrderRevision(collectionItems, dragPreviewRank);
+    const showPlaceholder =
+      !!draggingFavoriteId &&
+      !!dragPreviewRank?.has(draggedIds[0]) &&
+      (groupedView.mode !== 'hierarchical' ||
+        favoritePreviewDestination.current?.groupId === collectionItems[0]?.groupId);
     return (
-      <div
-        className="bookmark-collection relative"
-        data-layout={layout}
-        data-size={bookmarkSize}
+      <FavoriteCollection
+        items={collectionItems}
+        layout={layout}
+        size={bookmarkSize}
+        hasGroupLabels={groupedView.mode === 'labeled'}
+        draggedIds={draggingFavoriteId ? draggedIds : []}
+        draggingFavoriteId={draggingFavoriteId}
+        focusedFavoriteId={focusedFavoriteId}
+        dragPreviewRank={dragPreviewRank}
+        showPlaceholder={showPlaceholder}
+        placeholder={
+          showPlaceholder ? (
+            <div
+              ref={slotRef}
+              aria-hidden="true"
+              className="pointer-events-none min-w-0 rounded-lg border-2 border-dashed border-primary/70 bg-primary-light/35 shadow-sm"
+              style={{ height: dragPlaceholderHeight }}
+            />
+          ) : null
+        }
+        onRegister={registerFavoriteCollection}
         onDragOver={(event) => {
           const payload = getActiveLibraryDragPayload();
           if (payload?.type !== 'item') return;
@@ -1686,24 +1765,29 @@ export function DashboardApp() {
             collection.querySelectorAll<HTMLElement>('[data-favorite-id]'),
           )
             .filter((card) => !dragIdsRef.current.includes(card.dataset.favoriteId!))
-            .map((card) => ({
-              id: card.dataset.favoriteId!,
-              left: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetLeft,
-              top: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetTop,
-              width: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetWidth,
-              height: (card.closest<HTMLElement>('.favorite-entry') ?? card).offsetHeight,
-            }));
+            .map((card) => {
+              const slot =
+                card.closest<HTMLElement>('.bookmark-virtual-slot, .favorite-entry') ??
+                card;
+              const bounds = slot.getBoundingClientRect();
+              return {
+                id: card.dataset.favoriteId!,
+                left: bounds.left - rect.left,
+                top: bounds.top - rect.top,
+                width: bounds.width,
+                height: bounds.height,
+              };
+            });
           const target = getItemDropTarget(
-            event.clientX - rect.left + collection.scrollLeft,
-            event.clientY - rect.top + collection.scrollTop,
+            event.clientX - rect.left,
+            event.clientY - rect.top,
             slots,
             layout,
           );
           // Keep the previous destination over a gap or the stack placeholder.
           if (target) previewFavoriteDrop(payload.id, target.targetId, target.placement);
         }}
-      >
-        {collectionItems.map((item) => {
+        renderItem={(item) => {
           const moveAvailability = favoriteMoveAvailability.get(item.id)!;
           return (
             <FavoriteCard
@@ -1747,23 +1831,8 @@ export function DashboardApp() {
               selected={selectedIds.has(item.id)}
             />
           );
-        })}
-        {draggingFavoriteId &&
-          dragPreviewRank?.has(draggedIds[0]) &&
-          (groupedView.mode !== 'hierarchical' ||
-            favoritePreviewDestination.current?.groupId ===
-              collectionItems[0]?.groupId) && (
-            <div
-              ref={slotRef}
-              aria-hidden="true"
-              className="pointer-events-none min-w-0 rounded-lg border-2 border-dashed border-primary/70 bg-primary-light/35 shadow-sm"
-              style={{
-                order: dragPreviewRank.get(draggedIds[0]),
-                height: dragPlaceholderHeight,
-              }}
-            />
-          )}
-      </div>
+        }}
+      />
     );
   };
 
@@ -1951,24 +2020,52 @@ export function DashboardApp() {
               !target.matches('[data-favorite-open]')
             )
               return;
-            const triggers = Array.from(
+            const collections = [...favoriteCollections.current.entries()]
+              .filter(
+                ([node]) =>
+                  node.isConnected &&
+                  node.getClientRects().length > 0 &&
+                  !node.closest('[inert]'),
+              )
+              .sort(([left], [right]) => {
+                const position = left.compareDocumentPosition(right);
+                if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+                if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+                return 0;
+              });
+            const navigationIds: string[] = [];
+            const navigationGeometry: ReturnType<typeof getFavoriteNavigationGeometry> =
+              [];
+            for (const [collection, registered] of collections) {
+              const bounds = collection.getBoundingClientRect();
+              navigationIds.push(...registered.items.map((item) => item.id));
+              navigationGeometry.push(
+                ...getFavoriteNavigationGeometry(
+                  registered.items.length,
+                  registered.metrics,
+                  bounds,
+                ),
+              );
+            }
+            const currentId =
+              target.closest<HTMLElement>('[data-favorite-id]')?.dataset.favoriteId;
+            const index = currentId ? navigationIds.indexOf(currentId) : -1;
+            const next = getNavigationTarget(navigationGeometry, index, event.key);
+            event.preventDefault();
+            if (next === undefined) return;
+            const nextId = navigationIds[next];
+            if (!nextId) return;
+            setFocusedFavoriteId(nextId);
+            const nextTrigger = Array.from(
               event.currentTarget.querySelectorAll<HTMLButtonElement>(
                 '[data-favorite-open]',
               ),
-            ).filter(
+            ).find(
               (button) =>
-                button.getClientRects().length > 0 && !button.closest('[inert]'),
+                button.closest<HTMLElement>('[data-favorite-id]')?.dataset.favoriteId ===
+                nextId,
             );
-            const index = triggers.indexOf(target as HTMLButtonElement);
-            const next = getNavigationTarget(
-              triggers.map((button) =>
-                button.closest('[data-favorite-id]')!.getBoundingClientRect(),
-              ),
-              index,
-              event.key,
-            );
-            event.preventDefault();
-            if (next !== undefined) triggers[next]?.focus();
+            nextTrigger?.focus();
           }}
           onDragOver={(event) => {
             if (getActiveLibraryDragPayload()?.type !== 'item') return;

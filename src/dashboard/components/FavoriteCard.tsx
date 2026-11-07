@@ -12,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { FaviconImage } from '../../components/FaviconImage';
 import { ThumbnailImage } from '../../components/ThumbnailImage';
-import { getThumbnail, type BookmarkSize } from '../../core/storage';
+import type { BookmarkSize } from '../../core/storage';
 import { getUrlLabel, parseSafeUrl } from '../../core/validation';
 import {
   checkFileAvailability,
@@ -30,6 +30,8 @@ import {
   setLibraryDragData,
 } from '../drag';
 import { getFavoriteReorderOffset, type FavoriteLayout } from '../favorite-motion';
+import { acquireThumbnailUrl } from '../thumbnail-resources';
+import { observeThumbnailTarget } from '../thumbnail-visibility';
 
 interface FavoriteCardProps {
   item: Item;
@@ -131,6 +133,9 @@ export function FavoriteCard({
   const [thumbnailUrl, setThumbnailUrl] = useState<string>();
   const [loadingPreviewHash, setLoadingPreviewHash] = useState<string | null>(null);
   const [fullThumbnailUrl, setFullThumbnailUrl] = useState<string>();
+  const [thumbnailNearViewportHash, setThumbnailNearViewportHash] = useState<
+    string | null
+  >(null);
   const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
   const [fileAvailability, setFileAvailability] = useState<FileAvailability>('unknown');
   const previewTimer = useRef<number>();
@@ -150,6 +155,7 @@ export function FavoriteCard({
   const wasDragging = useRef(false);
   const isLocalFile = parseSafeUrl(item.url)?.protocol === 'file:';
   const isMissingFile = isLocalFile && fileAvailability === 'missing';
+  const thumbnailNearViewport = thumbnailNearViewportHash === item.previewHash;
 
   useEffect(() => {
     if (!isLocalFile) {
@@ -220,9 +226,10 @@ export function FavoriteCard({
     }
 
     const entry = card.closest<HTMLElement>('.favorite-entry') ?? card;
+    const slot = card.closest<HTMLElement>('.bookmark-virtual-slot') ?? entry;
     const currentLayout = {
-      left: entry.offsetLeft,
-      top: entry.offsetTop,
+      left: slot.offsetLeft,
+      top: slot.offsetTop,
       width: entry.offsetWidth,
       height: entry.offsetHeight,
       orderRevision,
@@ -285,35 +292,81 @@ export function FavoriteCard({
   });
 
   useEffect(() => {
-    let currentUrl: string | undefined;
-    let fullUrl: string | undefined;
-    let active = true;
-    setThumbnailUrl(undefined);
-    setFullThumbnailUrl(undefined);
-    setLoadingPreviewHash(item.previewHash ?? null);
-    if (!item.previewHash) return () => undefined;
+    const card = cardRef.current;
+    if (!item.previewHash || size === 'compact' || thumbnailNearViewport || !card) {
+      return;
+    }
+    return observeThumbnailTarget(card, () =>
+      setThumbnailNearViewportHash(item.previewHash ?? null),
+    );
+  }, [item.previewHash, size, thumbnailNearViewport]);
 
-    void getThumbnail(item.previewHash)
-      .then((thumbnail) => {
-        if (!active || !thumbnail) return;
-        currentUrl = URL.createObjectURL(thumbnail.smallBlob ?? thumbnail.blob);
-        fullUrl = URL.createObjectURL(thumbnail.blob);
-        setThumbnailUrl(currentUrl);
-        setFullThumbnailUrl(fullUrl);
+  const shouldLoadSmallThumbnail =
+    !!item.previewHash &&
+    ((size !== 'compact' && thumbnailNearViewport) || hoverPreviewOpen);
+
+  useEffect(() => {
+    let active = true;
+    let release: (() => void) | undefined;
+    setThumbnailUrl(undefined);
+    if (!item.previewHash || !shouldLoadSmallThumbnail) {
+      setLoadingPreviewHash(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoadingPreviewHash(item.previewHash);
+    void acquireThumbnailUrl(item.previewHash, 'small')
+      .then((resource) => {
+        if (!active) {
+          resource?.release();
+          return;
+        }
+        if (resource) {
+          release = resource.release;
+          setThumbnailUrl(resource.url);
+        }
+        setLoadingPreviewHash(null);
       })
       .catch(() => {
-        if (active) setThumbnailUrl(undefined);
-      })
-      .finally(() => {
         if (active) setLoadingPreviewHash(null);
       });
 
     return () => {
       active = false;
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-      if (fullUrl) URL.revokeObjectURL(fullUrl);
+      release?.();
     };
-  }, [item.previewHash]);
+  }, [item.previewHash, shouldLoadSmallThumbnail]);
+
+  useEffect(() => {
+    let active = true;
+    let release: (() => void) | undefined;
+    setFullThumbnailUrl(undefined);
+    if (!item.previewHash || !hoverPreviewOpen) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void acquireThumbnailUrl(item.previewHash, 'full')
+      .then((resource) => {
+        if (!active) {
+          resource?.release();
+          return;
+        }
+        if (resource) {
+          release = resource.release;
+          setFullThumbnailUrl(resource.url);
+        }
+      })
+      .catch(() => setFullThumbnailUrl(undefined));
+
+    return () => {
+      active = false;
+      release?.();
+    };
+  }, [hoverPreviewOpen, item.previewHash]);
 
   const cancelPreviewHide = () => {
     if (previewHideTimer.current) window.clearTimeout(previewHideTimer.current);
@@ -431,7 +484,10 @@ export function FavoriteCard({
             collection ?? event.currentTarget.parentElement!
           ).querySelectorAll<HTMLElement>('[data-favorite-id]'),
         );
-        dragItemIds.slice(0, 3).forEach((id, index) => {
+        const visibleDragIds = [...new Set([item.id, ...dragItemIds])]
+          .filter((id) => cards.some((card) => card.dataset.favoriteId === id))
+          .slice(0, 3);
+        visibleDragIds.forEach((id, index) => {
           const source = cards.find((card) => card.dataset.favoriteId === id);
           if (!source) return;
           const clone = source.cloneNode(true) as HTMLElement;

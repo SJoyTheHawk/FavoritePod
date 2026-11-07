@@ -1,4 +1,6 @@
-import { parseSafeUrl } from './validation';
+import { normalizeVisitedSiteUrl } from './discovery-url';
+
+export { normalizeVisitedSiteUrl } from './discovery-url';
 
 export interface TopSiteEntry {
   url: string;
@@ -6,15 +8,6 @@ export interface TopSiteEntry {
 }
 
 export type VisitedSiteSuggestion = TopSiteEntry;
-
-export function normalizeVisitedSiteUrl(value: string): string | undefined {
-  const parsed = parseSafeUrl(value);
-  if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
-    return undefined;
-  }
-  parsed.hash = '';
-  return parsed.toString();
-}
 
 export function buildVisitedSiteSuggestions(
   topSites: readonly TopSiteEntry[],

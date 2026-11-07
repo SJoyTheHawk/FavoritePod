@@ -35,6 +35,7 @@ export function refreshContextMenus(): Promise<void> {
 }
 
 let popupQueue: Promise<void> = Promise.resolve();
+let installed = false;
 
 export function handleContextMenuClick(
   info: chrome.contextMenus.OnClickData,
@@ -81,21 +82,12 @@ export function handleContextMenuClick(
 }
 
 export function installContextMenus(): void {
+  if (installed) return;
+  installed = true;
   const reportError = (cause: unknown) =>
     console.error('FavoritePod context menus could not be refreshed.', cause);
   const refresh = () => void refreshContextMenus().catch(reportError);
-  const onClick = (info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab) => {
-    void handleContextMenuClick(info, tab).catch(reportError);
-  };
-  const registerClickListener = () => {
-    // Optional API namespaces may be unavailable until the permission is granted.
-    if (chrome.contextMenus && !chrome.contextMenus.onClicked.hasListener(onClick)) {
-      chrome.contextMenus.onClicked.addListener(onClick);
-    }
-  };
-  registerClickListener();
   chrome.permissions.onAdded.addListener(() => {
-    registerClickListener();
     refresh();
   });
   chrome.permissions.onRemoved.addListener(refresh);

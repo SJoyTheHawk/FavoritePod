@@ -884,15 +884,15 @@ separately in [`phase-9-manual-test.md`](./manual_test/phase-9-manual-test.md).
 
 ## Phase 10: Polish & Testing (Week 14-16)
 
-**Status Review (2026-11-07)**: After 9 phases, FavoritePod is functionally complete with 17,655 lines of code, 204 passing tests, and stable builds. The core features work well, but polish and optimization are needed before public launch.
+**Status Review (2026-11-08)**: After 9 phases, FavoritePod is functionally complete, with 240 passing tests and stable builds. Phase 10.1 is closed and Phase 10.2 performance work is implemented; real-profile acceptance checks remain.
 
 **Current System Health**:
 - ✅ All tests passing, TypeScript compiles cleanly
 - ✅ Robust HLC-based sync, offline support, comprehensive Drive integration
 - ✅ Optional features (Frequently Visited, Context Menus) implemented
-- ⚠️ Bundle sizes need optimization (231KB dashboard, 200KB global libs)
+- ⚠️ Bundle sizes still need optimization (282KB dashboard entry and a 201KB shared JavaScript chunk)
 - ✅ Phase 10.1 theme, motion, loading, and keyboard work closed after user manual acceptance; drag cancellation note resolved
-- ⚠️ Performance untested with large collections (1000+ items)
+- ✅ Isolated 5,760-favorite profile completed; real-profile drag, resize, and memory acceptance remains pending
 - ⚠️ Accessibility incomplete (keyboard shortcuts, ARIA labels need work)
 
 ### 10.1 Design System Finalization
@@ -955,39 +955,55 @@ phases 10.2–10.4 remain separate work.
 ### 10.2 Performance Optimization
 **Goal**: Fast and smooth experience
 
-**Current Status**:
-- ✅ Thumbnails load on-demand via useEffect
-- ✅ Dexie queries use indexes
-- ✅ Search is implemented and functional
-- ⚠️ No virtual scrolling (untested with 1000+ items)
-- ⚠️ Bundle sizes large (dashboard 231KB, needs code splitting)
-- ⚠️ No profiling data for large collections
+**Progress (2026-11-08)**: Large-library profiling confirmed virtualization was
+needed. The production dashboard now mounts visible favorite rows plus two rows
+of overscan, keeps logical selection in dashboard state, retains the native drag
+source, pins the keyboard-focus row, and supports Home/End and arrow navigation across unmounted
+favorites. Search is debounced by 300ms. A shared IntersectionObserver and
+hash-keyed thumbnail resource manager load nearby small previews, share duplicate
+images, and release full-size images when previews close. Discovery and context
+menus are emitted as optional dynamic chunks.
+
+An isolated production Chrome run with 5,760 favorites and one shared preview
+measured about 1.4GB JS heap and 4.7s settled load before the change. Afterward,
+the first 9 cards appeared in about 104ms; the page settled in about 1.1s with
+about 20.8MB JS heap and 9 cards mounted. End focused the final favorite, and a
+selection stayed checked after scrolling away and back. See
+[`phase-10.2-manual-test.md`](./manual_test/phase-10.2-manual-test.md) for the
+profile setup, results, and pending manual acceptance.
+
+The reported Escape regression in virtualized collections is fixed: stable
+favorite slots keep the native source element attached through placeholder changes,
+reorders, and scrolling, so native dragend reaches the shared synchronous reset.
+Isolated Chrome checks confirm immediate original-order restoration for single and
+multiple favorites, including cancellation after scrolling a 5,760-item collection.
+The user's cancellation acceptance checkbox remains open for retesting.
 
 **Revised Priority Tasks**:
-- [ ] **HIGH**: Profile dashboard with 1000+ items, identify bottlenecks
-- [ ] **HIGH**: Implement lazy thumbnail loading with Intersection Observer (currently loads all)
-- [ ] **MEDIUM**: Add search debouncing (300ms)
-- [ ] **MEDIUM**: Code split optional features to reduce initial bundle
-- [ ] **LOW**: Virtual scrolling if profiling shows need (defer until proven necessary)
+- [x] **HIGH**: Profile a 5,760-item dashboard and identify the all-cards mount cost
+- [x] **HIGH**: Load nearby thumbnails with Intersection Observer and share duplicate resources
+- [x] **MEDIUM**: Debounce search by 300ms
+- [x] **MEDIUM**: Code split Discovery and Context Menu feature modules
+- [x] **HIGH**: Virtualize favorite rows after profiling proved it necessary
 - [ ] **LOW**: Compress build output further (already using production build)
 
-**Performance Targets** (to verify):
+**Performance Targets**:
 - Popup opens: <100ms (current: untested)
 - Dashboard loads: <500ms with 100 items (current: untested)
-- Dashboard loads: <2s with 1000 items (NEW)
+- Dashboard loads: <2s with 1000 items (5,760-item isolated profile settles in ~1.1s)
 - Drag-and-drop: 60fps (current: appears smooth but not measured)
-- Search results: <100ms (current: no debounce, instant but could cause lag)
+- Search results: <100ms after the 300ms debounce (not yet profiled)
 - Sync cycle: <5s for 100 items (current: appears fast but not measured)
 
 ### 10.3 Comprehensive Testing
 **Goal**: High confidence before release
 
 **Current Status**:
-- ✅ 204 unit tests passing across 23 test files
+- ✅ 240 unit tests passing across 28 test files
 - ✅ Core modules well-tested (HLC, merge, storage, Drive sync)
 - ✅ Manual testing completed for Phases 1-9
 - ⚠️ No automated E2E tests (all manual so far)
-- ⚠️ No large dataset testing (untested with 1000+ items)
+- ⚠️ No large dataset testing on the user's normal extension profile or target devices
 - ⚠️ Accessibility not audited
 
 **Revised Priority Tasks**:

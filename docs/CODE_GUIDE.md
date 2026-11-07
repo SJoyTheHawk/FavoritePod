@@ -1134,11 +1134,24 @@ optimization before public launch. See `IMPLEMENTATION_PLAN.md` for full details
 
 ### HIGH Priority Tasks
 
-1. **Large Collection Rendering & Memory (implemented in 10.2)**
-   - `FavoriteCollection.tsx` virtualizes measured rows with two rows of overscan.
-   - `thumbnail-visibility.ts` pools one IntersectionObserver; `thumbnail-resources.ts` shares object URLs by hash and size, reference-counts active cards, and bounds the unused small-preview cache to 64 entries / 16 MiB.
+For large group counts, offscreen favorite collections suspend their virtualizer
+and document-height observation while preserving geometry. Closed group menu
+panels remain unmounted. File availability probes share in-flight requests and
+cache at most 256 status-only results for 30 seconds, keyed by the rewritten path;
+permission is checked before using cached results. Cancel response bodies after
+headers and time out probes after five seconds. No file contents are cached.
+
+Use `resize-observer.ts` for resize-driven layout updates: batch the latest
+notification for each target into an animation frame, rather than changing
+virtual row sizes or React geometry during ResizeObserver delivery. Disconnect
+observers and cancel pending frames on cleanup. Keep the initial collection
+measurement in its layout effect and drag cancellation synchronous.
+
+1. **Large Collection Rendering & Memory (Phase 10.2 closed 2026-11-08)**
+   - `FavoriteCollection.tsx` virtualizes measured rows with half a viewport of overscan above/below, rounded outward to whole rows. `viewport-buffer.ts` centralizes the 0.5 fraction shared with image visibility; height changes update both.
+   - `thumbnail-visibility.ts` pools one IntersectionObserver; `thumbnail-resources.ts` shares object URLs by hash and size, reference-counts active consumers, limits image work to four jobs, and cancels obsolete queued loads. Small URLs revoke on final release with no unused card cache. Full hover URLs retain the ten most recently opened distinct images; reopening refreshes recency, and older entries revoke once unused. Small derivatives and originals persist in IndexedDB.
    - Dashboard selection stays keyed by item ID. Favorite slots keep stable parents, the native drag source stays mounted, and the keyboard target row stays pinned; logical geometry keeps arrow/Home/End navigation working across unmounted rows.
-   - The isolated 5,760-item profile and pending manual checks are recorded in `docs/manual_test/phase-10.2-manual-test.md`.
+   - All 11 user manual checks are complete. The isolated profiles, normal-profile measurements, and accepted remaining large-group memory limitation are recorded in `docs/manual_test/phase-10.2-manual-test.md`. Further group-tree optimization and bundle compression are deferred beyond closure.
 
 2. **Theme Toggle Implementation**
    - **Implemented (10.1)**: `src/dashboard/hooks/use-theme.ts` runs at dashboard and popup startup
@@ -1195,9 +1208,9 @@ Phase 10 Focus Areas:
 ### Testing Priorities
 
 - **Two-device Drive sync**: Validate concurrent editing, conflict resolution
-- **Large dataset**: Automated 5,760-item profile passes; see `docs/manual_test/phase-10.2-manual-test.md` for real-profile scroll, drag, and memory checks
+- **Large dataset**: Phase 10.2 automated profiles and user manual scroll, drag, resize, and memory checks are complete; see `docs/manual_test/phase-10.2-manual-test.md` for evidence and accepted limits
 - **Accessibility**: Keyboard-only navigation, screen reader compatibility
-- **Performance profiling**: Initial profile measured; repeat on the user's normal Chrome profile and target hardware
+- **Performance profiling**: Phase 10.2 normal-profile measurements accepted; broader target-hardware benchmarking remains future work
 
 ### Documentation Needed
 

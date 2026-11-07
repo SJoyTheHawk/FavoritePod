@@ -1204,7 +1204,7 @@ The dashboard owns the hook for the page lifetime and passes its `theme`, `ready
 
 - Use `AnimatedDialog` and `useDialogTransition` from `src/components/AnimatedDialog.tsx` for conditionally mounted dialogs. Route dismissal through the transition hook; the parent unmount callback runs after exit. Keep operation-specific busy/cancel guards.
 - Keep Headless UI `DialogBackdrop` and `DialogPanel` with `transition` and the shared `dialog-backdrop` / `dialog-panel` CSS classes. The 200ms fade and small panel movement use the guide's timing. Preserve existing widths, padding, backdrop, and focus traps.
-- Preserve existing drag-stack ghosts, placement highlights, and same-group reorder/drop animations. Adding, removing, or transferring favorites between groups must not replay neighboring cards' old positions. Keep the drag placeholder until the saved destination is rendered, and replace active motion when retargeting. Card hover changes the established shadow without adding transforms that conflict with drag geometry.
+- Preserve existing drag-stack ghosts, placement highlights, and reorder/drop animations. During a drag, animate existing source/destination cards as the placeholder enters, moves, or leaves, including across groups. Include the placeholder position in the motion revision even when the dragged item is not yet a destination member. Adding/removing favorites or committing a transfer must not replay neighboring cards' old positions. Keep the drag placeholder until the saved destination is rendered, and replace active motion when retargeting. Card hover changes the established shadow without adding transforms that conflict with drag geometry.
 - Cancelling a drag with Escape restores the original layout and clears the ghost, placeholder, group-header tint, and sidebar placement highlight without waiting for mouse release. Native drag termination must perform the same cleanup; a drop already saving keeps its placeholder until persistence is observed.
 - Cancellation removes the ghost and resets the layout in the same update, with no return/reorder animation. Normal reordering and successful drops retain their existing motion.
 - Use `ThumbnailImage` to hold image space while storage/decode is pending, fade in decoded previews, and fall back if an image fails. Existing object-URL cleanup remains with the owning card.
@@ -1230,20 +1230,43 @@ See [Phase 10.1 manual checks](./manual_test/phase-10.1-manual-test.md). Browser
 
 The dashboard uses `ThumbnailImage` for stable sizing, decode feedback, and
 fallbacks. `thumbnail-visibility.ts` shares one IntersectionObserver across
-cards and starts loading 240px before a card enters view. Keep full-size previews
-closed until the hover preview opens.
+cards and collections. The buffer is 50% of the window scroll viewport height
+above and below, computed in CSS pixels and rebuilt on height changes. The window
+viewport excludes browser chrome; the dashboard header scrolls with the document.
+Transient overlays do not change the buffer. Use pixel root margins calculated
+from height, not percentage root margins. Report exits from this buffered region
+so images release beyond it. Keep full-size previews closed until the hover
+preview opens, and close them when the card leaves the buffered region.
 
 `thumbnail-resources.ts` keys object URLs by preview hash and size, deduplicates
-parallel reads, and reference-counts mounted cards. Release full-size URLs when
-the preview closes. Keep at most 64 unused small previews and 16 MiB of cached
-small blobs; always revoke a URL when its cache entry is evicted.
+parallel reads, and reference-counts active consumers, including drag copies.
+Revoke small URLs immediately after their final consumer releases; do not add
+an unused card-thumbnail memory cache beyond the 50% viewport buffer. Retain the
+ten most recently opened distinct full-size hover images by hash. Reopening
+refreshes recency; closing does not. Evict older URLs once no active consumer
+needs them. Still-open previews retain ownership until they close. Cancelled or
+failed pending loads do not enter this cache; saved originals remain in IndexedDB.
+Limit reads/conversions to four jobs and skip queued loads whose consumers leave
+view. Imported/synced images without a small preview get a persisted 320 × 200
+derivative; preserve the original bytes and hash. Close decoded bitmaps and release
+canvas buffers after conversion. Reuse on-disk card derivatives instead of unused
+small URLs. The hover cache retains resource URLs for reuse, not hidden image nodes.
 
 ### Large Collections
 
-`FavoriteCollection` uses `@tanstack/react-virtual` to mount visible rows plus two
-rows of overscan while preserving the full document scroll height. The row count
+`FavoriteCollection` uses `@tanstack/react-virtual` to mount visible rows plus
+50% of the viewport height on each side, rounded outward to whole overscan rows,
+while preserving the full document scroll height. Share the buffer fraction with
+image observation; recalculate rows on viewport/card-size changes. The row count
 follows responsive grid columns and the existing card dimensions for each size.
 Keep selection in dashboard state by favorite ID; do not tie it to mounted cards.
+Offscreen collections return an empty ordinary virtual range: window virtualizers
+otherwise clamp to edge rows and accumulate mounted cards across groups. Preserve
+the collection height and explicitly pinned keyboard/drag source while hidden.
+Disable offscreen virtualizers so they remove scroll subscriptions; preserve the
+last measured collection height (or the current row estimate after size changes).
+Only active collections observe document-wide height changes. Group action menu
+panels mount on opening, retaining existing pointer/keyboard behavior and styling.
 
 Render visible favorite slots directly under the collection with stable item keys;
 moving between rows must retain the same card element. Keep the native drag source
@@ -1253,8 +1276,10 @@ mounted DOM nodes. Keep drop hit testing based on mounted visible slots, and
 measure positions relative to the full virtualized collection. Search waits 300ms
 after the last keystroke and resets scrolling to the start of the result set.
 
-The 5,760-item isolated profile and the remaining real-profile acceptance checks
-are tracked in [`phase-10.2-manual-test.md`](./manual_test/phase-10.2-manual-test.md).
+Phase 10.2 closed on 2026-11-08 after all user manual checks passed. The isolated
+profiles, normal-profile measurements, final cache policy, and accepted remaining
+large-group memory cost are recorded in
+[`phase-10.2-manual-test.md`](./manual_test/phase-10.2-manual-test.md).
 
 ---
 

@@ -11,6 +11,23 @@ export interface PathOverride {
 
 export const FILE_ACCESS_DENIED = 'FILE_ACCESS_DENIED';
 
+const FILE_AVAILABILITY_TTL_MS = 30_000;
+const FILE_AVAILABILITY_CACHE_LIMIT = 256;
+const availabilityCache = new Map<
+  string,
+  { value: FileAvailability; checkedAt: number }
+>();
+const pendingAvailability = new Map<string, Promise<FileAvailability>>();
+let availabilityRequests = 0;
+
+export function getFileAvailabilityStats() {
+  return {
+    cachedResults: availabilityCache.size,
+    pendingChecks: pendingAvailability.size,
+    requestsStarted: availabilityRequests,
+  };
+}
+
 function settingsKey(deviceId: string): string {
   return `pathOverrides:${deviceId}`;
 }
@@ -159,10 +176,39 @@ export async function checkFileAvailability(
     return 'unknown';
   }
 
+  const target = applyPathOverride(url, overrides);
+  const cached = availabilityCache.get(target);
+  if (cached && Date.now() - cached.checkedAt < FILE_AVAILABILITY_TTL_MS)
+    return cached.value;
+  const pending = pendingAvailability.get(target);
+  if (pending) return pending;
+  const request = (async (): Promise<FileAvailability> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    availabilityRequests += 1;
+    let value: FileAvailability;
+    try {
+      const response = await fetch(target, { signal: controller.signal });
+      value = response.ok ? 'available' : 'missing';
+      // Only existence is needed. Never retain/download the whole local file.
+      await response.body?.cancel().catch(() => undefined);
+    } catch {
+      value = controller.signal.aborted ? 'unknown' : 'missing';
+    } finally {
+      clearTimeout(timeout);
+      controller.abort();
+    }
+    availabilityCache.delete(target);
+    availabilityCache.set(target, { value, checkedAt: Date.now() });
+    while (availabilityCache.size > FILE_AVAILABILITY_CACHE_LIMIT) {
+      availabilityCache.delete(availabilityCache.keys().next().value!);
+    }
+    return value;
+  })();
+  pendingAvailability.set(target, request);
   try {
-    const response = await fetch(applyPathOverride(url, overrides));
-    return response.ok ? 'available' : 'missing';
-  } catch {
-    return 'missing';
+    return await request;
+  } finally {
+    if (pendingAvailability.get(target) === request) pendingAvailability.delete(target);
   }
 }

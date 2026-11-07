@@ -18,6 +18,44 @@ const reordered = { ...layout, left: 0, top: 200, orderRevision: 'after' };
 describe('favorite visible order', () => {
   const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
 
+  it('tracks entering, moving, and leaving a cross-group placeholder', () => {
+    const before = new Map([
+      ['foreign', 0],
+      ['a', 1],
+      ['b', 2],
+      ['c', 3],
+    ]);
+    const after = new Map([
+      ['a', 0],
+      ['b', 1],
+      ['foreign', 2],
+      ['c', 3],
+    ]);
+    const original = getFavoriteOrderRevision(items, null);
+    expect(getFavoriteOrderRevision(items, before)).toBe(original);
+    expect(getFavoriteOrderRevision(items, after)).toBe(original);
+    const entered = getFavoriteOrderRevision(items, before, 'foreign');
+    const retargeted = getFavoriteOrderRevision(items, after, 'foreign');
+    expect(entered).not.toBe(original);
+    expect(retargeted).not.toBe(entered);
+    expect(getFavoriteOrderRevision(items, after, 'foreign')).toBe(retargeted);
+    expect(
+      getFavoriteReorderOffset(layout, { ...reordered, orderRevision: entered }),
+    ).toEqual({ x: 200, y: -100 });
+    expect(
+      getFavoriteReorderOffset(
+        { ...layout, orderRevision: entered },
+        { ...reordered, orderRevision: retargeted },
+      ),
+    ).toEqual({ x: 200, y: -100 });
+    expect(
+      getFavoriteReorderOffset(
+        { ...layout, orderRevision: entered },
+        { ...reordered, orderRevision: original },
+      ),
+    ).toEqual({ x: 200, y: -100 });
+  });
+
   it('keeps the revision stable when a drag starts without moving cards', () => {
     expect(
       getFavoriteOrderRevision(
@@ -66,7 +104,7 @@ describe('favorite reorder motion', () => {
     }
   });
 
-  it('does not replay cross-group preview positions when the drag commits', () => {
+  it('honors motion suppression before or after a layout change', () => {
     expect(
       getFavoriteReorderOffset(layout, { ...reordered, animateReorder: false }),
     ).toBeNull();

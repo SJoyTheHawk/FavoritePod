@@ -1,8 +1,9 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../db';
 import {
   applyPathOverride,
   checkFileAvailability,
+  getFileAvailabilityStats,
   getPathOverrides,
   openFileUrl,
   savePathOverrides,
@@ -30,6 +31,10 @@ beforeEach(async () => {
 afterAll(async () => {
   vi.unstubAllGlobals();
   await db.delete();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('local file links', () => {
@@ -103,7 +108,56 @@ describe('local file links', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     expect(
-      await checkFileAvailability('file:///Users/alice/tools/app.html', [override]),
+      await checkFileAvailability('file:///Users/alice/tools/missing.html', [override]),
     ).toBe('missing');
+  });
+
+  it('shares missing-file probes across duplicate cards and remounts until expiry', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('File not found'));
+    vi.stubGlobal('fetch', fetchMock);
+    const url = 'file:///Users/alice/removed-dedup.png';
+    expect(
+      await Promise.all(Array.from({ length: 88 }, () => checkFileAvailability(url, []))),
+    ).toEqual(Array(88).fill('missing'));
+    expect(await checkFileAvailability(url, [])).toBe('missing');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    now.mockReturnValue(31_001);
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue({ ok: true, body: { cancel } });
+    expect(await checkFileAvailability(url, [])).toBe('available');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+  });
+
+  it('checks permission before cached results and keys probes by the rewritten path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
+    const url = 'file:///Users/alice/tools/cache-target.html';
+    expect(await checkFileAvailability(url, [])).toBe('available');
+    isAllowedFileSchemeAccess.mockResolvedValue(false);
+    expect(await checkFileAvailability(url, [])).toBe('unknown');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    isAllowedFileSchemeAccess.mockResolvedValue(true);
+    fetchMock.mockResolvedValue({ ok: false });
+    expect(await checkFileAvailability(url, [override])).toBe('missing');
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'file:///Volumes/tools/cache-target.html',
+      { signal: expect.any(AbortSignal) },
+    );
+  });
+
+  it('bounds cached file statuses without retaining file response bodies', async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: { cancel } }));
+    for (let index = 0; index < 280; index++) {
+      await checkFileAvailability('file:///Users/alice/bounded-' + index, []);
+    }
+    expect(getFileAvailabilityStats()).toMatchObject({
+      cachedResults: 256,
+      pendingChecks: 0,
+    });
+    expect(cancel).toHaveBeenCalledTimes(280);
   });
 });

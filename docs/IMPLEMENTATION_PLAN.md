@@ -22,6 +22,11 @@ Phase 10.1 closed on 2026-11-07 after user-reported manual acceptance and a veri
 fix for drag cancellation leaving stale background/drop highlights; see
 [Phase 10.1 manual tests](./manual_test/phase-10.1-manual-test.md).
 
+Phase 10.2 closed on 2026-11-08 after all 11 user manual checks were marked
+complete. The remaining large-group memory cost is accepted for this stage;
+further group-tree and bundle optimization is deferred. See
+[Phase 10.2 manual tests](./manual_test/phase-10.2-manual-test.md).
+
 ## Architecture Overview
 
 ```
@@ -884,7 +889,7 @@ separately in [`phase-9-manual-test.md`](./manual_test/phase-9-manual-test.md).
 
 ## Phase 10: Polish & Testing (Week 14-16)
 
-**Status Review (2026-11-08)**: After 9 phases, FavoritePod is functionally complete, with 240 passing tests and stable builds. Phase 10.1 is closed and Phase 10.2 performance work is implemented; real-profile acceptance checks remain.
+**Status Review (2026-11-08)**: After 9 phases, FavoritePod is functionally complete, with passing tests and stable builds. Phases 10.1 and 10.2 are closed after user manual acceptance. The remaining large-group memory cost is accepted for this stage; Phases 10.3–10.4 remain separate.
 
 **Current System Health**:
 - ✅ All tests passing, TypeScript compiles cleanly
@@ -892,7 +897,7 @@ separately in [`phase-9-manual-test.md`](./manual_test/phase-9-manual-test.md).
 - ✅ Optional features (Frequently Visited, Context Menus) implemented
 - ⚠️ Bundle sizes still need optimization (282KB dashboard entry and a 201KB shared JavaScript chunk)
 - ✅ Phase 10.1 theme, motion, loading, and keyboard work closed after user manual acceptance; drag cancellation note resolved
-- ✅ Isolated 5,760-favorite profile completed; real-profile drag, resize, and memory acceptance remains pending
+- ✅ Phase 10.2 large-library loading, scrolling, drag, resize, and memory checks accepted; further group-memory optimization deferred
 - ⚠️ Accessibility incomplete (keyboard shortcuts, ARIA labels need work)
 
 ### 10.1 Design System Finalization
@@ -955,13 +960,21 @@ phases 10.2–10.4 remain separate work.
 ### 10.2 Performance Optimization
 **Goal**: Fast and smooth experience
 
+**Status (2026-11-08)**: Closed. All 11 manual checks are marked complete by the
+user. The user accepts the current performance and remaining large-group memory
+cost, and requested that optimization stop at this stage. No acceptance blockers
+remain. Further group-tree work and additional bundle compression are deferred.
+Closure verification passes 263 tests across 32 files, TypeScript compilation,
+lint, formatting, and production build; isolated browser regression evidence and
+manual acceptance are recorded separately in the checklist.
+
 **Progress (2026-11-08)**: Large-library profiling confirmed virtualization was
-needed. The production dashboard now mounts visible favorite rows plus two rows
-of overscan, keeps logical selection in dashboard state, retains the native drag
+needed. The production dashboard now mounts visible favorite rows plus half a
+viewport above/below (rounded outward to whole rows), keeps logical selection in dashboard state, retains the native drag
 source, pins the keyboard-focus row, and supports Home/End and arrow navigation across unmounted
 favorites. Search is debounced by 300ms. A shared IntersectionObserver and
 hash-keyed thumbnail resource manager load nearby small previews, share duplicate
-images, and release full-size images when previews close. Discovery and context
+images, and retain the ten most recently opened full-size hover images. Discovery and context
 menus are emitted as optional dynamic chunks.
 
 An isolated production Chrome run with 5,760 favorites and one shared preview
@@ -970,14 +983,30 @@ the first 9 cards appeared in about 104ms; the page settled in about 1.1s with
 about 20.8MB JS heap and 9 cards mounted. End focused the final favorite, and a
 selection stayed checked after scrolling away and back. See
 [`phase-10.2-manual-test.md`](./manual_test/phase-10.2-manual-test.md) for the
-profile setup, results, and pending manual acceptance.
+profile setup, results, and completed manual acceptance.
 
 The reported Escape regression in virtualized collections is fixed: stable
 favorite slots keep the native source element attached through placeholder changes,
 reorders, and scrolling, so native dragend reaches the shared synchronous reset.
 Isolated Chrome checks confirm immediate original-order restoration for single and
 multiple favorites, including cancellation after scrolling a 5,760-item collection.
-The user's cancellation acceptance checkbox remains open for retesting.
+The user has accepted cancellation. A subsequent scrolling memory regression is
+fixed: offscreen groups release edge rows, viewport exits release thumbnail
+resources, and imported originals receive persisted small derivatives. The
+3,240-distinct-preview profile and user memory measurements are documented in
+the Phase 10.2 checklist. The initial 240px image margin is now replaced with
+50% of the window viewport height above and below, coordinated with row overscan
+and updated on resize. The user declined an unused card-thumbnail cache: small
+URLs still release with their last consumer. Full-size hover images now retain
+the ten most recently opened distinct resources, refreshing recency on reopen
+and releasing older entries once no active preview needs them.
+The subsequent 1,439-group reproduction identified per-group scroll/layout work
+and initialized closed menu panels as additional allocation costs. Offscreen
+virtualizers now suspend subscriptions with preserved height; document-wide
+measurement runs only for active collections, and menu panels mount on demand.
+Repeated missing-file checks share bounded 30-second status results and cancel
+unread response bodies. This reduces measured memory; the remaining cost is
+explicitly accepted at closure rather than treated as fully eliminated.
 
 **Revised Priority Tasks**:
 - [x] **HIGH**: Profile a 5,760-item dashboard and identify the all-cards mount cost
@@ -985,9 +1014,12 @@ The user's cancellation acceptance checkbox remains open for retesting.
 - [x] **MEDIUM**: Debounce search by 300ms
 - [x] **MEDIUM**: Code split Discovery and Context Menu feature modules
 - [x] **HIGH**: Virtualize favorite rows after profiling proved it necessary
-- [ ] **LOW**: Compress build output further (already using production build)
 
-**Performance Targets**:
+**Deferred Beyond Closure**:
+- Further group-tree virtualization/index consolidation to reduce the remaining large-group baseline
+- Additional bundle compression beyond the current production build and optional chunks
+
+**Reference Performance Targets (not all benchmarked; not closure blockers)**:
 - Popup opens: <100ms (current: untested)
 - Dashboard loads: <500ms with 100 items (current: untested)
 - Dashboard loads: <2s with 1000 items (5,760-item isolated profile settles in ~1.1s)
@@ -999,11 +1031,11 @@ The user's cancellation acceptance checkbox remains open for retesting.
 **Goal**: High confidence before release
 
 **Current Status**:
-- ✅ 240 unit tests passing across 28 test files
+- ✅ 263 unit tests passing across 32 test files
 - ✅ Core modules well-tested (HLC, merge, storage, Drive sync)
 - ✅ Manual testing completed for Phases 1-9
 - ⚠️ No automated E2E tests (all manual so far)
-- ⚠️ No large dataset testing on the user's normal extension profile or target devices
+- ✅ Phase 10.2 large-library checks accepted on the user's normal profile; broader target-device benchmarking remains separate
 - ⚠️ Accessibility not audited
 
 **Revised Priority Tasks**:
@@ -1085,20 +1117,21 @@ The user's cancellation acceptance checkbox remains open for retesting.
 
 #### 1. **Performance & Memory (CRITICAL for v1)**
 
-**Issue**: Large collections (5,760+ items) cause 2GB memory usage due to:
+**Original findings (addressed in Phase 10.2; remaining group overhead accepted)**:
 - All matching favorites mounted simultaneously in "All favorites" view
 - Each card creates both small and full-size thumbnail URLs
 - No resource sharing for duplicate images
 - Group tree fully mounted even when collapsed
 
-**Recommendation** (see `docs/future_plan/HIGH_MEMORY_INSPECTION.md`):
-- [ ] Implement virtual scrolling for favorite grid/list (render only visible + 2 rows buffer)
-- [ ] Add thumbnail resource manager with deduplication and LRU caching (64 entries / 16MB limit)
-- [ ] Generate missing 320×200 card previews on demand from imported images
-- [ ] Virtualize group tree rendering (unmount collapsed branches)
-- [ ] Build group/item indexes once per data update instead of repeatedly
+**Closure disposition** (see `docs/future_plan/HIGH_MEMORY_INSPECTION.md`):
+- [x] Virtualize favorite grid/list with the agreed 50% viewport buffer above/below
+- [x] Deduplicate thumbnail resources; retain ten recent hover images with no unused small-image cache
+- [x] Generate missing 320×200 card previews on demand from imported images
+- [x] Suspend offscreen collection work and mount group menu panels on demand
+- Deferred: group-tree virtualization and further consolidation of hierarchy indexes
 
-**Priority**: HIGH - Affects users with 500+ items. Should complete before public launch.
+**Disposition**: Phase 10.2 closed by user acceptance on 2026-11-08. Remaining
+group-memory cost is a documented future improvement, not an open phase blocker.
 
 #### 2. **Bundle Size Optimization**
 

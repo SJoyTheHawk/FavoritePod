@@ -225,68 +225,80 @@ function GroupBranch({
                 </span>
               </button>
               <Menu>
-                <MenuButton
-                  aria-label={`Actions for ${group.title}`}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-tertiary opacity-0 transition hover:bg-background hover:text-text-primary focus-visible:opacity-100 group-hover/tree-row:opacity-100 data-[open]:opacity-100"
-                  title="Group actions"
-                  type="button"
-                >
-                  <EllipsisHorizontalIcon aria-hidden="true" className="h-4 w-4" />
-                </MenuButton>
-                <MenuItems
-                  anchor="bottom end"
-                  className="z-40 min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
-                >
-                  <GroupAction
-                    icon={<PencilSquareIcon />}
-                    label="Edit or move…"
-                    onClick={() => onEdit(group)}
-                  />
-                  <GroupAction
-                    icon={<FolderPlusIcon />}
-                    label="New sub-group"
-                    onClick={() => onCreateChild(group.id)}
-                  />
-                  <GroupAction
-                    icon={<HomeIcon />}
-                    label={
-                      homePageGroupId === group.id ? 'Remove home page' : 'Set home page'
-                    }
-                    onClick={() =>
-                      onSetHomePage(homePageGroupId === group.id ? undefined : group.id)
-                    }
-                  />
-                  <GroupAction
-                    icon={<ChevronUpIcon />}
-                    label="Move up"
-                    onClick={() =>
-                      void onMoveGroup(
-                        group.id,
-                        group.parentId,
-                        siblings[siblingIndex - 1]?.id,
-                      )
-                    }
-                    disabled={siblingIndex <= 0}
-                  />
-                  <GroupAction
-                    icon={<ChevronDownIcon />}
-                    label="Move down"
-                    onClick={() =>
-                      void onMoveGroup(
-                        group.id,
-                        group.parentId,
-                        siblings[siblingIndex + 2]?.id,
-                      )
-                    }
-                    disabled={siblingIndex < 0 || siblingIndex >= siblings.length - 1}
-                  />
-                  <GroupAction
-                    icon={<TrashIcon />}
-                    label="Delete group"
-                    onClick={() => onDelete(group)}
-                    danger
-                  />
-                </MenuItems>
+                {({ open }) => (
+                  <>
+                    <MenuButton
+                      aria-label={`Actions for ${group.title}`}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-tertiary opacity-0 transition hover:bg-background hover:text-text-primary focus-visible:opacity-100 group-hover/tree-row:opacity-100 data-[open]:opacity-100"
+                      title="Group actions"
+                      type="button"
+                    >
+                      <EllipsisHorizontalIcon aria-hidden="true" className="h-4 w-4" />
+                    </MenuButton>
+                    {open && (
+                      <MenuItems
+                        anchor="bottom end"
+                        className="z-40 min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
+                      >
+                        <GroupAction
+                          icon={<PencilSquareIcon />}
+                          label="Edit or move…"
+                          onClick={() => onEdit(group)}
+                        />
+                        <GroupAction
+                          icon={<FolderPlusIcon />}
+                          label="New sub-group"
+                          onClick={() => onCreateChild(group.id)}
+                        />
+                        <GroupAction
+                          icon={<HomeIcon />}
+                          label={
+                            homePageGroupId === group.id
+                              ? 'Remove home page'
+                              : 'Set home page'
+                          }
+                          onClick={() =>
+                            onSetHomePage(
+                              homePageGroupId === group.id ? undefined : group.id,
+                            )
+                          }
+                        />
+                        <GroupAction
+                          icon={<ChevronUpIcon />}
+                          label="Move up"
+                          onClick={() =>
+                            void onMoveGroup(
+                              group.id,
+                              group.parentId,
+                              siblings[siblingIndex - 1]?.id,
+                            )
+                          }
+                          disabled={siblingIndex <= 0}
+                        />
+                        <GroupAction
+                          icon={<ChevronDownIcon />}
+                          label="Move down"
+                          onClick={() =>
+                            void onMoveGroup(
+                              group.id,
+                              group.parentId,
+                              siblings[siblingIndex + 2]?.id,
+                            )
+                          }
+                          disabled={
+                            siblingIndex < 0 || siblingIndex >= siblings.length - 1
+                          }
+                        />
+                        <GroupAction
+                          icon={<TrashIcon />}
+                          label="Delete group"
+                          onClick={() => onDelete(group)}
+                          danger
+                        />
+                      </MenuItems>
+                    )}
+                  </>
+                )}
               </Menu>
             </div>
             {children.length > 0 && (

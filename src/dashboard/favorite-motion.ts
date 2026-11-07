@@ -14,6 +14,7 @@ export interface FavoriteLayout {
 interface FavoriteRevisionCache {
   collection?: string;
   originalOrder?: string;
+  placeholderOrder?: { order: string; rank: number; revision: string };
   previewOrder: WeakMap<ReadonlyMap<string, number>, string>;
 }
 
@@ -45,8 +46,20 @@ export function getFavoriteCollectionRevision(
 export function getFavoriteOrderRevision(
   items: readonly { id: string }[],
   previewRank: ReadonlyMap<string, number> | null,
+  placeholderId?: string,
 ): string {
   const cache = getRevisionCache(items);
+  if (placeholderId && previewRank?.has(placeholderId)) {
+    const order = getFavoriteOrderRevision(items, previewRank);
+    const rank = previewRank.get(placeholderId)!;
+    const cached = cache.placeholderOrder;
+    if (cached?.order === order && cached.rank === rank) return cached.revision;
+    // A foreign dragged favorite is not a collection member yet, but its
+    // placeholder still moves the existing cards. Include that position.
+    const revision = JSON.stringify([order, rank]);
+    cache.placeholderOrder = { order, rank, revision };
+    return revision;
+  }
   if (!previewRank) {
     if (cache.originalOrder === undefined) {
       cache.originalOrder = JSON.stringify(items.map((item) => item.id));

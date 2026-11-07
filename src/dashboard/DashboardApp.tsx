@@ -155,7 +155,7 @@ import {
   resolveItemDropDestination,
   type ItemDropPlacement,
 } from './drag';
-import { getGroupLabels } from './group-labels';
+import { getGroupLabels, getGroupsInTreeOrder } from './group-labels';
 import { getGroupedFavoriteView, getItemsByGroupAndDescendants } from './grouped-view';
 import { getNavigationTarget } from './keyboard-navigation';
 
@@ -453,6 +453,7 @@ export function DashboardApp() {
   );
   const [historyVersion, setHistoryVersion] = useState(0);
   const groupLabels = useMemo(() => getGroupLabels(groups), [groups]);
+  const groupsInTreeOrder = useMemo(() => getGroupsInTreeOrder(groups), [groups]);
   const groupsById = useMemo(
     () => new Map(groups.map((group) => [group.id, group])),
     [groups],
@@ -478,7 +479,6 @@ export function DashboardApp() {
     }
     return result;
   }, [items]);
-  const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const selectedGroup = selectedGroupId ? groupsById.get(selectedGroupId) : undefined;
   const hasLocalFiles = useMemo(
     () => items.some((item) => parseSafeUrl(item.url)?.protocol === 'file:'),
@@ -1719,19 +1719,17 @@ export function DashboardApp() {
   };
 
   const renderFavoriteCollection = (collectionItems: readonly Item[]) => {
-    const animateReorder =
-      !draggingFavoriteId ||
-      draggedIds.every(
-        (id) =>
-          itemsById.get(id)?.groupId === favoritePreviewDestination.current?.groupId,
-      );
     const collectionRevision = getFavoriteCollectionRevision(collectionItems);
-    const orderRevision = getFavoriteOrderRevision(collectionItems, dragPreviewRank);
     const showPlaceholder =
       !!draggingFavoriteId &&
       !!dragPreviewRank?.has(draggedIds[0]) &&
       (groupedView.mode !== 'hierarchical' ||
         favoritePreviewDestination.current?.groupId === collectionItems[0]?.groupId);
+    const orderRevision = getFavoriteOrderRevision(
+      collectionItems,
+      dragPreviewRank,
+      showPlaceholder ? draggedIds[0] : undefined,
+    );
     return (
       <FavoriteCollection
         items={collectionItems}
@@ -1793,7 +1791,7 @@ export function DashboardApp() {
             <FavoriteCard
               orderRevision={orderRevision}
               collectionRevision={collectionRevision}
-              animateReorder={animateReorder}
+              animateReorder
               cancellationRevision={dragCancellationRevision.current}
               canMoveDown={moveAvailability.canMoveDown}
               canMoveUp={moveAvailability.canMoveUp}
@@ -1995,6 +1993,19 @@ export function DashboardApp() {
           className="min-w-0 flex-1 px-4 py-6 sm:px-7 sm:py-8"
           id="main-content"
           tabIndex={-1}
+          onKeyDownCapture={(event) => {
+            if (
+              event.key !== 'Escape' ||
+              event.defaultPrevented ||
+              event.nativeEvent.isComposing ||
+              selectedVisibleItems.length === 0 ||
+              document.querySelector('[role="dialog"], [role="menu"]')
+            )
+              return;
+            event.preventDefault();
+            event.stopPropagation();
+            setSelectedIds(new Set());
+          }}
           onKeyDown={(event) => {
             if (
               event.defaultPrevented ||
@@ -2198,7 +2209,9 @@ export function DashboardApp() {
             </div>
 
             {visibleItems.length > 0 && (
-              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+              <div
+                className={`${selectedVisibleItems.length > 0 ? 'sticky top-0 z-20 ' : ''}mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2`}
+              >
                 <label className="flex h-8 items-center gap-2 text-sm text-text-primary">
                   <input
                     aria-label="Select all visible favorites"
@@ -2221,7 +2234,7 @@ export function DashboardApp() {
                       value=""
                     >
                       <option value="">Move to group…</option>
-                      {groups.map((group) => (
+                      {groupsInTreeOrder.map((group) => (
                         <option key={group.id} value={group.id}>
                           {groupLabels.get(group.id) ?? group.title}
                         </option>

@@ -1,5 +1,26 @@
 # Reduce FavoritePod’s memory use while keeping continuous scrolling
 
+## Phase 10.2 disposition (2026-11-08)
+
+Phase 10.2 is closed after all 11 user manual checks were marked complete. The
+user accepts the remaining memory cost for this stage and chose to stop further
+optimization. Completed work includes favorite virtualization, shared/cancelled
+image loads, persisted 320 × 200 derivatives, offscreen virtualizer suspension,
+active-only document measurements, on-demand group menu panels, and bounded
+file-availability status probes.
+
+Final approved policy supersedes the original proposals below: keep card images
+within 50% of the viewport height above and below, with no additional unused-card
+cache; retain the ten most recently opened distinct full-size hover images.
+The remaining future opportunities are group-tree virtualization, unmounting
+collapsed branches while preserving interaction behavior, consolidating repeated
+hierarchy indexes, and broader device profiling. These are deferred improvements,
+not Phase 10.2 acceptance blockers. Evidence and limits are recorded in
+[the completed checklist](../manual_test/phase-10.2-manual-test.md).
+
+The following findings and implementation outline are the original investigation,
+retained for context; current behavior and accepted policy are described above.
+
 ## Findings and approach
 
 The strongest approach is **rendering only the favorites near the screen, sharing duplicate images, and loading large previews only when needed**.

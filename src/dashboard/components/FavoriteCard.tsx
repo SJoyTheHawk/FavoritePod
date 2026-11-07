@@ -30,8 +30,8 @@ import {
   setLibraryDragData,
 } from '../drag';
 import { getFavoriteReorderOffset, type FavoriteLayout } from '../favorite-motion';
-import { acquireThumbnailUrl } from '../thumbnail-resources';
-import { observeThumbnailTarget } from '../thumbnail-visibility';
+import { acquireThumbnailUrl, retainThumbnailUrl } from '../thumbnail-resources';
+import { observeNearViewport } from '../thumbnail-visibility';
 
 interface FavoriteCardProps {
   item: Item;
@@ -133,9 +133,7 @@ export function FavoriteCard({
   const [thumbnailUrl, setThumbnailUrl] = useState<string>();
   const [loadingPreviewHash, setLoadingPreviewHash] = useState<string | null>(null);
   const [fullThumbnailUrl, setFullThumbnailUrl] = useState<string>();
-  const [thumbnailNearViewportHash, setThumbnailNearViewportHash] = useState<
-    string | null
-  >(null);
+  const [thumbnailNearViewport, setThumbnailNearViewport] = useState(false);
   const [hoverPreviewOpen, setHoverPreviewOpen] = useState(false);
   const [fileAvailability, setFileAvailability] = useState<FileAvailability>('unknown');
   const previewTimer = useRef<number>();
@@ -150,12 +148,12 @@ export function FavoriteCard({
   const dragImageRef = useRef<HTMLElement | null>(null);
   const nativeDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const dragImageCleanup = useRef<(() => void) | null>(null);
+  const dragImageReleases = useRef<Array<() => void>>([]);
   const previousLayout = useRef<FavoriteLayout>();
   const motion = useRef<Animation>();
   const wasDragging = useRef(false);
   const isLocalFile = parseSafeUrl(item.url)?.protocol === 'file:';
   const isMissingFile = isLocalFile && fileAvailability === 'missing';
-  const thumbnailNearViewport = thumbnailNearViewportHash === item.previewHash;
 
   useEffect(() => {
     if (!isLocalFile) {
@@ -181,6 +179,8 @@ export function FavoriteCard({
     dragImageCleanup.current = null;
     dragImageRef.current?.remove();
     dragImageRef.current = null;
+    dragImageReleases.current.forEach((release) => release());
+    dragImageReleases.current = [];
     nativeDragImageRef.current?.remove();
     nativeDragImageRef.current = null;
   };
@@ -293,19 +293,23 @@ export function FavoriteCard({
 
   useEffect(() => {
     const card = cardRef.current;
-    if (!item.previewHash || size === 'compact' || thumbnailNearViewport || !card) {
-      return;
-    }
-    return observeThumbnailTarget(card, () =>
-      setThumbnailNearViewportHash(item.previewHash ?? null),
-    );
-  }, [item.previewHash, size, thumbnailNearViewport]);
+    if (!card) return;
+    return observeNearViewport(card, setThumbnailNearViewport);
+  }, []);
+
+  useEffect(() => {
+    if (thumbnailNearViewport) return;
+    if (previewTimer.current) window.clearTimeout(previewTimer.current);
+    previewTimer.current = undefined;
+    setHoverPreviewOpen(false);
+  }, [thumbnailNearViewport]);
 
   const shouldLoadSmallThumbnail =
     !!item.previewHash &&
     ((size !== 'compact' && thumbnailNearViewport) || hoverPreviewOpen);
 
   useEffect(() => {
+    const controller = new AbortController();
     let active = true;
     let release: (() => void) | undefined;
     setThumbnailUrl(undefined);
@@ -317,7 +321,7 @@ export function FavoriteCard({
     }
 
     setLoadingPreviewHash(item.previewHash);
-    void acquireThumbnailUrl(item.previewHash, 'small')
+    void acquireThumbnailUrl(item.previewHash, 'small', controller.signal)
       .then((resource) => {
         if (!active) {
           resource?.release();
@@ -335,11 +339,13 @@ export function FavoriteCard({
 
     return () => {
       active = false;
+      controller.abort();
       release?.();
     };
   }, [item.previewHash, shouldLoadSmallThumbnail]);
 
   useEffect(() => {
+    const controller = new AbortController();
     let active = true;
     let release: (() => void) | undefined;
     setFullThumbnailUrl(undefined);
@@ -349,7 +355,7 @@ export function FavoriteCard({
       };
     }
 
-    void acquireThumbnailUrl(item.previewHash, 'full')
+    void acquireThumbnailUrl(item.previewHash, 'full', controller.signal)
       .then((resource) => {
         if (!active) {
           resource?.release();
@@ -360,10 +366,13 @@ export function FavoriteCard({
           setFullThumbnailUrl(resource.url);
         }
       })
-      .catch(() => setFullThumbnailUrl(undefined));
+      .catch(() => {
+        if (active) setFullThumbnailUrl(undefined);
+      });
 
     return () => {
       active = false;
+      controller.abort();
       release?.();
     };
   }, [hoverPreviewOpen, item.previewHash]);
@@ -490,6 +499,12 @@ export function FavoriteCard({
         visibleDragIds.forEach((id, index) => {
           const source = cards.find((card) => card.dataset.favoriteId === id);
           if (!source) return;
+          for (const image of source.querySelectorAll<HTMLImageElement>(
+            'img[src^="blob:"]',
+          )) {
+            const release = retainThumbnailUrl(image.src);
+            if (release) dragImageReleases.current.push(release);
+          }
           const clone = source.cloneNode(true) as HTMLElement;
           clone.removeAttribute('data-favorite-id');
           clone.removeAttribute('id');

@@ -17,6 +17,7 @@ import type { Item } from '../../core/types';
 import { getUrlLabel } from '../../core/validation';
 import { FavoriteFallback } from './FavoriteFallback';
 import { ThumbnailImage } from '../../components/ThumbnailImage';
+import { observeElementResize } from '../resize-observer';
 
 interface HoverPreviewProps {
   anchorRef: RefObject<HTMLElement | null>;
@@ -75,7 +76,9 @@ export function HoverPreview({
       viewportPadding,
       Math.min(anchorRect.left, window.innerWidth - panelRect.width - viewportPadding),
     );
-    setPosition({ top, left });
+    setPosition((current) =>
+      current.top === top && current.left === left ? current : { top, left },
+    );
   }, [anchorRef, positionRef]);
 
   useLayoutEffect(() => {
@@ -101,9 +104,7 @@ export function HoverPreview({
 
   useEffect(() => {
     if (!open || !panelRef.current || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(placePreview);
-    observer.observe(panelRef.current);
-    return () => observer.disconnect();
+    return observeElementResize([panelRef.current], placePreview);
   }, [open, placePreview]);
 
   if (!open) return null;

@@ -16,6 +16,9 @@ import {
 } from 'react';
 import type { BookmarkSize, LibraryView } from '../../core/storage';
 import type { Item } from '../../core/types';
+import { observeNearViewport } from '../thumbnail-visibility';
+import { getViewportOverscanRows } from '../viewport-buffer';
+import { observeElementResize } from '../resize-observer';
 import {
   getFavoriteCollectionMetrics,
   type FavoriteCollectionMetrics,
@@ -64,12 +67,10 @@ function FavoriteCollectionSlot({
     const node = slotRef.current;
     // The hidden native source stays mounted but occupies no layout slot.
     if (!node || rowIndex < 0) return;
-    const observer = new ResizeObserver(([entry]) => {
+    return observeElementResize([node], ([entry]) => {
       const height = entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height;
       if (height > 0) onMeasure(rowIndex, height);
     });
-    observer.observe(node);
-    return () => observer.disconnect();
   }, [onMeasure, rowIndex]);
 
   return (
@@ -97,6 +98,12 @@ export function FavoriteCollection({
   const collectionRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [scrollMargin, setScrollMargin] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
+  const [nearViewport, setNearViewport] = useState(false);
+  useEffect(() => {
+    const node = collectionRef.current;
+    if (node) return observeNearViewport(node, setNearViewport);
+  }, []);
   const metrics = useMemo(
     () => getFavoriteCollectionMetrics(width, layout, size, hasGroupLabels),
     [hasGroupLabels, layout, size, width],
@@ -143,27 +150,45 @@ export function FavoriteCollection({
     return next;
   }, [dragPreviewRank, draggedIds, orderedItems, placeholder, showPlaceholder]);
   const rowCount = Math.ceil(entries.length / metrics.columns);
+  const source = draggingFavoriteId
+    ? items.find((item) => item.id === draggingFavoriteId)
+    : undefined;
   const focusedItemIndex = entries.findIndex(
     (entry) => entry.item?.id === focusedFavoriteId,
   );
   const rangeExtractor = useCallback(
     (range: Range) => {
-      const indexes = new Set(defaultRangeExtractor(range));
+      // Window virtualizers clamp an offscreen collection to its first/last
+      // rows. Exclude those rows instead of keeping cards for every past group.
+      const indexes = new Set(nearViewport ? defaultRangeExtractor(range) : []);
       if (focusedItemIndex >= 0)
         indexes.add(Math.floor(focusedItemIndex / metrics.columns));
       return [...indexes]
         .filter((index) => index >= 0 && index < rowCount)
         .sort((a, b) => a - b);
     },
-    [focusedItemIndex, metrics.columns, rowCount],
+    [focusedItemIndex, metrics.columns, nearViewport, rowCount],
   );
   const virtualizer = useWindowVirtualizer<HTMLDivElement>({
+    enabled: nearViewport || focusedItemIndex >= 0 || !!source,
     count: rowCount,
     estimateSize: () => metrics.rowHeight,
-    overscan: 2,
+    overscan: getViewportOverscanRows(viewportHeight, metrics.rowHeight),
     scrollMargin,
     rangeExtractor,
   });
+  const layoutRevision = [rowCount, metrics.columns, metrics.rowHeight].join(':');
+  const lastMeasuredLayout = useRef({ revision: '', height: 0 });
+  const live = nearViewport || focusedItemIndex >= 0 || !!source;
+  const collectionHeight = live
+    ? virtualizer.getTotalSize()
+    : lastMeasuredLayout.current.revision === layoutRevision
+      ? lastMeasuredLayout.current.height
+      : rowCount * metrics.rowHeight;
+  useLayoutEffect(() => {
+    if (live)
+      lastMeasuredLayout.current = { revision: layoutRevision, height: collectionHeight };
+  }, [collectionHeight, layoutRevision, live]);
   const measureRow = useCallback(
     (index: number, height: number) =>
       virtualizer.resizeItem(index, height + metrics.columnGap),
@@ -174,6 +199,7 @@ export function FavoriteCollection({
     const node = collectionRef.current;
     if (!node) return;
     const measure = () => {
+      setViewportHeight(window.innerHeight);
       setWidth((current) => {
         const next = node.getBoundingClientRect().width;
         return Math.abs(current - next) < 0.5 ? current : next;
@@ -184,15 +210,18 @@ export function FavoriteCollection({
       );
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    observer.observe(document.documentElement);
+    // Offscreen collections only need their own size. Document-height changes
+    // otherwise trigger thousands of redundant reads and React updates.
+    const stopObserving = observeElementResize(
+      live ? [node, document.documentElement] : [node],
+      measure,
+    );
     window.addEventListener('resize', measure);
     return () => {
-      observer.disconnect();
+      stopObserving();
       window.removeEventListener('resize', measure);
     };
-  }, []);
+  }, [live]);
 
   useEffect(() => {
     virtualizer.measure();
@@ -214,9 +243,6 @@ export function FavoriteCollection({
         top: row.start - scrollMargin,
       })),
   );
-  const source = draggingFavoriteId
-    ? items.find((item) => item.id === draggingFavoriteId)
-    : undefined;
   if (source) {
     // Keep the exact source element under the same parent through every preview
     // reorder and scroll. Reparenting it between virtual rows loses native
@@ -236,10 +262,11 @@ export function FavoriteCollection({
       data-layout={layout}
       data-size={size}
       data-virtualized="true"
+      data-virtual-active={live ? 'true' : 'false'}
       data-virtual-columns={metrics.columns}
       onDragOver={onDragOver}
       ref={collectionRef}
-      style={{ height: virtualizer.getTotalSize() }}
+      style={{ height: collectionHeight }}
     >
       {slots.map(({ entry, rowIndex, column, top }) => (
         <FavoriteCollectionSlot

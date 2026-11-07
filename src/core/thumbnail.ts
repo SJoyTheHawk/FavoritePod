@@ -33,6 +33,16 @@ export async function compressThumbnail(blob: Blob): Promise<ThumbnailInput> {
   }
 }
 
+/** Derive a card image without changing the archived original or its hash. */
+export async function createSmallThumbnail(blob: Blob): Promise<Blob> {
+  const image = await createImageBitmap(blob);
+  try {
+    return await resizeThumbnail(image, SMALL_WIDTH, SMALL_HEIGHT);
+  } finally {
+    image.close();
+  }
+}
+
 async function resizeThumbnail(
   image: ImageBitmap,
   width: number,
@@ -48,18 +58,23 @@ async function resizeThumbnail(
   const canvas = new OffscreenCanvas(width, height);
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Could not prepare the thumbnail canvas.');
-  context.drawImage(
-    image,
-    sourceX,
-    sourceY,
-    sourceWidth,
-    sourceHeight,
-    0,
-    0,
-    width,
-    height,
-  );
-  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.75 });
+  try {
+    context.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      width,
+      height,
+    );
+    return await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.75 });
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 export async function captureVisibleTab(

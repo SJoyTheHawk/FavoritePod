@@ -13,10 +13,9 @@ import {
   ArrowPathIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
+  Bars3Icon,
   BookmarkIcon,
   CheckCircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   Cog6ToothIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
@@ -141,6 +140,7 @@ import { FavoriteDialog } from './components/FavoriteDialog';
 import { MoveFavoriteDialog } from './components/MoveFavoriteDialog';
 import { GroupDialog } from './components/GroupDialog';
 import { GroupTree } from './components/GroupTree';
+import { GroupSidebar } from './components/GroupSidebar';
 import { GroupedFavoriteSection } from './components/GroupedFavoriteSection';
 import { SettingsDialog } from './components/SettingsDialog';
 import { FrequentlyVisitedSection } from './components/FrequentlyVisitedSection';
@@ -390,6 +390,8 @@ export function DashboardApp() {
   const contextMenuEditorHandled = useRef(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const closeMobileSidebar = useCallback(() => setMobileSidebarOpen(false), []);
   const [homePageGroupId, setHomePageGroupIdState] = useState<string>();
   const [showPreview, setShowPreviewState] = useState(true);
   const [openBehavior, setOpenBehaviorState] = useState<OpenBehavior>('all');
@@ -1860,7 +1862,18 @@ export function DashboardApp() {
         Skip to favorites
       </a>
       <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-2 sm:px-7">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <button
+            aria-controls="favorite-group-sidebar"
+            aria-expanded={mobileSidebarOpen}
+            aria-label="Open favorite groups"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary md:hidden"
+            onClick={() => setMobileSidebarOpen(true)}
+            title="Open favorite groups"
+            type="button"
+          >
+            <Bars3Icon aria-hidden="true" className="h-6 w-6" />
+          </button>
           <img
             alt=""
             aria-hidden="true"
@@ -1871,7 +1884,7 @@ export function DashboardApp() {
                 : '/icons/icon_light.jpg'
             }
           />
-          <span className="text-lg font-semibold">FavoritePod</span>
+          <span className="hidden text-lg font-semibold md:inline">FavoritePod</span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <button
@@ -1905,7 +1918,7 @@ export function DashboardApp() {
           />
           <button
             aria-label="Settings"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary"
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary md:flex"
             onClick={() => {
               setSettingsSection(undefined);
               setSettingsOpen(true);
@@ -1930,88 +1943,59 @@ export function DashboardApp() {
       </header>
 
       <div className="flex flex-1 flex-col md:flex-row">
-        <aside
-          aria-label="Favorite groups"
-          className={`border-b border-border md:sticky md:top-16 md:flex md:h-[calc(100dvh-4rem)] md:flex-col md:self-start md:shrink-0 md:border-b-0 md:border-r md:transition-[width] md:duration-200 ${sidebarCollapsed ? 'md:w-14' : 'md:w-64'}`}
+        <GroupSidebar
+          collapsed={sidebarCollapsed}
+          disabled={!settingsLoaded}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={closeMobileSidebar}
+          onOpenSettings={() => {
+            closeMobileSidebar();
+            setSettingsSection(undefined);
+            setSettingsOpen(true);
+          }}
+          onError={notifyError}
+          onToggle={() =>
+            void saveSidebarCollapsed(!sidebarCollapsed).catch((cause) =>
+              notifyError(errorMessage(cause)),
+            )
+          }
         >
-          <div
-            className={`flex min-h-9 shrink-0 items-center px-3 pt-3 ${sidebarCollapsed ? 'justify-center pb-3 md:px-2' : 'mb-3 justify-end md:px-4 md:pt-6'}`}
-          >
-            <button
-              aria-controls="favorite-group-sidebar"
-              aria-expanded={!sidebarCollapsed}
-              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!settingsLoaded}
-              onClick={() =>
-                void saveSidebarCollapsed(!sidebarCollapsed).catch((cause) =>
-                  notifyError(errorMessage(cause)),
-                )
-              }
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              type="button"
-            >
-              {sidebarCollapsed ? (
-                <ChevronRightIcon
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  strokeWidth={2.25}
-                />
-              ) : (
-                <ChevronLeftIcon
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  strokeWidth={2.25}
-                />
-              )}
-            </button>
-          </div>
-          <div
-            className={
-              sidebarCollapsed
-                ? 'hidden'
-                : 'min-h-0 max-h-64 overflow-y-auto md:max-h-none md:flex-1 md:overscroll-contain'
+          <GroupTree
+            groups={groups}
+            items={items}
+            homePageGroupId={homePageGroupId}
+            onCreateGroup={() => setDialog({ type: 'group', parentId: null })}
+            onCreateChild={(parentId) => setDialog({ type: 'group', parentId })}
+            onDelete={(group) =>
+              void removeGroup(group).catch((cause) => notifyError(errorMessage(cause)))
             }
-            id="favorite-group-sidebar"
-          >
-            <div className="px-3 pb-3 md:px-4 md:pb-6">
-              <GroupTree
-                groups={groups}
-                items={items}
-                homePageGroupId={homePageGroupId}
-                onCreateGroup={() => setDialog({ type: 'group', parentId: null })}
-                onCreateChild={(parentId) => setDialog({ type: 'group', parentId })}
-                onDelete={(group) =>
-                  void removeGroup(group).catch((cause) =>
-                    notifyError(errorMessage(cause)),
-                  )
-                }
-                onEdit={(group) => setDialog({ type: 'group', group })}
-                onSetHomePage={(groupId) => {
-                  void selectHomePage(groupId).catch((cause: unknown) =>
-                    notifyError(errorMessage(cause)),
-                  );
-                }}
-                onMoveGroup={(groupId, parentId, beforeId) => {
-                  void handleMoveGroup(groupId, parentId, beforeId);
-                }}
-                onMoveItem={(itemId, groupId) => {
-                  if (dragIdsRef.current.length > 1) {
-                    const ids = [...dragIdsRef.current];
-                    clearFavoriteDrag();
-                    void moveDraggedFavorites(ids, groupId).catch((cause) =>
-                      notifyError(errorMessage(cause)),
-                    );
-                  } else {
-                    void handleMoveFavorite(itemId, groupId);
-                  }
-                }}
-                onSelect={selectGroup}
-                selectedGroupId={selectedGroupId}
-              />
-            </div>
-          </div>
-        </aside>
+            onEdit={(group) => setDialog({ type: 'group', group })}
+            onSetHomePage={(groupId) => {
+              void selectHomePage(groupId).catch((cause: unknown) =>
+                notifyError(errorMessage(cause)),
+              );
+            }}
+            onMoveGroup={(groupId, parentId, beforeId) => {
+              void handleMoveGroup(groupId, parentId, beforeId);
+            }}
+            onMoveItem={(itemId, groupId) => {
+              if (dragIdsRef.current.length > 1) {
+                const ids = [...dragIdsRef.current];
+                clearFavoriteDrag();
+                void moveDraggedFavorites(ids, groupId).catch((cause) =>
+                  notifyError(errorMessage(cause)),
+                );
+              } else {
+                void handleMoveFavorite(itemId, groupId);
+              }
+            }}
+            onSelect={(groupId) => {
+              selectGroup(groupId);
+              closeMobileSidebar();
+            }}
+            selectedGroupId={selectedGroupId}
+          />
+        </GroupSidebar>
 
         <section
           className="min-w-0 flex-1 px-4 py-6 sm:px-7 sm:py-8"

@@ -78,7 +78,7 @@ Enable **Settings → Behavior → Show frequently visited → Home page** to al
 above the group set as your home page. This option starts off and is independent
 of All favorites visibility. Hiding from a section's menu affects only that view.
 
-Chrome access is separate: enable **Settings → Behavior → Optional features → Frequently
+Chrome access is separate: enable **Settings → Behavior → Permission control → Frequently
 visited access** to grant Top sites permission. Chrome selects and orders the
 sites; FavoritePod filters unsafe, duplicate, and locally hidden entries, then
 shows up to ten. A shorter list stays shorter—no browsing-history backfill or
@@ -165,8 +165,10 @@ before deleting their folder. Import files support up to 10,000 favorites and
 
 Settings are organized into **Appearance**, **Behavior**, **Import & export**,
 **Google Drive**, and **Local files** tabs. Use the arrow keys to move between tabs.
-The desktop folder sidebar scrolls independently of the bookmarks. Left-click a
-bookmark to open it in a new tab, or middle-click to open it in a background tab.
+The desktop folder sidebar scrolls independently of the bookmarks. Drag its right
+edge to resize it; your width is remembered on this device. Double-click the edge
+to reset, or focus it and use the arrow keys to adjust it. Left-click a bookmark
+to open it in a new tab, or middle-click to open it in a background tab.
 
 Keep an export before removing the extension or making a large change to your
 library. Local file links in a backup still need their original files on the

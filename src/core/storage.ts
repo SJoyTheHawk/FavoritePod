@@ -141,6 +141,24 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
   await db.settings.put({ key: 'sidebarCollapsed', value: collapsed });
 }
 
+export const DEFAULT_SIDEBAR_WIDTH = 256;
+export const MIN_SIDEBAR_WIDTH = 192;
+export const MAX_SIDEBAR_WIDTH = 480;
+
+function normalizeSidebarWidth(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(value)))
+    : DEFAULT_SIDEBAR_WIDTH;
+}
+
+export async function getSidebarWidth(): Promise<number> {
+  return normalizeSidebarWidth((await db.settings.get('sidebarWidth'))?.value);
+}
+
+export async function setSidebarWidth(width: number): Promise<void> {
+  await db.settings.put({ key: 'sidebarWidth', value: normalizeSidebarWidth(width) });
+}
+
 export async function getShowPreview(): Promise<boolean> {
   const record = await db.settings.get('showPreview');
   return record?.value !== false;

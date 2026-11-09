@@ -1,5 +1,5 @@
 import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Description,
   DialogBackdrop,
@@ -162,6 +162,11 @@ export function SettingsDialog({
   const discoverySectionRef = useRef<HTMLDivElement>(null);
   const discoverySwitchRef = useRef<HTMLButtonElement>(null);
   const discoveryFocused = useRef(false);
+
+  useLayoutEffect(() => {
+    // Reset within the commit so the outgoing panel never paints at the top again.
+    if (panelsRef.current) panelsRef.current.scrollTop = 0;
+  }, [selectedTab]);
 
   useEffect(() => {
     if (
@@ -334,10 +339,7 @@ export function SettingsDialog({
           <TabGroup
             className="mt-4 flex min-h-0 flex-1 flex-col"
             selectedIndex={selectedTab}
-            onChange={(index) => {
-              setSelectedTab(index);
-              panelsRef.current?.scrollTo({ top: 0 });
-            }}
+            onChange={setSelectedTab}
           >
             <TabList
               aria-label="Settings categories"
@@ -352,7 +354,7 @@ export function SettingsDialog({
               ].map((label) => (
                 <Tab
                   key={label}
-                  className="min-h-9 rounded-md px-2.5 text-sm font-medium text-text-secondary transition hover:bg-surface-hover hover:text-text-primary data-[selected]:bg-primary-light data-[selected]:text-primary"
+                  className="min-h-9 rounded-md px-2.5 text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-text-primary data-[selected]:bg-primary-light data-[selected]:text-primary"
                 >
                   {label}
                 </Tab>
@@ -360,7 +362,7 @@ export function SettingsDialog({
             </TabList>
             <TabPanels
               ref={panelsRef}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-4 pr-1"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-4 pr-1 [scrollbar-gutter:stable]"
             >
               <TabPanel className="focus:outline-none" unmount={false}>
                 <fieldset>
@@ -610,7 +612,7 @@ export function SettingsDialog({
 
                 <section className="mt-6 border-t border-border pt-5">
                   <h3 className="text-sm font-medium text-text-primary">
-                    Optional features
+                    Permission control
                   </h3>
                   <div className="mt-3 divide-y divide-border rounded-md border border-border">
                     <div

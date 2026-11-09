@@ -816,8 +816,8 @@ Chrome-top-sites-only revision, permission flow, and layout/accessibility checks
 - Keyboard, touch, desktop/narrow layouts, and light/dark themes work
 
 Implementation notes:
-- Visibility defaults on. Browser access remains opt-in through **Settings →
-  Optional features → Frequently visited access**. Hiding stops reads and clears
+- Visibility defaults on. Browser access remains opt-in through **Settings → Behavior →
+  Permission control → Frequently visited access**. Hiding stops reads and clears
   results when both visibility options are off; turning access off removes Top
   sites permission. History is no longer declared or requested.
 - Chrome selects and orders the sites. Only safe http/https URLs qualify; hidden
@@ -859,7 +859,7 @@ popup flow. Phase 9.2 is not included in the 2026-11-07 Phase 9.1 sign-off.
 - No page/group submenus or dashboard tab are opened
 
 Implementation notes:
-- Off by default. Enable **Settings → Optional features → Right-click save menu**
+- Off by default. Enable **Settings → Behavior → Permission control → Right-click save menu**
   to request the optional permission. Disabling removes menu entries immediately;
   its permission can be reused on re-enable.
 - One **Save to FavoritePod** action opens the FavoritePod toolbar popup directly

@@ -94,7 +94,7 @@ the popup-window fallback. Test-only grants and fixture click data were used;
 the installed listener, popup APIs, and storage were real. Native context-menu
 selection, permission prompts, and worker wake/restart remain manual acceptance.
 
-- [ ] Enable **Settings → Optional features → Right-click save menu**. Deny any
+- [ ] Enable **Settings → Behavior → Permission control → Right-click save menu**. Deny any
       permission prompt first, then enable successfully. Frequently visited access
       remains independent. There is exactly one **Save to FavoritePod** option,
       with no **Save this page**, **Save this link**, or **Save to group** submenu.

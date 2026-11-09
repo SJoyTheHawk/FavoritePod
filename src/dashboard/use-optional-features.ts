@@ -65,7 +65,7 @@ export function useOptionalFeatures() {
       },
       error: () =>
         setError(
-          'Could not load optional feature settings. Reopen the launcher to retry.',
+          'Could not load permission and visibility settings. Reopen the launcher to retry.',
         ),
     });
     refreshPermissions();

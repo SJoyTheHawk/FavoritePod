@@ -20,6 +20,7 @@ import {
   getLastUsedGroupId,
   getRecentItems,
   getSidebarCollapsed,
+  getSidebarWidth,
   getShowPreview,
   getThemePreference,
   listGroups,
@@ -40,6 +41,7 @@ import {
   setLastSelectedGroupId,
   setOpenBehavior,
   setSidebarCollapsed,
+  setSidebarWidth,
   setBookmarkSize,
   setShowPreview,
   setThemePreference,
@@ -115,6 +117,30 @@ describe('local library storage', () => {
     expect(await getSidebarCollapsed()).toBe(true);
     await setSidebarCollapsed(false);
     expect(await getSidebarCollapsed()).toBe(false);
+  });
+
+  it('remembers the sidebar width across collapse and launcher reopen', async () => {
+    expect(await getSidebarWidth()).toBe(256);
+    await setSidebarWidth(352);
+    await setSidebarCollapsed(true);
+    db.close();
+    await db.open();
+    expect(await getSidebarWidth()).toBe(352);
+    await setSidebarCollapsed(false);
+    expect(await getSidebarWidth()).toBe(352);
+  });
+
+  it('keeps invalid sidebar widths from breaking the layout', async () => {
+    for (const value of ['wide', null, NaN, Infinity]) {
+      await db.settings.put({ key: 'sidebarWidth', value });
+      expect(await getSidebarWidth()).toBe(256);
+    }
+    await db.settings.put({ key: 'sidebarWidth', value: 9999 });
+    expect(await getSidebarWidth()).toBe(480);
+    await setSidebarWidth(-100);
+    expect(await getSidebarWidth()).toBe(192);
+    await setSidebarWidth(336.7);
+    expect(await getSidebarWidth()).toBe(337);
   });
 
   it('persists preview visibility and startup selection preferences', async () => {

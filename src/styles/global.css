@@ -46,6 +46,12 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+.sidebar-resizing,
+.sidebar-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 /* Shared dialog motion preserves Headless UI focus management during exit. */
 .dialog-backdrop {
   transition: opacity 200ms ease-out;

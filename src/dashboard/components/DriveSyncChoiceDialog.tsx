@@ -1,6 +1,6 @@
 import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDialog';
 import { useState } from 'react';
-import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { Description, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import type { DriveSyncChoice, DriveSyncPreview } from '../../core/drive-sync';
 
 interface DriveSyncChoiceDialogProps {
@@ -14,21 +14,21 @@ interface DriveSyncChoiceDialogProps {
 const choices: { value: DriveSyncChoice; label: string; description: string }[] = [
   {
     value: 'merge',
-    label: 'Merge local and Drive data',
+    label: 'Combine bookmarks from both places',
     description:
-      'Keep favorites from both places and resolve edits by their field timestamps.',
+      'Keep bookmarks from this computer and Google Drive. If a bookmark has changed in both places, use the most recent edits.',
   },
   {
     value: 'replace-local',
-    label: 'Replace local with Drive',
+    label: 'Use bookmarks from Google Drive',
     description:
-      'Use the Drive library on this device. A snapshot of the current local library is saved first.',
+      'Replace all FavoritePod bookmarks and groups on this computer with those saved in Google Drive.',
   },
   {
     value: 'replace-drive',
-    label: 'Replace Drive with local',
+    label: 'Use bookmarks from this computer',
     description:
-      'Use this device’s library on Drive. A snapshot of the current local library is saved first.',
+      'Replace all FavoritePod bookmarks and groups in Google Drive with those saved on this computer.',
   },
 ];
 
@@ -42,6 +42,15 @@ export function DriveSyncChoiceDialog({
   const dialogTransition = useDialogTransition(onClosed);
   const onCancel = dialogTransition.close;
   const [choice, setChoice] = useState<DriveSyncChoice>('merge');
+  const [confirmReplacement, setConfirmReplacement] = useState(false);
+  const requiresConfirmation = choice !== 'merge';
+  const replacementTarget =
+    choice === 'replace-local' ? 'on this computer' : 'in Google Drive';
+  const replacementSource =
+    choice === 'replace-local' ? 'in Google Drive' : 'on this computer';
+  const dismissReplacement = () => {
+    if (!busy) setConfirmReplacement(false);
+  };
 
   return (
     <AnimatedDialog
@@ -54,29 +63,30 @@ export function DriveSyncChoiceDialog({
       <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
         <DialogPanel
           transition
-          className="dialog-panel w-full max-w-lg rounded-lg border border-border bg-background p-5 shadow-xl"
+          className="dialog-panel max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl"
         >
           <DialogTitle className="text-lg font-semibold text-text-primary">
             Sync with Google Drive
           </DialogTitle>
           <p className="mt-1 text-sm text-text-secondary">
-            Both libraries contain data. Choose how FavoritePod should combine them.
+            You have FavoritePod bookmarks on this computer and in Google Drive. Choose
+            which bookmarks to keep.
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 rounded-md bg-surface p-3 text-sm">
             <div>
-              <p className="font-medium text-text-primary">Local</p>
+              <p className="font-medium text-text-primary">This computer</p>
               <p className="mt-1 text-text-secondary">
                 {preview.local.items}{' '}
-                {preview.local.items === 1 ? 'favorite' : 'favorites'} in{' '}
+                {preview.local.items === 1 ? 'bookmark' : 'bookmarks'} in{' '}
                 {preview.local.groups} {preview.local.groups === 1 ? 'group' : 'groups'}
               </p>
             </div>
             <div>
-              <p className="font-medium text-text-primary">Drive</p>
+              <p className="font-medium text-text-primary">Google Drive</p>
               <p className="mt-1 text-text-secondary">
                 {preview.drive.items}{' '}
-                {preview.drive.items === 1 ? 'favorite' : 'favorites'} in{' '}
+                {preview.drive.items === 1 ? 'bookmark' : 'bookmarks'} in{' '}
                 {preview.drive.groups} {preview.drive.groups === 1 ? 'group' : 'groups'}
               </p>
             </div>
@@ -112,7 +122,7 @@ export function DriveSyncChoiceDialog({
             ))}
           </fieldset>
 
-          {error && (
+          {error && !confirmReplacement && (
             <p className="mt-3 text-sm text-danger" role="alert">
               {error}
             </p>
@@ -130,7 +140,11 @@ export function DriveSyncChoiceDialog({
             <button
               className="min-h-9 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
               disabled={busy}
-              onClick={() => void onContinue(choice)}
+              onClick={() => {
+                if (busy) return;
+                if (requiresConfirmation) setConfirmReplacement(true);
+                else void onContinue(choice);
+              }}
               type="button"
             >
               {busy ? 'Syncing…' : 'Continue'}
@@ -138,6 +152,58 @@ export function DriveSyncChoiceDialog({
           </div>
         </DialogPanel>
       </div>
+      <AnimatedDialog
+        className="relative z-[70]"
+        onClose={dismissReplacement}
+        open={confirmReplacement}
+      >
+        <DialogBackdrop
+          transition
+          className="dialog-backdrop fixed inset-0 bg-black/35"
+        />
+        <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
+          <DialogPanel
+            transition
+            aria-busy={busy}
+            className="dialog-panel max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl"
+          >
+            <DialogTitle className="text-lg font-semibold text-text-primary">
+              Replace bookmarks {replacementTarget}?
+            </DialogTitle>
+            <Description className="mt-2 text-sm text-text-secondary">
+              Bookmarks and groups {replacementTarget} will be replaced with those{' '}
+              {replacementSource}. Any that are not {replacementSource} will be lost. This
+              cannot be undone.
+            </Description>
+            {error && (
+              <p className="mt-3 text-sm text-danger" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="min-h-9 rounded-md border border-border px-3 text-sm font-medium text-text-primary transition hover:bg-surface-hover disabled:opacity-60"
+                data-autofocus
+                disabled={busy}
+                onClick={dismissReplacement}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="min-h-9 rounded-md bg-danger px-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+                disabled={busy}
+                onClick={() => {
+                  if (!busy && requiresConfirmation) void onContinue(choice);
+                }}
+                type="button"
+              >
+                {busy ? 'Syncing…' : 'Replace bookmarks'}
+              </button>
+            </div>
+          </DialogPanel>
+        </div>
+      </AnimatedDialog>
     </AnimatedDialog>
   );
 }

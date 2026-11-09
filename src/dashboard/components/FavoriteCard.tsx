@@ -11,12 +11,14 @@ import {
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { FaviconImage } from '../../components/FaviconImage';
+import { bookmarkActivationHandlers } from '../../components/bookmark-activation';
 import { ThumbnailImage } from '../../components/ThumbnailImage';
 import type { BookmarkSize } from '../../core/storage';
 import { getUrlLabel, parseSafeUrl } from '../../core/validation';
 import {
   checkFileAvailability,
   FILE_ACCESS_DENIED,
+  FTP_UNSUPPORTED,
   openSavedUrl,
   type FileAvailability,
   type PathOverride,
@@ -411,13 +413,13 @@ export function FavoriteCard({
     }, 150);
   };
 
-  const openItem = async () => {
+  const openItem = async (background = false) => {
     if (!parseSafeUrl(item.url)) {
       onOpenError('This favorite has an invalid address and cannot be opened.');
       return;
     }
     try {
-      await openSavedUrl(item.url);
+      await openSavedUrl(item.url, { active: !background });
     } catch (cause) {
       if (cause instanceof Error && cause.message === FILE_ACCESS_DENIED) {
         onFileAccessDenied();
@@ -425,7 +427,11 @@ export function FavoriteCard({
           'File access is turned off. Enable "Allow access to file URLs" in Chrome extension settings.',
         );
       } else {
-        onOpenError('Chrome could not open this address. Check the URL and try again.');
+        onOpenError(
+          cause instanceof Error && cause.message === FTP_UNSUPPORTED
+            ? FTP_UNSUPPORTED
+            : 'Chrome could not open this address. Check the URL and try again.',
+        );
       }
     }
   };
@@ -649,7 +655,7 @@ export function FavoriteCard({
             aria-expanded={hoverPreviewOpen}
             aria-haspopup="dialog"
             className={`absolute inset-0 h-full w-full focus-visible:z-10 focus-visible:outline-offset-[-2px] ${isCompactGrid ? 'flex items-center justify-center' : 'text-left'}`}
-            onClick={() => void openItem()}
+            {...bookmarkActivationHandlers((background) => void openItem(background))}
             type="button"
           >
             {isCompactGrid ? (
@@ -751,7 +757,7 @@ export function FavoriteCard({
             size === 'compact' ? `${item.title} — ${getUrlLabel(item.url)}` : undefined
           }
           className={`min-w-0 ${isCompactGrid ? 'w-full text-center' : 'text-left'}`}
-          onClick={() => void openItem()}
+          {...bookmarkActivationHandlers((background) => void openItem(background))}
           type="button"
         >
           <span
@@ -805,9 +811,9 @@ export function FavoriteCard({
           setHoverPreviewOpen(false);
         }}
         onEdit={editItem}
-        onOpen={() => {
+        onOpen={(background) => {
           setHoverPreviewOpen(false);
-          void openItem();
+          void openItem(background);
         }}
         onPanelEnter={cancelPreviewHide}
         onPanelLeave={hidePreview}

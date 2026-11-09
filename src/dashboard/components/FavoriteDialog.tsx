@@ -10,7 +10,12 @@ import {
 import type { Group, Item, ThumbnailInput } from '../../core/types';
 import { getThumbnail } from '../../core/storage';
 import { compressThumbnail } from '../../core/thumbnail';
-import { getUrlLabel, isValidUrl, parseSafeUrl } from '../../core/validation';
+import {
+  getUrlLabel,
+  INVALID_URL_MESSAGE,
+  isValidUrl,
+  parseSafeUrl,
+} from '../../core/validation';
 import { FaviconImage } from '../../components/FaviconImage';
 import { getGroupLabels } from '../group-labels';
 
@@ -109,7 +114,7 @@ export function FavoriteDialog({
     setBusy(true);
     setError(undefined);
     if (!isValidUrl(url)) {
-      setError('Use an http, https, or file address.');
+      setError(INVALID_URL_MESSAGE);
       setBusy(false);
       return;
     }

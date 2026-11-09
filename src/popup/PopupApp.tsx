@@ -8,10 +8,11 @@ import {
 import { dismissRecentItem } from '../core/storage';
 import { useLibrary, useRecentItems } from '../core/use-library';
 import { getUrlLabel, parseSafeUrl } from '../core/validation';
-import { FILE_ACCESS_DENIED, openSavedUrl } from '../core/file-links';
+import { FILE_ACCESS_DENIED, FTP_UNSUPPORTED, openSavedUrl } from '../core/file-links';
 import { BookmarkDialog } from './BookmarkDialog';
 import { POPUP_PATH, readPopupSaveRequest } from '../core/popup-save-request';
 import { FaviconImage } from '../components/FaviconImage';
+import { bookmarkActivationHandlers } from '../components/bookmark-activation';
 import { installDriveSyncChangeHooks } from '../core/drive-sync-triggers';
 import { useTheme } from '../dashboard/hooks/use-theme';
 
@@ -76,16 +77,18 @@ export function PopupApp() {
   const parsedCurrentUrl = parseSafeUrl(currentUrl);
   const canAddCurrentPage = !tabLoading && !libraryLoading && Boolean(parsedCurrentUrl);
 
-  const openItem = async (url: string) => {
+  const openItem = async (url: string, background = false) => {
     setError(undefined);
     try {
-      await openSavedUrl(url);
-      window.close();
+      await openSavedUrl(url, { active: !background });
+      if (!background) window.close();
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message === FILE_ACCESS_DENIED
           ? 'File access is turned off. Enable "Allow access to file URLs" in Chrome extension settings.'
-          : 'Chrome could not open this address. Check the URL and try again.',
+          : cause instanceof Error && cause.message === FTP_UNSUPPORTED
+            ? FTP_UNSUPPORTED
+            : 'Chrome could not open this address. Check the URL and try again.',
       );
     }
   };
@@ -172,7 +175,9 @@ export function PopupApp() {
                       <div className="flex min-h-10 items-center gap-2">
                         <button
                           className="flex min-w-0 flex-1 items-center gap-3 py-0.5 text-left transition hover:bg-surface-hover"
-                          onClick={() => void openItem(item.url)}
+                          {...bookmarkActivationHandlers(
+                            (background) => void openItem(item.url, background),
+                          )}
                           type="button"
                         >
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface text-text-secondary">

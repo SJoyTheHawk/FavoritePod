@@ -29,11 +29,22 @@ function compareOrder(
       : 1;
 }
 
-function selectExportRecords(
+export function selectExportRecords(
   allGroups: Group[],
   allItems: Item[],
   selectedGroupIds?: readonly string[],
 ): { groups: Group[]; items: Item[] } {
+  const activeGroups = new Map(
+    allGroups.filter((group) => !isGroupDeleted(group)).map((group) => [group.id, group]),
+  );
+  allGroups = [...activeGroups.values()].map((group) =>
+    group.parentId && !activeGroups.has(group.parentId)
+      ? { ...group, parentId: null }
+      : group,
+  );
+  allItems = allItems.filter(
+    (item) => !isItemDeleted(item) && activeGroups.has(item.groupId),
+  );
   if (!selectedGroupIds) {
     return {
       groups: allGroups.sort(compareOrder),
@@ -84,20 +95,7 @@ export async function exportToZip(options: ExportOptions = {}): Promise<Blob> {
     db.groups.toArray(),
     db.items.toArray(),
   ]);
-  const activeGroups = new Map(
-    allGroups.filter((group) => !isGroupDeleted(group)).map((group) => [group.id, group]),
-  );
-  const exportableGroups = [...activeGroups.values()].map((group) =>
-    group.parentId && !activeGroups.has(group.parentId)
-      ? { ...group, parentId: null }
-      : group,
-  );
-  const exportableItems = allItems.filter((item) => !isItemDeleted(item));
-  const selected = selectExportRecords(
-    exportableGroups,
-    exportableItems,
-    options.groupIds,
-  );
+  const selected = selectExportRecords(allGroups, allItems, options.groupIds);
   const groups = selected.groups;
   const items = selected.items;
   if (groups.length > MAX_RECORDS || items.length > MAX_RECORDS)

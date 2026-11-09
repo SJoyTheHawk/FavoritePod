@@ -6,6 +6,7 @@ import {
   getFileAvailabilityStats,
   getPathOverrides,
   openFileUrl,
+  openSavedUrl,
   savePathOverrides,
   type PathOverride,
 } from '../file-links';
@@ -38,6 +39,44 @@ afterEach(() => {
 });
 
 describe('local file links', () => {
+  it('opens web and Chrome URLs in the background when requested', async () => {
+    for (const url of ['https://example.com', 'chrome://settings']) {
+      await openSavedUrl(url, { active: false });
+      expect(chrome.tabs.create).toHaveBeenLastCalledWith({ url, active: false });
+    }
+  });
+
+  it('preserves file access checks and path overrides for background tabs', async () => {
+    await savePathOverrides([override]);
+    await openSavedUrl('file:///Users/alice/tools/app.html', { active: false });
+    expect(chrome.tabs.create).toHaveBeenLastCalledWith({
+      url: 'file:///Volumes/tools/app.html',
+      active: false,
+    });
+    isAllowedFileSchemeAccess.mockResolvedValue(false);
+    await expect(
+      openSavedUrl('file:///Users/alice/tools/app.html', { active: false }),
+    ).rejects.toThrow('FILE_ACCESS_DENIED');
+    expect(chrome.tabs.create).toHaveBeenCalledTimes(1);
+  });
+  it('opens Chrome shortcuts and OS handlers directly, and explains legacy FTP', async () => {
+    for (const url of [
+      'chrome://settings',
+      'chrome-extension://abcdefghijklmnop/options.html',
+      'mailto:alex@example.com',
+      'tel:+1234',
+      'sms:+1234',
+    ]) {
+      await openSavedUrl(url);
+      expect(chrome.tabs.create).toHaveBeenLastCalledWith({ url });
+    }
+    const calls = vi.mocked(chrome.tabs.create).mock.calls.length;
+    await expect(openSavedUrl('ftp://archive.example/file')).rejects.toThrow(
+      'FTP client',
+    );
+    await expect(openSavedUrl('javascript:alert(1)')).rejects.toThrow('invalid address');
+    expect(chrome.tabs.create).toHaveBeenCalledTimes(calls);
+  });
   it('applies the longest matching folder prefix and preserves the remaining URL', () => {
     const result = applyPathOverride(
       'file:///Users/alice/tools/nested/my%20tool/index.html?mode=1#start',

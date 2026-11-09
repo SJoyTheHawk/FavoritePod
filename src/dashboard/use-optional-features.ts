@@ -4,9 +4,11 @@ import {
   getContextMenuEnabled,
   getShowFrequentlyVisited,
   getShowFrequentlyVisitedOnHome,
+  getShowHiddenBookmarks,
   getSiteDiscoveryEnabled,
   setShowFrequentlyVisited,
   setShowFrequentlyVisitedOnHome,
+  setShowHiddenBookmarks,
 } from '../core/storage';
 import {
   saveContextMenuEnabled,
@@ -17,6 +19,7 @@ export function useOptionalFeatures() {
   const [preferences, setPreferences] = useState({
     showFrequentlyVisited: true,
     showFrequentlyVisitedOnHome: false,
+    showHiddenBookmarks: false,
     discovery: false,
     contextMenu: false,
   });
@@ -52,6 +55,7 @@ export function useOptionalFeatures() {
     const subscription = liveQuery(async () => ({
       showFrequentlyVisited: await getShowFrequentlyVisited(),
       showFrequentlyVisitedOnHome: await getShowFrequentlyVisitedOnHome(),
+      showHiddenBookmarks: await getShowHiddenBookmarks(),
       discovery: await getSiteDiscoveryEnabled(),
       contextMenu: await getContextMenuEnabled(),
     })).subscribe({
@@ -84,6 +88,8 @@ export function useOptionalFeatures() {
     saveShowFrequentlyVisited: setShowFrequentlyVisited,
     showFrequentlyVisitedOnHome: preferences.showFrequentlyVisitedOnHome,
     saveShowFrequentlyVisitedOnHome: setShowFrequentlyVisitedOnHome,
+    showHiddenBookmarks: preferences.showHiddenBookmarks,
+    saveShowHiddenBookmarks: setShowHiddenBookmarks,
     discoveryEnabled: preferences.discovery && permissions.discovery,
     discoveryPermissionGranted: permissions.discovery,
     contextMenuEnabled: preferences.contextMenu && permissions.contextMenu,

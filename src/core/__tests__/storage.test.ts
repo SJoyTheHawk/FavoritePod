@@ -366,7 +366,7 @@ describe('local library storage', () => {
 
   it('rejects executable URL schemes and writes edits as newer field clocks', async () => {
     await expect(createItem({ url: 'javascript:alert(1)' })).rejects.toThrow(
-      'web address',
+      'Use an http',
     );
     const item = await createItem({ url: 'https://example.com', title: 'Example' });
     const updated = await updateItem(item.id, { title: 'Renamed' });

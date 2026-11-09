@@ -9,6 +9,8 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { downloadZip, exportToZip } from '../../core/export';
+import { downloadChromiumHtml, exportToChromiumHtml } from '../../core/export-chrome';
+import { db } from '../../core/db';
 import {
   getImportImpact,
   importArchive,
@@ -19,7 +21,7 @@ import type { ArchiveProgress, ImportArchive, ImportResult } from '../../core/ar
 import type { Group, Item } from '../../core/types';
 import { getGroupLabels } from '../group-labels';
 
-export type ArchiveDialogMode = 'export' | 'import';
+export type ArchiveDialogMode = 'export' | 'export-chrome' | 'import';
 
 interface ImportExportDialogProps {
   mode: ArchiveDialogMode;
@@ -85,6 +87,7 @@ export function ImportExportDialog({
   onClose: onClosed,
   onImported,
 }: ImportExportDialogProps) {
+  const exporting = mode !== 'import';
   const dialogTransition = useDialogTransition(onClosed);
   const onClose = dialogTransition.close;
   const [allGroupsSelected, setAllGroupsSelected] = useState(true);
@@ -200,13 +203,26 @@ export function ImportExportDialog({
     setError(undefined);
     setProgress(undefined);
     try {
-      const blob = await exportToZip({
-        groupIds: allGroupsSelected ? undefined : [...selectedGroupIds],
-        onProgress: (current, total) =>
-          setProgress({ stage: 'validating', current, total }),
-      });
       const date = new Date().toISOString().slice(0, 10);
-      downloadZip(blob, `favoritepod-${date}.zip`);
+      if (mode === 'export-chrome') {
+        const records = await db.transaction('r', db.groups, db.items, async () => ({
+          groups: await db.groups.toArray(),
+          items: await db.items.toArray(),
+        }));
+        const html = exportToChromiumHtml(
+          records.groups,
+          records.items,
+          allGroupsSelected ? undefined : selectedGroupIds,
+        );
+        downloadChromiumHtml(html, `favoritepod-${date}.html`);
+      } else {
+        const blob = await exportToZip({
+          groupIds: allGroupsSelected ? undefined : [...selectedGroupIds],
+          onProgress: (current, total) =>
+            setProgress({ stage: 'validating', current, total }),
+        });
+        downloadZip(blob, `favoritepod-${date}.zip`);
+      }
       onClose();
     } catch (cause) {
       setError(errorMessage(cause));
@@ -266,15 +282,17 @@ export function ImportExportDialog({
                   aria-hidden="true"
                   className="h-5 w-5 text-warning"
                 />
-              ) : mode === 'export' ? (
+              ) : exporting ? (
                 <ArrowDownTrayIcon aria-hidden="true" className="h-5 w-5 text-primary" />
               ) : (
                 <ArrowUpTrayIcon aria-hidden="true" className="h-5 w-5 text-primary" />
               )}
               {reviewing
                 ? 'Review import'
-                : mode === 'export'
-                  ? 'Export library'
+                : exporting
+                  ? mode === 'export-chrome'
+                    ? 'Export Chrome bookmarks'
+                    : 'Export library'
                   : 'Import library'}
             </DialogTitle>
             <button
@@ -417,7 +435,7 @@ export function ImportExportDialog({
                 </>
               ) : null}
             </div>
-          ) : mode === 'export' ? (
+          ) : exporting ? (
             <div className="mt-5">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-sm font-medium text-text-primary">Groups</h2>
@@ -470,6 +488,11 @@ export function ImportExportDialog({
               {!allGroupsSelected && selectedGroupIds.size === 0 && (
                 <p className="mt-2 text-xs text-warning">Select at least one group.</p>
               )}
+              <p className="mt-3 text-xs leading-relaxed text-text-secondary">
+                {mode === 'export-chrome'
+                  ? 'Download folders and bookmarks as HTML for importing into Chrome and other browsers. Preview images are not included.'
+                  : 'Download a FavoritePod ZIP backup, including folders, favorites, and preview images.'}
+              </p>
             </div>
           ) : (
             <div className="mt-5 grid gap-4">
@@ -634,7 +657,7 @@ export function ImportExportDialog({
             >
               Cancel
             </button>
-            {mode === 'export' ? (
+            {exporting ? (
               <button
                 className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={busy || (!allGroupsSelected && selectedGroupIds.size === 0)}
@@ -642,7 +665,11 @@ export function ImportExportDialog({
                 type="button"
               >
                 <ArrowDownTrayIcon aria-hidden="true" className="h-4 w-4" />
-                {busy ? 'Preparing...' : 'Download ZIP'}
+                {busy
+                  ? 'Preparing...'
+                  : mode === 'export-chrome'
+                    ? 'Download HTML'
+                    : 'Download ZIP'}
               </button>
             ) : reviewing ? (
               <>

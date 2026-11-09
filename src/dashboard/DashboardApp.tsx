@@ -78,7 +78,11 @@ import {
   savePathOverrides as persistPathOverrides,
   type PathOverride,
 } from '../core/file-links';
-import { parseSafeUrl } from '../core/validation';
+import {
+  INVALID_URL_MESSAGE,
+  isHiddenOnThisPlatform,
+  parseSafeUrl,
+} from '../core/validation';
 import { normalizeVisitedSiteUrl } from '../core/discovery-url';
 import type { VisitedSiteSuggestion } from '../core/discovery';
 import { useOptionalFeatures } from './use-optional-features';
@@ -142,7 +146,11 @@ import { SettingsDialog } from './components/SettingsDialog';
 import { FrequentlyVisitedSection } from './components/FrequentlyVisitedSection';
 import { DriveSyncChoiceDialog } from './components/DriveSyncChoiceDialog';
 import { GoogleDriveSignInDialog } from './components/GoogleDriveSignInDialog';
-import { ImportExportDialog } from './components/ImportExportDialog';
+import {
+  ImportExportDialog,
+  type ArchiveDialogMode,
+} from './components/ImportExportDialog';
+import { ChromeBookmarksImportDialog } from './components/ChromeBookmarksImportDialog';
 import type { ImportMode, ImportResult } from '../core/import';
 import { FileAccessHint } from './components/FileAccessHint';
 import {
@@ -174,7 +182,7 @@ type DialogState =
   | { type: 'group'; group?: Group; parentId?: string | null }
   | null;
 
-type ArchiveDialogState = 'export' | 'import' | null;
+type ArchiveDialogState = ArchiveDialogMode | null;
 
 interface HistoryEntry {
   label: string;
@@ -429,6 +437,7 @@ export function DashboardApp() {
   const [settingsSection, setSettingsSection] = useState<'discovery'>();
   const [driveSignInOpen, setDriveSignInOpen] = useState(false);
   const [archiveDialog, setArchiveDialog] = useState<ArchiveDialogState>(null);
+  const [chromeImportOpen, setChromeImportOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [dragPreviewOrder, setDragPreviewOrder] = useState<string[] | null>(null);
   const [draggingFavoriteId, setDraggingFavoriteId] = useState<string | null>(null);
@@ -647,7 +656,7 @@ export function DashboardApp() {
     }
     window.history.replaceState(null, '', location);
     if (!parsed) {
-      notifyError('Use an http, https, or file address.');
+      notifyError(INVALID_URL_MESSAGE);
       return;
     }
     const existing = items.find((item) => parseSafeUrl(item.url)?.href === parsed.href);
@@ -1171,11 +1180,19 @@ export function DashboardApp() {
     }
     const searchTerm = debouncedSearch.trim().toLocaleLowerCase();
     return items.filter((item) => {
+      if (!optionalFeatures.showHiddenBookmarks && isHiddenOnThisPlatform(item.url))
+        return false;
       if (selectedGroupId && !scope.has(item.groupId)) return false;
       if (!searchTerm) return true;
       return `${item.title} ${item.url}`.toLocaleLowerCase().includes(searchTerm);
     });
-  }, [debouncedSearch, groups, items, selectedGroupId]);
+  }, [
+    debouncedSearch,
+    groups,
+    items,
+    selectedGroupId,
+    optionalFeatures.showHiddenBookmarks,
+  ]);
 
   const groupedView = useMemo(
     () => getGroupedFavoriteView(groups, visibleItems, selectedGroupId, groupingMode),
@@ -1842,7 +1859,7 @@ export function DashboardApp() {
       >
         Skip to favorites
       </a>
-      <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 sm:px-7">
+      <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-2 sm:px-7">
         <div className="flex items-center gap-3">
           <img
             alt=""
@@ -1914,10 +1931,11 @@ export function DashboardApp() {
 
       <div className="flex flex-1 flex-col md:flex-row">
         <aside
-          className={`border-b border-border py-3 md:shrink-0 md:border-b-0 md:border-r md:transition-[width] md:duration-200 ${sidebarCollapsed ? 'px-3 md:w-14 md:px-2' : 'px-3 md:w-64 md:px-4 md:py-6'}`}
+          aria-label="Favorite groups"
+          className={`border-b border-border md:sticky md:top-16 md:flex md:h-[calc(100dvh-4rem)] md:flex-col md:self-start md:shrink-0 md:border-b-0 md:border-r md:transition-[width] md:duration-200 ${sidebarCollapsed ? 'md:w-14' : 'md:w-64'}`}
         >
           <div
-            className={`flex min-h-9 items-center ${sidebarCollapsed ? 'justify-center' : 'mb-3 justify-end'}`}
+            className={`flex min-h-9 shrink-0 items-center px-3 pt-3 ${sidebarCollapsed ? 'justify-center pb-3 md:px-2' : 'mb-3 justify-end md:px-4 md:pt-6'}`}
           >
             <button
               aria-controls="favorite-group-sidebar"
@@ -1950,42 +1968,48 @@ export function DashboardApp() {
           </div>
           <div
             className={
-              sidebarCollapsed ? 'hidden' : 'max-h-64 overflow-y-auto md:max-h-none'
+              sidebarCollapsed
+                ? 'hidden'
+                : 'min-h-0 max-h-64 overflow-y-auto md:max-h-none md:flex-1 md:overscroll-contain'
             }
             id="favorite-group-sidebar"
           >
-            <GroupTree
-              groups={groups}
-              items={items}
-              homePageGroupId={homePageGroupId}
-              onCreateGroup={() => setDialog({ type: 'group', parentId: null })}
-              onCreateChild={(parentId) => setDialog({ type: 'group', parentId })}
-              onDelete={(group) =>
-                void removeGroup(group).catch((cause) => notifyError(errorMessage(cause)))
-              }
-              onEdit={(group) => setDialog({ type: 'group', group })}
-              onSetHomePage={(groupId) => {
-                void selectHomePage(groupId).catch((cause: unknown) =>
-                  notifyError(errorMessage(cause)),
-                );
-              }}
-              onMoveGroup={(groupId, parentId, beforeId) => {
-                void handleMoveGroup(groupId, parentId, beforeId);
-              }}
-              onMoveItem={(itemId, groupId) => {
-                if (dragIdsRef.current.length > 1) {
-                  const ids = [...dragIdsRef.current];
-                  clearFavoriteDrag();
-                  void moveDraggedFavorites(ids, groupId).catch((cause) =>
+            <div className="px-3 pb-3 md:px-4 md:pb-6">
+              <GroupTree
+                groups={groups}
+                items={items}
+                homePageGroupId={homePageGroupId}
+                onCreateGroup={() => setDialog({ type: 'group', parentId: null })}
+                onCreateChild={(parentId) => setDialog({ type: 'group', parentId })}
+                onDelete={(group) =>
+                  void removeGroup(group).catch((cause) =>
+                    notifyError(errorMessage(cause)),
+                  )
+                }
+                onEdit={(group) => setDialog({ type: 'group', group })}
+                onSetHomePage={(groupId) => {
+                  void selectHomePage(groupId).catch((cause: unknown) =>
                     notifyError(errorMessage(cause)),
                   );
-                } else {
-                  void handleMoveFavorite(itemId, groupId);
-                }
-              }}
-              onSelect={selectGroup}
-              selectedGroupId={selectedGroupId}
-            />
+                }}
+                onMoveGroup={(groupId, parentId, beforeId) => {
+                  void handleMoveGroup(groupId, parentId, beforeId);
+                }}
+                onMoveItem={(itemId, groupId) => {
+                  if (dragIdsRef.current.length > 1) {
+                    const ids = [...dragIdsRef.current];
+                    clearFavoriteDrag();
+                    void moveDraggedFavorites(ids, groupId).catch((cause) =>
+                      notifyError(errorMessage(cause)),
+                    );
+                  } else {
+                    void handleMoveFavorite(itemId, groupId);
+                  }
+                }}
+                onSelect={selectGroup}
+                selectedGroupId={selectedGroupId}
+              />
+            </div>
           </div>
         </aside>
 
@@ -2110,8 +2134,8 @@ export function DashboardApp() {
                   savedUrls={savedVisitedUrls}
                   loading={!optionalFeatures.ready || visitedSites.loading}
                   error={optionalFeatures.error ?? visitedSites.error}
-                  onOpen={(site) => {
-                    void openSavedUrl(site.url).catch(() =>
+                  onOpen={(site, background) => {
+                    void openSavedUrl(site.url, { active: !background }).catch(() =>
                       notifyError('Chrome could not open this site. Try again.'),
                     );
                   }}
@@ -2421,6 +2445,8 @@ export function DashboardApp() {
           homePageAvailable={!!homePageGroupId && groupsById.has(homePageGroupId)}
           openBehavior={openBehavior}
           showPreview={showPreview}
+          showHiddenBookmarks={optionalFeatures.showHiddenBookmarks}
+          onSaveShowHiddenBookmarks={optionalFeatures.saveShowHiddenBookmarks}
           showFrequentlyVisited={optionalFeatures.showFrequentlyVisited}
           showFrequentlyVisitedOnHome={optionalFeatures.showFrequentlyVisitedOnHome}
           onSaveShowFrequentlyVisitedOnHome={
@@ -2447,6 +2473,10 @@ export function DashboardApp() {
           onArchiveAction={(mode) => {
             setSettingsOpen(false);
             setArchiveDialog(mode);
+          }}
+          onImportChromeBookmarks={() => {
+            setSettingsOpen(false);
+            setChromeImportOpen(true);
           }}
         />
       )}
@@ -2484,6 +2514,12 @@ export function DashboardApp() {
           mode={archiveDialog}
           onClose={() => setArchiveDialog(null)}
           onImported={completeImport}
+        />
+      )}
+      {chromeImportOpen && (
+        <ChromeBookmarksImportDialog
+          onClose={() => setChromeImportOpen(false)}
+          onImported={(result) => completeImport('copy', result)}
         />
       )}
       <div

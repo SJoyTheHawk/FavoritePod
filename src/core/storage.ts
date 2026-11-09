@@ -2,7 +2,12 @@ import { compareHLC, latestHLC, tickHLC } from './hlc';
 import { isGroupDeleted, isItemDeleted } from './merge';
 import { keyBetween, nextOrderKey } from './ordering';
 import { hashBlob } from './thumbnail';
-import { getDefaultTitle, isValidUrl } from './validation';
+import {
+  getDefaultTitle,
+  INVALID_URL_MESSAGE,
+  isHiddenOnThisPlatform,
+  isValidUrl,
+} from './validation';
 import { db } from './db';
 import type {
   Group,
@@ -143,6 +148,14 @@ export async function getShowPreview(): Promise<boolean> {
 
 export async function setShowPreview(showPreview: boolean): Promise<void> {
   await db.settings.put({ key: 'showPreview', value: showPreview });
+}
+
+export async function getShowHiddenBookmarks(): Promise<boolean> {
+  return (await db.settings.get('showHiddenBookmarks'))?.value === true;
+}
+
+export async function setShowHiddenBookmarks(show: boolean): Promise<void> {
+  await db.settings.put({ key: 'showHiddenBookmarks', value: show });
 }
 
 export async function getOpenBehavior(): Promise<OpenBehavior> {
@@ -288,8 +301,12 @@ export async function listItems(groupId?: string): Promise<Item[]> {
 
 export async function getRecentItems(limit = 5): Promise<Item[]> {
   const dismissed = await getDismissedRecentItemIds();
+  const showHidden = await getShowHiddenBookmarks();
   const items = (await db.items.toArray()).filter(
-    (item) => !isItemDeleted(item) && !dismissed.has(item.id),
+    (item) =>
+      !isItemDeleted(item) &&
+      !dismissed.has(item.id) &&
+      (showHidden || !isHiddenOnThisPlatform(item.url)),
   );
   return items.sort((a, b) => compareLatestItemClock(b, a)).slice(0, limit);
 }
@@ -505,7 +522,7 @@ export async function moveGroup(
 }
 
 export async function deleteGroup(id: string): Promise<void> {
-  await db.transaction('rw', db.groups, db.items, db.syncMeta, async () => {
+  await db.transaction('rw', db.groups, db.items, db.syncMeta, db.settings, async () => {
     const group = await db.groups.get(id);
     if (!group || isGroupDeleted(group)) return;
 
@@ -525,6 +542,18 @@ export async function deleteGroup(id: string): Promise<void> {
     }
 
     const items = await db.items.toArray();
+    if (!(await getShowHiddenBookmarks())) {
+      const hiddenCount = items.filter(
+        (item) =>
+          descendantIds.has(item.groupId) &&
+          !isItemDeleted(item) &&
+          isHiddenOnThisPlatform(item.url),
+      ).length;
+      if (hiddenCount)
+        throw new Error(
+          `This group contains ${hiddenCount} hidden ${hiddenCount === 1 ? 'bookmark' : 'bookmarks'}. Enable “Show hidden bookmarks” in Settings to see and move or delete them.`,
+        );
+    }
     if (items.some((item) => descendantIds.has(item.groupId) && !isItemDeleted(item))) {
       throw new Error('Move favorites before deleting this group.');
     }
@@ -546,7 +575,7 @@ export interface CreateItemInput {
 
 export async function createItem(data: CreateItemInput): Promise<Item> {
   const url = data.url.trim();
-  if (!isValidUrl(url)) throw new Error('Use a web address or a local file URL.');
+  if (!isValidUrl(url)) throw new Error(INVALID_URL_MESSAGE);
   const title = normalizedTitle(data.title ?? '', url);
   const previewHash = data.thumbnail ? await hashBlob(data.thumbnail.blob) : undefined;
 
@@ -612,7 +641,7 @@ export async function updateItem(
   options?: { thumbnail?: ThumbnailInput | null; expected?: Item; signal?: AbortSignal },
 ): Promise<Item> {
   if (Object.hasOwn(updates, 'url') && updates.url && !isValidUrl(updates.url)) {
-    throw new Error('Use a web address or a local file URL.');
+    throw new Error(INVALID_URL_MESSAGE);
   }
 
   const thumbnail = options?.thumbnail;

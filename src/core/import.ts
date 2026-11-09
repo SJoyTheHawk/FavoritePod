@@ -1,5 +1,5 @@
 import { strFromU8, unzipSync } from 'fflate';
-import { compareHLC, createHLC, receiveHLC } from './hlc';
+import { compareHLC, createHLC, receiveHLC, tickHLC } from './hlc';
 import {
   ExportBaseSchema,
   ExportDataV1Schema,
@@ -284,6 +284,7 @@ function remapForCopy(
   archive: ImportArchive,
   existingGroups: Group[],
   deviceId: string,
+  wrapInGroup: boolean,
 ): { groups: Group[]; items: Item[] } {
   const groupIds = new Map(
     archive.data.groups.map((group) => [group.id, crypto.randomUUID()]),
@@ -296,6 +297,39 @@ function remapForCopy(
     .map((group) => group.orderKey);
   const now = Date.now();
   const clock = createHLC(now, 0, deviceId);
+  if (!wrapInGroup) {
+    const rootKeys = new Map<string, string>();
+    const rootGroups = archive.data.groups
+      .filter((group) => !group.parentId)
+      .sort((left, right) =>
+        left.orderKey < right.orderKey
+          ? -1
+          : left.orderKey > right.orderKey
+            ? 1
+            : left.id.localeCompare(right.id),
+      );
+    for (const group of rootGroups) {
+      const key = nextOrderKey(currentRootKeys);
+      currentRootKeys.push(key);
+      rootKeys.set(group.id, key);
+    }
+    return {
+      groups: archive.data.groups.map((group) => ({
+        ...group,
+        id: groupIds.get(group.id)!,
+        parentId: group.parentId ? groupIds.get(group.parentId)! : null,
+        orderKey: rootKeys.get(group.id) ?? group.orderKey,
+        clock: rootKeys.has(group.id)
+          ? { ...group.clock, orderKey: tickHLC(group.clock.orderKey, deviceId) }
+          : group.clock,
+      })),
+      items: archive.data.items.map((item) => ({
+        ...item,
+        id: itemIds.get(item.id)!,
+        groupId: groupIds.get(item.groupId)!,
+      })),
+    };
+  }
   const title =
     archive.filename
       .replace(/\.zip$/i, '')
@@ -337,6 +371,7 @@ export async function importArchive(
   archive: ImportArchive,
   mode: ImportMode,
   onProgress?: ImportProgressCallback,
+  copyOptions: { wrapInGroup?: boolean } = {},
 ): Promise<ImportResult> {
   if (mode === 'replace') await createSnapshot();
   const deviceId = await getDeviceId();
@@ -353,10 +388,19 @@ export async function importArchive(
       let items = archive.data.items as Item[];
       const existingGroups = mode === 'copy' ? await db.groups.toArray() : [];
       if (mode === 'copy') {
-        const copied = remapForCopy(archive, existingGroups, deviceId);
+        const copied = remapForCopy(
+          archive,
+          existingGroups,
+          deviceId,
+          copyOptions.wrapInGroup !== false,
+        );
         groups = copied.groups;
         items = copied.items;
       }
+      if (groups.length > MAX_RECORDS || items.length > MAX_RECORDS)
+        throw new Error(
+          `The import exceeds the ${MAX_RECORDS.toLocaleString()} record limit, including its import folder.`,
+        );
 
       const thumbnailRecords = [...archive.thumbnails.values()];
       if (mode === 'replace') {

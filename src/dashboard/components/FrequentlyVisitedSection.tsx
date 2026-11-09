@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
 import { FaviconImage } from '../../components/FaviconImage';
+import { bookmarkActivationHandlers } from '../../components/bookmark-activation';
 import type { VisitedSiteSuggestion } from '../../core/discovery';
 import { getUrlLabel } from '../../core/validation';
 
@@ -19,7 +20,7 @@ interface FrequentlyVisitedSectionProps {
   savedUrls: ReadonlySet<string>;
   loading: boolean;
   error?: string;
-  onOpen: (site: VisitedSiteSuggestion) => void;
+  onOpen: (site: VisitedSiteSuggestion, background: boolean) => void;
   onSave: (site: VisitedSiteSuggestion) => void;
   onHide: (site: VisitedSiteSuggestion) => void;
   onHideSection: () => void;
@@ -172,7 +173,9 @@ export function FrequentlyVisitedSection({
                 <button
                   aria-label={'Open ' + site.title}
                   className="flex h-24 w-full min-w-0 flex-col items-center justify-center gap-3 rounded-lg px-2 focus-visible:outline-offset-[-2px]"
-                  onClick={() => onOpen(site)}
+                  {...bookmarkActivationHandlers((background) =>
+                    onOpen(site, background),
+                  )}
                   title={site.title + ' — ' + getUrlLabel(site.url)}
                   type="button"
                 >

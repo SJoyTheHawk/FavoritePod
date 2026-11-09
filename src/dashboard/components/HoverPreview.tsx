@@ -17,6 +17,7 @@ import type { Item } from '../../core/types';
 import { getUrlLabel } from '../../core/validation';
 import { FavoriteFallback } from './FavoriteFallback';
 import { ThumbnailImage } from '../../components/ThumbnailImage';
+import { bookmarkActivationHandlers } from '../../components/bookmark-activation';
 import { observeElementResize } from '../resize-observer';
 
 interface HoverPreviewProps {
@@ -27,7 +28,7 @@ interface HoverPreviewProps {
   thumbnailUrl?: string;
   fullThumbnailUrl?: string;
   onEdit: () => void;
-  onOpen: () => void;
+  onOpen: (background: boolean) => void;
   onPanelEnter: () => void;
   onPanelLeave: () => void;
   onClose: () => void;
@@ -178,7 +179,7 @@ export function HoverPreview({
         <div className="mt-1 flex flex-wrap gap-1.5">
           <button
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition hover:bg-primary-hover"
-            onClick={onOpen}
+            {...bookmarkActivationHandlers(onOpen)}
             type="button"
           >
             <ArrowTopRightOnSquareIcon aria-hidden="true" className="h-3.5 w-3.5" />

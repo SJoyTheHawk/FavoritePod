@@ -6,7 +6,7 @@ export function faviconSources(pageUrl: string, savedUrl?: string): string[] {
   const page = parseSafeUrl(pageUrl);
   if (
     page &&
-    page.protocol !== 'file:' &&
+    (page.protocol === 'http:' || page.protocol === 'https:') &&
     typeof chrome !== 'undefined' &&
     chrome.runtime?.id
   ) {

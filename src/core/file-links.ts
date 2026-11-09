@@ -10,6 +10,8 @@ export interface PathOverride {
 }
 
 export const FILE_ACCESS_DENIED = 'FILE_ACCESS_DENIED';
+export const FTP_UNSUPPORTED =
+  'Chrome no longer supports FTP. Copy this address and open it in an FTP client.';
 
 const FILE_AVAILABILITY_TTL_MS = 30_000;
 const FILE_AVAILABILITY_CACHE_LIMIT = 256;
@@ -146,7 +148,14 @@ export function getExtensionSettingsUrl(): string {
   return `chrome://extensions/?id=${chrome.runtime.id}`;
 }
 
-export async function openFileUrl(url: string): Promise<void> {
+export interface OpenSavedUrlOptions {
+  active?: boolean;
+}
+
+export async function openFileUrl(
+  url: string,
+  options: OpenSavedUrlOptions = {},
+): Promise<void> {
   const parsed = parseSafeUrl(url);
   if (!parsed || parsed.protocol !== 'file:') {
     throw new Error('This is not a valid local file URL.');
@@ -154,17 +163,21 @@ export async function openFileUrl(url: string): Promise<void> {
   if (!(await hasFileAccess())) throw new Error(FILE_ACCESS_DENIED);
 
   const target = applyPathOverride(url, await getPathOverrides());
-  await chrome.tabs.create({ url: target });
+  await chrome.tabs.create({ url: target, ...options });
 }
 
-export async function openSavedUrl(url: string): Promise<void> {
+export async function openSavedUrl(
+  url: string,
+  options: OpenSavedUrlOptions = {},
+): Promise<void> {
   const parsed = parseSafeUrl(url);
   if (!parsed) throw new Error('This favorite has an invalid address.');
   if (parsed.protocol === 'file:') {
-    await openFileUrl(url);
+    await openFileUrl(url, options);
     return;
   }
-  await chrome.tabs.create({ url });
+  if (parsed.protocol === 'ftp:') throw new Error(FTP_UNSUPPORTED);
+  await chrome.tabs.create({ url: url.trim(), ...options });
 }
 
 export async function checkFileAvailability(

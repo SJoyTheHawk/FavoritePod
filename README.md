@@ -71,14 +71,14 @@ offers **Add to favorites**, **Edit favorite** if already saved, and **Hide
 shortcut**. Saving opens the favorite editor so you can choose a group.
 
 The section is shown by default. Hide it using its **…** menu or turn off
-**Settings → Show frequently visited → All favorites** for a cleaner layout. Showing it again
+**Settings → Behavior → Show frequently visited → All favorites** for a cleaner layout. Showing it again
 restores your shortcuts without changing your favorites.
 
-Enable **Settings → Show frequently visited → Home page** to also show shortcuts
+Enable **Settings → Behavior → Show frequently visited → Home page** to also show shortcuts
 above the group set as your home page. This option starts off and is independent
 of All favorites visibility. Hiding from a section's menu affects only that view.
 
-Chrome access is separate: enable **Settings → Optional features → Frequently
+Chrome access is separate: enable **Settings → Behavior → Optional features → Frequently
 visited access** to grant Top sites permission. Chrome selects and orders the
 sites; FavoritePod filters unsafe, duplicate, and locally hidden entries, then
 shows up to ten. A shorter list stays shorter—no browsing-history backfill or
@@ -111,7 +111,7 @@ To enable local file access:
 Then open the local file in Chrome and save it through FavoritePod, or add its
 address in the launcher.
 
-If a folder has a different location on another computer, use **Settings → File
+If a folder has a different location on another computer, use **Settings → Local files → File
 Locations Remap** to tell FavoritePod where to look on that device. This changes
 how links open; it does not move your files.
 
@@ -148,10 +148,25 @@ devices can continue syncing.
 
 ## Back up or move your library
 
-Open **Settings → Import and export**:
+Open the **Import & export** tab in **Settings**:
 
 - **Export library** saves a ZIP file containing your favorites, folders, and preview images. You can export everything or selected folders.
+- **Export Chrome bookmarks** saves an HTML bookmarks file you can import into Chrome or another browser. You can export everything or selected folders; HTML does not include previews.
 - **Import library** lets you review a FavoritePod ZIP file before adding it. Choose whether to import a copy, update matching entries, or replace the local library.
+- **Import Chrome bookmarks** accepts the HTML file from Chrome’s **Bookmark Manager → ⋮ → Export Bookmarks**. Choose or drop an `.html` or `.htm` file (up to 20 MB), review the folders, bookmarks, and any skipped entries, then import it into a new **Imported: filename** folder. Folder nesting, empty folders, duplicates, and order are preserved. Each import creates a separate copy. [Chrome’s export instructions](https://support.google.com/chrome/answer/96816?hl=en).
+
+Chrome shortcuts (`chrome://settings`) and extension pages are supported alongside
+websites and local files. Email, phone, SMS, and legacy FTP links are preserved in
+imports and exports. **Settings → Behavior → Show hidden bookmarks** reveals links hidden by
+default on your device: FTP everywhere, phone and SMS on desktop, and email on
+mobile. FTP links must be opened in an FTP client. Move or delete hidden bookmarks
+before deleting their folder. Import files support up to 10,000 favorites and
+10,000 folders, including the new import folder.
+
+Settings are organized into **Appearance**, **Behavior**, **Import & export**,
+**Google Drive**, and **Local files** tabs. Use the arrow keys to move between tabs.
+The desktop folder sidebar scrolls independently of the bookmarks. Left-click a
+bookmark to open it in a new tab, or middle-click to open it in a background tab.
 
 Keep an export before removing the extension or making a large change to your
 library. Local file links in a backup still need their original files on the

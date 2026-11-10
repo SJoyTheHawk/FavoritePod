@@ -391,7 +391,11 @@ export function DashboardApp() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const closeMobileSidebar = useCallback(() => setMobileSidebarOpen(false), []);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeMobileSidebar = useCallback(() => {
+    mobileMenuButtonRef.current?.focus();
+    setMobileSidebarOpen(false);
+  }, []);
   const [homePageGroupId, setHomePageGroupIdState] = useState<string>();
   const [showPreview, setShowPreviewState] = useState(true);
   const [openBehavior, setOpenBehaviorState] = useState<OpenBehavior>('all');
@@ -421,6 +425,14 @@ export function DashboardApp() {
   const initialLastGroupId = useRef<string | null | undefined>(undefined);
   const initialDriveSyncAccount = useRef<string>();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const deselectFavorites = (ids: readonly string[]) => {
+    if (ids.length === 0) return;
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of ids) next.delete(id);
+      return next.size === current.size ? current : next;
+    });
+  };
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -1320,6 +1332,7 @@ export function DashboardApp() {
       .map((id) => items.find((item) => item.id === id)!)
       .map(({ id, groupId, orderKey }) => ({ id, groupId, orderKey }));
     const moved = await moveItems(ids, groupId, beforeItemId);
+    deselectFavorites(ids);
     const after = moved.map(({ id, groupId, orderKey }) => ({ id, groupId, orderKey }));
     registerHistory({
       label: `${ids.length} favorites moved`,
@@ -1593,6 +1606,7 @@ export function DashboardApp() {
       undo: () => restoreItemPositions([before]),
       redo: () => restoreItemPositions([after]),
     });
+    deselectFavorites([itemId]);
     notify(previous.groupId === groupId ? 'Favorite reordered.' : 'Favorite moved.');
   };
 
@@ -1869,6 +1883,7 @@ export function DashboardApp() {
             aria-label="Open favorite groups"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-surface-hover hover:text-text-primary md:hidden"
             onClick={() => setMobileSidebarOpen(true)}
+            ref={mobileMenuButtonRef}
             title="Open favorite groups"
             type="button"
           >
@@ -1930,7 +1945,7 @@ export function DashboardApp() {
           </button>
           <button
             aria-label="Add favorite"
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-white transition hover:bg-primary-hover"
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white transition hover:bg-primary-hover"
             onClick={() =>
               setDialog({ type: 'favorite', groupId: selectedGroupId ?? undefined })
             }
@@ -2302,7 +2317,7 @@ export function DashboardApp() {
               </div>
             ) : groupedView.mode === 'hierarchical' &&
               (sectionGroups.length > 0 || groupedView.directItems.length > 0) ? (
-              <div className="space-y-8">
+              <div className="space-y-6">
                 {groupedView.directItems.length > 0 &&
                   renderFavoriteCollection(groupedView.directItems)}
                 {sectionGroups.map((group) => (

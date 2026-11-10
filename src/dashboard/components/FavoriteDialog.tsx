@@ -17,7 +17,7 @@ import {
   parseSafeUrl,
 } from '../../core/validation';
 import { FaviconImage } from '../../components/FaviconImage';
-import { getGroupLabels } from '../group-labels';
+import { getGroupLabels, getGroupsInTreeOrder } from '../group-labels';
 
 interface FavoriteDialogProps {
   groups: Group[];
@@ -44,10 +44,11 @@ export function FavoriteDialog({
 }: FavoriteDialogProps) {
   const dialogTransition = useDialogTransition(onClosed);
   const onClose = dialogTransition.close;
+  const orderedGroups = useMemo(() => getGroupsInTreeOrder(groups), [groups]);
   const [title, setTitle] = useState(item?.title ?? initialTitle ?? '');
   const [url, setUrl] = useState(item?.url ?? initialUrl ?? '');
   const [groupId, setGroupId] = useState(
-    item?.groupId ?? initialGroupId ?? groups[0]?.id ?? '',
+    item?.groupId ?? initialGroupId ?? orderedGroups[0]?.id ?? '',
   );
   const [thumbnailUrl, setThumbnailUrl] = useState<string>();
   const [previewHash, setPreviewHash] = useState(item?.previewHash);
@@ -262,7 +263,7 @@ export function FavoriteDialog({
                   value={groupId}
                 >
                   {groups.length === 0 && <option value="">Favorites</option>}
-                  {groups.map((group) => (
+                  {orderedGroups.map((group) => (
                     <option key={group.id} value={group.id}>
                       {labels.get(group.id) ?? group.title}
                     </option>

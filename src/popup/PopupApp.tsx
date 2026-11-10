@@ -148,7 +148,7 @@ export function PopupApp() {
               type="button"
             >
               <PlusIcon aria-hidden="true" className="h-4 w-4" />
-              Add bookmark
+              Add favorite
             </button>
             {!tabLoading && tab && !parsedCurrentUrl && (
               <p className="mt-2 text-xs text-text-secondary">

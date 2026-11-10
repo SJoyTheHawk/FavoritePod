@@ -14,7 +14,7 @@ import { captureFavicon } from '../core/favicon';
 import { capturePopupThumbnail } from '../core/popup-thumbnail';
 import { applyPathOverride, getPathOverrides } from '../core/file-links';
 import type { PopupSaveRequest } from '../core/popup-save-request';
-import { getGroupLabels } from '../dashboard/group-labels';
+import { getGroupLabels, getGroupsInTreeOrder } from '../dashboard/group-labels';
 import {
   createItem,
   deleteItem,
@@ -74,6 +74,7 @@ export function BookmarkDialog({
   const parsedCurrentUrl = parseSafeUrl(currentUrl);
   const pageTitle = tab.title?.trim() || getDefaultTitle(currentUrl) || 'Untitled page';
   const groupLabels = getGroupLabels(groups);
+  const orderedGroups = useMemo(() => getGroupsInTreeOrder(groups), [groups]);
   const captureRequest = useMemo<PopupSaveRequest>(
     () =>
       saveRequest ?? {
@@ -96,7 +97,7 @@ export function BookmarkDialog({
       try {
         const next = await capturePopupThumbnail(captureRequest, controller.signal);
         if (initialFavorite) {
-          // The first preview belongs to the bookmark saved by Add bookmark.
+          // The first preview belongs to the favorite saved by Add favorite.
           const updated = await updateItemThumbnail(
             initialFavorite.id,
             next,
@@ -158,9 +159,9 @@ export function BookmarkDialog({
           );
         const lastGroupId = await getLastUsedGroupId();
         if (!active) return;
+        const currentGroups = getGroupsInTreeOrder(groupsRef.current);
         const defaultGroup =
-          groupsRef.current.find((group) => group.id === lastGroupId) ??
-          groupsRef.current[0];
+          currentGroups.find((group) => group.id === lastGroupId) ?? currentGroups[0];
         const existing = Boolean(item);
         // Match Chrome's bookmark behavior: Add saves by default. Save below
         // confirms edits; closing this dialog must not undo the addition.
@@ -240,13 +241,14 @@ export function BookmarkDialog({
       // Do not overwrite a bookmark that appeared while this new draft was open.
       if (!favorite && itemsRef.current.some((item) => item.url === currentUrl))
         throw new Error(
-          'This page was just saved elsewhere. Reopen Add bookmark to review it.',
+          'This page was just saved elsewhere. Reopen Add favorite to review it.',
         );
       let saved: Item;
+      const targetGroupId = groupId || orderedGroups[0]?.id;
       if (favorite) {
         saved = await updateItem(
           favorite.id,
-          { title: name, ...(groupId ? { groupId } : {}) },
+          { title: name, ...(targetGroupId ? { groupId: targetGroupId } : {}) },
           { thumbnail, expected: favorite },
         );
       } else {
@@ -254,7 +256,7 @@ export function BookmarkDialog({
         saved = await createItem({
           url: currentUrl,
           title: name,
-          groupId: groupId || undefined,
+          groupId: targetGroupId,
           faviconUrl: faviconUrl ?? tab.favIconUrl,
           thumbnail: thumbnail ?? undefined,
         });
@@ -317,7 +319,7 @@ export function BookmarkDialog({
         >
           <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
             <DialogTitle className="text-sm font-semibold text-text-primary">
-              {saveRequest ? 'Save to FavoritePod' : 'Add bookmark'}
+              {saveRequest ? 'Save to FavoritePod' : 'Add favorite'}
             </DialogTitle>
             <button
               aria-label="Close dialog"
@@ -442,12 +444,12 @@ export function BookmarkDialog({
                   Folder
                   <select
                     className="h-9 w-full min-w-0 max-w-full truncate rounded-md border border-border bg-background px-2.5 text-sm font-normal text-text-primary outline-none transition focus:border-primary disabled:opacity-60"
-                    disabled={busy || groups.length === 0}
+                    disabled={busy}
                     onChange={(event) => setGroupId(event.target.value)}
                     value={groupId}
                   >
-                    {groups.length === 0 && <option value="">Favorites</option>}
-                    {groups.map((group) => (
+                    <option value="">No folder</option>
+                    {orderedGroups.map((group) => (
                       <option key={group.id} value={group.id}>
                         {groupLabels.get(group.id) ?? group.title}
                       </option>

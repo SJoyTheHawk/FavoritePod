@@ -238,7 +238,7 @@ function GroupBranch({
                     {open && (
                       <MenuItems
                         anchor="bottom end"
-                        className="z-40 min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
+                        className="z-[60] min-w-44 rounded-md border border-border bg-background p-1 shadow-lg focus:outline-none"
                       >
                         <GroupAction
                           icon={<PencilSquareIcon />}

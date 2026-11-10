@@ -1,7 +1,7 @@
 {
   "name": "favoritepod",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "engines": {
     "node": ">=20.19.0"
@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "package:store": "npm run build && node scripts/package-store.mjs",
     "preview": "vite preview",
     "type-check": "tsc -b --pretty",
     "test": "vitest run --config vitest.config.ts",

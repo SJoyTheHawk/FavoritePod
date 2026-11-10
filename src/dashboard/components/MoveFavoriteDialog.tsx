@@ -2,7 +2,7 @@ import { AnimatedDialog, useDialogTransition } from '../../components/AnimatedDi
 import { useMemo, useState, type FormEvent } from 'react';
 import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import type { Group, Item } from '../../core/types';
-import { getGroupLabels } from '../group-labels';
+import { getGroupLabels, getGroupsInTreeOrder } from '../group-labels';
 
 interface MoveFavoriteDialogProps {
   groups: Group[];
@@ -23,6 +23,7 @@ export function MoveFavoriteDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const labels = useMemo(() => getGroupLabels(groups), [groups]);
+  const orderedGroups = useMemo(() => getGroupsInTreeOrder(groups), [groups]);
   const canMove =
     groupId !== item.groupId && groups.some((group) => group.id === groupId);
 
@@ -72,7 +73,7 @@ export function MoveFavoriteDialog({
                 onChange={(event) => setGroupId(event.target.value)}
                 value={groupId}
               >
-                {groups.map((group) => (
+                {orderedGroups.map((group) => (
                   <option key={group.id} value={group.id}>
                     {labels.get(group.id) ?? group.title}
                     {group.id === item.groupId ? ' (current)' : ''}

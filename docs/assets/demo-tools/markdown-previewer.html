@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1e2026" />
+    <title>Markdown Previewer</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #1e2026;
+        color: #c7ccd6;
+      }
+      body {
+        margin: 0;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid #86b8fc;
+        outline-offset: 3px;
+      }
+      header {
+        height: 54px;
+        padding: 0 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid #363942;
+        background: #292c34;
+      }
+      header h1 {
+        font-size: 13px;
+        font-weight: 500;
+        margin: 0;
+      }
+      .brand-mark {
+        margin-right: 13px;
+        font-family: ui-monospace, monospace;
+        font-size: 17px;
+        color: #9cb6df;
+      }
+      .live {
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        color: #a7b2a5;
+      }
+      .live::before {
+        content: '●';
+        font-size: 8px;
+        margin-right: 7px;
+        color: #9ec99c;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 185px minmax(0, 1fr);
+      }
+      .files {
+        background: #24262d;
+        border-right: 1px solid #363942;
+        padding: 23px 0;
+      }
+      .files h2 {
+        font-size: 9px;
+        letter-spacing: 1.4px;
+        font-weight: 500;
+        color: #9097a5;
+        margin: 0 20px 22px;
+      }
+      .folder {
+        color: #afb5c0;
+        padding: 0 20px 14px;
+        font-size: 11px;
+      }
+      .file {
+        color: #cbd5e8;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        background: #363d4c;
+        border-left: 2px solid #9cb6df;
+        padding: 12px 12px 12px 22px;
+      }
+      .file span {
+        color: #929cae;
+        margin-right: 7px;
+      }
+      .file-note {
+        color: #777f8e;
+        font-size: 10px;
+        line-height: 1.8;
+        padding: 25px 20px;
+      }
+      main {
+        min-width: 0;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 42px;
+        padding-right: 18px;
+        background: #252830;
+        border-bottom: 1px solid #383d48;
+      }
+      .tab {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        padding: 0 18px;
+        border-top: 2px solid #9cb6df;
+        background: #1e2026;
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+      }
+      #restore {
+        border: 1px solid #535b6d;
+        color: #b5bfce;
+        background: transparent;
+        padding: 5px 9px;
+        border-radius: 3px;
+        font-size: 10px;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .panel {
+        min-width: 0;
+      }
+      .panel-heading {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 22px;
+        border-bottom: 1px solid #373b46;
+        color: #8f99ac;
+      }
+      .panel-heading h2 {
+        font-size: 10px;
+        font-weight: 400;
+        margin: 0;
+        font-family: ui-monospace, monospace;
+      }
+      .panel-heading span {
+        font-size: 9px;
+      }
+      .panel:last-child {
+        background: #fcfcfa;
+        color-scheme: light;
+      }
+      .panel:last-child .panel-heading {
+        border-bottom-color: #e4e6e7;
+        color: #8c939b;
+        background: #f0f1ef;
+      }
+      textarea {
+        display: block;
+        resize: none;
+        width: 100%;
+        height: 568px;
+        border: 0;
+        outline-offset: -3px;
+        padding: 24px;
+        background: #1e2026;
+        color: #c2b6d9;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.95;
+        tab-size: 2;
+      }
+      #preview {
+        height: 568px;
+        overflow: auto;
+        padding: 28px 34px;
+        color: #4d535c;
+        font-family: Georgia, serif;
+        font-size: 14px;
+        line-height: 1.8;
+        overflow-wrap: anywhere;
+      }
+      #preview > :first-child {
+        margin-top: 0;
+      }
+      #preview h1,
+      #preview h2,
+      #preview h3,
+      #preview h4,
+      #preview h5,
+      #preview h6 {
+        color: #242b35;
+        line-height: 1.25;
+        font-weight: 600;
+        margin: 22px 0 12px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      #preview h1 {
+        font-size: 30px;
+        letter-spacing: -1px;
+        border-bottom: 1px solid #dce0e4;
+        padding-bottom: 17px;
+      }
+      #preview h2 {
+        font-size: 19px;
+      }
+      #preview h3 {
+        font-size: 16px;
+      }
+      #preview h4,
+      #preview h5,
+      #preview h6 {
+        font-size: 14px;
+      }
+      #preview p {
+        margin: 12px 0;
+      }
+      #preview ul,
+      #preview ol {
+        padding-left: 22px;
+      }
+      #preview li {
+        margin: 5px 0;
+      }
+      #preview blockquote {
+        border-left: 3px solid #9faebc;
+        color: #768594;
+        margin: 20px 0;
+        padding: 4px 0 4px 17px;
+        font-style: italic;
+      }
+      #preview code {
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        padding: 3px 5px;
+        background: #e9edf1;
+        color: #4f617a;
+      }
+      #preview pre {
+        overflow: auto;
+        background: #edf0f3;
+        padding: 15px;
+      }
+      #preview pre code {
+        padding: 0;
+      }
+      #preview a {
+        color: #466c9b;
+      }
+      #preview hr {
+        border: 0;
+        border-top: 1px solid #dce0e4;
+      }
+      .statusbar {
+        background: #35445f;
+        color: #d4deef;
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 18px;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        gap: 12px;
+      }
+      footer {
+        padding: 16px 22px;
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        color: #7f8999;
+      }
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 140px minmax(0, 1fr);
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        textarea,
+        #preview {
+          height: 400px;
+        }
+      }
+      @media (max-width: 600px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .files {
+          display: none;
+        }
+        .toolbar {
+          padding-right: 10px;
+        }
+        .tab {
+          padding-inline: 12px;
+          font-size: 10px;
+        }
+        .statusbar span:last-child {
+          display: none;
+        }
+        #preview {
+          padding: 24px;
+        }
+        header {
+          padding-inline: 16px;
+        }
+        .live {
+          font-size: 9px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1><span class="brand-mark" aria-hidden="true">M↓</span> Markdown Previewer</h1>
+      <span class="live">Live preview</span>
+    </header>
+    <div class="app">
+      <aside class="files" aria-label="Current document">
+        <h2>EXPLORER</h2>
+        <div class="folder">⌄ &nbsp; WEBSITE REFRESH</div>
+        <div class="file"><span aria-hidden="true">M</span> project-notes.md</div>
+        <p class="file-note">A scratchpad for ideas,<br />one line at a time.</p>
+      </aside>
+      <main>
+        <div class="toolbar">
+          <div class="tab">project-notes.md</div>
+          <button type="button" id="restore">Restore example</button>
+        </div>
+        <div class="workspace">
+          <section class="panel">
+            <div class="panel-heading">
+              <h2 id="editor-label">MARKDOWN</h2>
+              <span>Plain text</span>
+            </div>
+            <textarea id="source" aria-labelledby="editor-label" spellcheck="false">
+# Website refresh
+
+A little more clarity. A little more character.
+A home for the things we love to make.
+
+## The direction
+
+- Keep the navigation **simple**
+- Give the typography room to breathe
+- Make every interaction feel thoughtful
+
+&gt; Design is how the whole thing feels.
+
+## A few next steps
+
+1. Collect visual references
+2. Sketch the first wireframe
+3. Build something small with `HTML` and `CSS`
+
+Make something *worth coming back to*.</textarea>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <h2 id="preview-label">PREVIEW</h2>
+              <span>Rendered document</span>
+            </div>
+            <article id="preview" aria-labelledby="preview-label"></article>
+          </section>
+        </div>
+        <div class="statusbar">
+          <span id="counts" role="status"></span
+          ><span>Markdown &nbsp; UTF-8 &nbsp; Live</span>
+        </div>
+      </main>
+    </div>
+    <footer>Headings / lists / quotes / emphasis / code / links</footer>
+
+    <script>
+      const source = document.querySelector('#source');
+      const preview = document.querySelector('#preview');
+      const example = source.value;
+
+      // Render a small Markdown subset as DOM nodes; typed HTML stays plain text.
+      function appendInline(parent, value) {
+        const tokens = /`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*|\[([^\]]+)\]\(([^\s)]+)\)/g;
+        let end = 0;
+        for (const match of value.matchAll(tokens)) {
+          parent.append(document.createTextNode(value.slice(end, match.index)));
+          let node;
+          if (match[1] !== undefined) {
+            node = document.createElement('code');
+            node.textContent = match[1];
+          } else if (match[2] !== undefined || match[3] !== undefined) {
+            node = document.createElement(match[2] !== undefined ? 'strong' : 'em');
+            node.textContent = match[2] ?? match[3];
+          } else {
+            let url;
+            try {
+              url = new URL(match[5]);
+            } catch {
+              /* Keep invalid links as text. */
+            }
+            if (url && ['http:', 'https:'].includes(url.protocol)) {
+              node = document.createElement('a');
+              node.href = url.href;
+              node.rel = 'noopener noreferrer';
+              node.target = '_blank';
+              node.textContent = match[4];
+            } else {
+              node = document.createTextNode(match[0]);
+            }
+          }
+          parent.append(node);
+          end = match.index + match[0].length;
+        }
+        parent.append(document.createTextNode(value.slice(end)));
+      }
+
+      function render() {
+        const content = document.createDocumentFragment();
+        const lines = source.value.replace(/\r\n?/g, '\n').split('\n');
+        let paragraph = [];
+        let list = null;
+        let code = null;
+        function flushParagraph() {
+          if (!paragraph.length) return;
+          const node = document.createElement('p');
+          appendInline(node, paragraph.join(' '));
+          content.append(node);
+          paragraph = [];
+        }
+        for (const line of lines) {
+          if (line.startsWith('```')) {
+            flushParagraph();
+            list = null;
+            if (code) {
+              code = null;
+            } else {
+              const pre = document.createElement('pre');
+              code = document.createElement('code');
+              pre.append(code);
+              content.append(pre);
+            }
+            continue;
+          }
+          if (code) {
+            code.append(document.createTextNode(`${line}\n`));
+            continue;
+          }
+          const heading = line.match(/^(#{1,6})\s+(.+)$/);
+          const item = line.match(/^\s*([-*]|\d+\.)\s+(.+)$/);
+          const quote = line.match(/^>\s?(.*)$/);
+          if (item) {
+            flushParagraph();
+            const tag = /^\d/.test(item[1]) ? 'ol' : 'ul';
+            if (!list || list.localName !== tag) {
+              list = document.createElement(tag);
+              content.append(list);
+            }
+            const li = document.createElement('li');
+            appendInline(li, item[2]);
+            list.append(li);
+            continue;
+          }
+          list = null;
+          if (heading || quote || /^\s*(---+|\*\*\*+)\s*$/.test(line) || !line.trim()) {
+            flushParagraph();
+            if (heading) {
+              const node = document.createElement(`h${heading[1].length}`);
+              appendInline(node, heading[2]);
+              content.append(node);
+            } else if (quote) {
+              const node = document.createElement('blockquote');
+              appendInline(node, quote[1]);
+              content.append(node);
+            } else if (line.trim()) {
+              content.append(document.createElement('hr'));
+            }
+          } else {
+            paragraph.push(line);
+          }
+        }
+        flushParagraph();
+        preview.replaceChildren(content);
+        const trimmed = source.value.trim();
+        const words = trimmed ? trimmed.split(/\s+/).length : 0;
+        document.querySelector('#counts').textContent =
+          `${words} words · ${source.value.length} characters`;
+      }
+      source.addEventListener('input', render);
+      document.querySelector('#restore').addEventListener('click', () => {
+        source.value = example;
+        render();
+      });
+      render();
+    </script>
+  </body>
+</html>

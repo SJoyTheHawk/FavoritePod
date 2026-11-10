@@ -1,0 +1,78 @@
+/* Local preview framing only. Do not paste this stylesheet into WordPress. */
+.fp-preview {
+  margin: 0;
+  background: #fff;
+  color: #334155;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.65;
+  --ast-global-color-0: #046bd2;
+  --ast-global-color-1: #045cb4;
+  --ast-global-color-2: #1e293b;
+  --ast-global-color-3: #334155;
+  --ast-global-color-4: #f0f5fa;
+}
+.fp-preview-note {
+  padding: 8px 20px;
+  background: #f0f5fa;
+  font-size: 12px;
+  text-align: center;
+}
+.fp-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  max-width: 1200px;
+  min-height: 94px;
+  margin: auto;
+  padding: 0 24px;
+}
+.fp-preview-header a,
+.fp-preview-footer a {
+  color: #334155;
+  text-decoration: none;
+}
+.fp-preview-header a:hover,
+.fp-preview-footer a:hover {
+  color: #046bd2;
+  text-decoration: underline;
+}
+.fp-preview-brand {
+  font-size: 24px;
+  font-weight: 700;
+}
+.fp-preview-header nav,
+.fp-preview-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.fp-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 40px max(24px, calc((100% - 1200px) / 2));
+  background: #f9f9f9;
+  font-size: 14px;
+}
+.fp-preview-footer p {
+  margin: 0 0 8px;
+}
+.fp-preview-skip {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+}
+.fp-preview-skip:focus {
+  top: 8px;
+  padding: 8px;
+  background: white;
+}
+@media (max-width: 600px) {
+  .fp-preview-header {
+    padding-block: 20px;
+  }
+}

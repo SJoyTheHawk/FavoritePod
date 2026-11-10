@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ece8df" />
+    <title>Design Brief</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #292620;
+        background: #ece8df;
+      }
+      body {
+        margin: 0;
+        padding: 28px 5vw;
+      }
+      .sheet {
+        max-width: 1120px;
+        margin: auto;
+        background: #fffdf6;
+        padding: 29px 40px 22px;
+        box-shadow: 0 3px 20px #3830240a;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 17px;
+        border-bottom: 2px solid #302b24;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .studio {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: -0.3px;
+      }
+      .studio span {
+        color: #bb482c;
+      }
+      .masthead {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+        gap: 30px;
+        padding: 24px 0 26px;
+      }
+      .eyebrow {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: #a44d35;
+      }
+      h1 {
+        font-family: Georgia, serif;
+        font-size: clamp(44px, 5vw, 70px);
+        font-weight: 400;
+        line-height: 1.02;
+        letter-spacing: -2.8px;
+        margin: 13px 0 0;
+      }
+      .issue {
+        color: #bd492d;
+        font-family: Georgia, serif;
+        font-size: 118px;
+        line-height: 0.9;
+        letter-spacing: -8px;
+        padding-right: 8px;
+      }
+      .standfirst {
+        display: grid;
+        grid-template-columns: 1fr 1.4fr;
+        gap: 40px;
+        padding: 18px 0;
+        border-top: 1px solid #c8bfb0;
+        border-bottom: 1px solid #c8bfb0;
+      }
+      .standfirst h2 {
+        font-family: Georgia, serif;
+        font-size: 20px;
+        font-weight: 400;
+        line-height: 1.3;
+        margin: 0;
+        max-width: 340px;
+        text-transform: none;
+        letter-spacing: -0.3px;
+      }
+      p {
+        font-family: Georgia, serif;
+        font-size: 13px;
+        line-height: 1.65;
+        color: #756d60;
+        margin: 0;
+      }
+      .document {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 0.95fr;
+        gap: 26px;
+        padding: 26px 0 22px;
+      }
+      .document > section + section {
+        border-left: 1px solid #ded7ca;
+        padding-left: 26px;
+      }
+      h2 {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 0 0 17px;
+      }
+      .goals {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .goals li {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 17px;
+        font-family: Georgia, serif;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+      .number {
+        color: #b94a31;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        padding-top: 2px;
+      }
+      .goals small {
+        display: block;
+        font-size: 11px;
+        color: #8c8170;
+        line-height: 1.5;
+        margin-top: 4px;
+      }
+      .direction {
+        color: #b54b32;
+        font-family: Georgia, serif;
+        font-size: 32px;
+        line-height: 1.18;
+        letter-spacing: -0.8px;
+        margin: 18px 0 0;
+      }
+      dl {
+        margin: 0;
+      }
+      dt {
+        font-size: 9px;
+        color: #9a8c78;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 15px 0 5px;
+      }
+      dt:first-child {
+        margin-top: 0;
+      }
+      dd {
+        font-family: Georgia, serif;
+        font-size: 12px;
+        line-height: 1.6;
+        margin: 0;
+      }
+      .deliverables {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-top: 14px;
+        border-top: 1px solid #c8bfb0;
+        font-size: 9px;
+        color: #8e806c;
+      }
+      .deliverables strong {
+        color: #4b4132;
+        font-weight: 500;
+      }
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        padding-top: 22px;
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #9b8b74;
+      }
+      @media (max-width: 800px) {
+        body {
+          padding: 18px;
+        }
+        .sheet {
+          padding: 25px;
+        }
+        .document {
+          grid-template-columns: 1fr;
+          gap: 25px;
+        }
+        .document > section + section {
+          border-left: 0;
+          padding: 20px 0 0;
+          border-top: 1px solid #ded7ca;
+        }
+        .standfirst {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+        .issue {
+          font-size: 90px;
+        }
+      }
+      @media (max-width: 450px) {
+        .sheet {
+          padding: 22px;
+        }
+        header {
+          font-size: 8px;
+        }
+        .studio {
+          font-size: 10px;
+        }
+        .masthead {
+          gap: 12px;
+        }
+        h1 {
+          font-size: 43px;
+          letter-spacing: -1.5px;
+        }
+        .issue {
+          font-size: 72px;
+          letter-spacing: -5px;
+        }
+        footer {
+          font-size: 7px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <header>
+        <div class="studio">FIELD<span> / </span>NOTES</div>
+        <span>Website refresh · Project document</span>
+      </header>
+      <main>
+        <div class="masthead">
+          <div>
+            <div class="eyebrow">The starting point / Creative direction</div>
+            <h1>Design<br />Brief.</h1>
+          </div>
+          <div class="issue" aria-hidden="true">01</div>
+        </div>
+        <section class="standfirst">
+          <h2>A clearer home for thoughtful work.</h2>
+          <p>
+            Give a small creative studio a welcoming new home. Help visitors understand
+            the work, explore recent projects, and start a conversation.
+          </p>
+        </section>
+        <article class="document" aria-label="Website refresh brief">
+          <section>
+            <h2>01 — What good looks like</h2>
+            <ol class="goals">
+              <li>
+                <span class="number" aria-hidden="true">a.</span>
+                <div>
+                  Make the first impression clear.<small
+                    >Explain what the studio does in a few simple words.</small
+                  >
+                </div>
+              </li>
+              <li>
+                <span class="number" aria-hidden="true">b.</span>
+                <div>
+                  Let the work take the lead.<small
+                    >Give selected projects space and useful context.</small
+                  >
+                </div>
+              </li>
+              <li>
+                <span class="number" aria-hidden="true">c.</span>
+                <div>
+                  Make the next step feel easy.<small
+                    >Simple navigation. A clear way to get in touch.</small
+                  >
+                </div>
+              </li>
+            </ol>
+          </section>
+          <section>
+            <h2>02 — Who we are designing for</h2>
+            <p>
+              Curious people looking for a thoughtful creative partner. They browse on
+              phones and laptops, value clear communication, and want to see the thinking
+              behind the work.
+            </p>
+            <div class="direction">Clarity.<br />Character.<br />Care.</div>
+          </section>
+          <section>
+            <h2>03 — Keep it focused</h2>
+            <dl>
+              <dt>In scope</dt>
+              <dd>Home, Work, About, Contact</dd>
+              <dt>Visual direction</dt>
+              <dd>Warm, calm, considered.<br />Generous type. Honest materials.</dd>
+              <dt>Priority</dt>
+              <dd>Clear on every screen</dd>
+              <dt>Out of scope</dt>
+              <dd>Shop & member accounts</dd>
+            </dl>
+          </section>
+        </article>
+        <section class="deliverables" aria-label="Project deliverables">
+          <strong>DELIVERABLES</strong><span>Visual direction</span><span>Wireframes</span
+          ><span>Working prototype</span><span>Launch review</span>
+        </section>
+      </main>
+      <footer>
+        <span>Sample project / Website refresh</span
+        ><span>Discover → Design → Launch &nbsp; / &nbsp; 01</span>
+      </footer>
+    </div>
+  </body>
+</html>

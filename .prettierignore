@@ -3,4 +3,3 @@ dist
 .local
 package-lock.json
 docs/
-NEXT_STEPS.md

@@ -3,7 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import type { Group } from '../../core/types';
-import { getGroupLabels } from '../group-labels';
+import { getGroupLabels, getGroupsInTreeOrder } from '../group-labels';
 
 interface GroupDialogProps {
   groups: Group[];
@@ -31,7 +31,7 @@ export function GroupDialog({
   const labels = useMemo(() => getGroupLabels(groups), [groups]);
 
   const availableParents = useMemo(() => {
-    if (!group) return groups;
+    if (!group) return getGroupsInTreeOrder(groups);
     const descendants = new Set<string>([group.id]);
     let changed = true;
     while (changed) {
@@ -47,7 +47,9 @@ export function GroupDialog({
         }
       }
     }
-    return groups.filter((candidate) => !descendants.has(candidate.id));
+    return getGroupsInTreeOrder(
+      groups.filter((candidate) => !descendants.has(candidate.id)),
+    );
   }, [group, groups]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {

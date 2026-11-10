@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fffdf6" />
+    <title>Color Palette</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #21211e;
+        background: #fffdf6;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 3px solid currentColor;
+        outline-offset: 4px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: center;
+        padding: 22px 32px;
+        border-bottom: 2px solid #23231f;
+      }
+      h1 {
+        font-size: 28px;
+        line-height: 1;
+        letter-spacing: -1.5px;
+        font-weight: 850;
+        margin: 0;
+      }
+      h1 span {
+        display: inline-block;
+        background: #eed24a;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        vertical-align: middle;
+        margin-right: 11px;
+      }
+      .header-note {
+        font-size: 11px;
+        color: #77776c;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 20px 32px;
+      }
+      .collection-label {
+        font-size: 9px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: #817f71;
+        margin-bottom: 5px;
+      }
+      #palette-name {
+        font-size: 18px;
+        font-weight: 550;
+        letter-spacing: -0.4px;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+      }
+      .actions button {
+        padding: 11px 15px;
+        border: 1px solid #24241f;
+        border-radius: 0;
+        background: transparent;
+        font-size: 11px;
+        color: #34342e;
+      }
+      #generate {
+        background: #23231f;
+        color: #fffdf6;
+      }
+      .palette {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+      .color {
+        min-width: 0;
+      }
+      .color + .color {
+        border-left: 1px solid #00000015;
+      }
+      .swatch {
+        height: 440px;
+        padding: 26px 25px;
+        display: flex;
+        flex-direction: column;
+        align-items: start;
+        justify-content: space-between;
+        position: relative;
+      }
+      .number {
+        font-size: 72px;
+        line-height: 1;
+        font-weight: 200;
+        letter-spacing: -4px;
+        opacity: 0.75;
+      }
+      .swatch button {
+        border: 1px solid currentColor;
+        color: inherit;
+        background: transparent;
+        padding: 8px 11px;
+        border-radius: 20px;
+        font-size: 10px;
+      }
+      .swatch button[aria-pressed='true'] {
+        border-width: 2px;
+        font-weight: 600;
+      }
+      .details {
+        padding: 19px 25px;
+        border-bottom: 1px solid #deddd2;
+      }
+      .name {
+        display: block;
+        font-size: 13px;
+        font-weight: 550;
+        margin-bottom: 9px;
+      }
+      .hex {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        color: #7b7a6e;
+      }
+      input[type='color'] {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      input[type='color']::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      input[type='color']::-webkit-color-swatch {
+        border: 1px solid #00000025;
+        border-radius: 50%;
+      }
+      input[type='color']::-moz-color-swatch {
+        border: 1px solid #00000025;
+        border-radius: 50%;
+      }
+      footer {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 22px 32px;
+        font-size: 10px;
+        color: #817f71;
+      }
+      #notice {
+        text-align: right;
+      }
+      @media (min-height: 850px) and (min-width: 701px) {
+        .swatch {
+          height: calc(100vh - 322px);
+        }
+      }
+      @media (max-width: 850px) {
+        .swatch {
+          padding: 20px 15px;
+        }
+        .number {
+          font-size: 54px;
+        }
+        .details {
+          padding: 18px 14px;
+        }
+        .header-note {
+          display: none;
+        }
+      }
+      @media (max-width: 600px) {
+        header {
+          padding: 22px;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        .toolbar {
+          padding: 20px 22px;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+        .palette {
+          grid-template-columns: 1fr;
+        }
+        .color {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .color + .color {
+          border-left: 0;
+        }
+        .swatch {
+          height: 160px;
+        }
+        .number {
+          font-size: 40px;
+          letter-spacing: -2px;
+        }
+        .details {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding-left: 25px;
+        }
+        footer {
+          flex-direction: column;
+          padding: 22px;
+        }
+        #notice {
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1><span aria-hidden="true"></span>Color Palette</h1>
+      <span class="header-note">Five colors. A thousand possibilities.</span>
+    </header>
+    <main>
+      <div class="toolbar">
+        <div>
+          <div class="collection-label">Collection 001 / Color studies</div>
+          <div id="palette-name">The quiet outdoors</div>
+        </div>
+        <div class="actions">
+          <button type="button" id="export">Export CSS</button
+          ><button type="button" id="generate">New palette ↗</button>
+        </div>
+      </div>
+      <section
+        class="palette"
+        id="palette"
+        aria-label="Five editable palette colors"
+      ></section>
+    </main>
+    <footer>
+      <span>Lock a color to keep it. Select a dot to edit it.</span
+      ><span id="notice" role="status">Start with a color that speaks to you.</span>
+    </footer>
+
+    <script>
+      const collections = [
+        {
+          name: 'The quiet outdoors',
+          colors: ['#486577', '#849B85', '#E9C879', '#DF8B69', '#F0E6D5'],
+          names: ['Deep water', 'Sage garden', 'Golden hour', 'Terracotta', 'Linen'],
+        },
+        {
+          name: 'A slower Sunday',
+          colors: ['#53516C', '#9C8DA6', '#DCB6BD', '#EDCFB5', '#F5EADC'],
+          names: ['Evening ink', 'Wild lavender', 'Rosewater', 'Apricot', 'Soft cream'],
+        },
+        {
+          name: 'Somewhere by the sea',
+          colors: ['#285A63', '#6A9B9A', '#B5C9BC', '#E9D8B4', '#C78164'],
+          names: ['Harbor', 'Sea glass', 'Coastal mist', 'Warm sand', 'Clay'],
+        },
+        {
+          name: 'A brighter kind of day',
+          colors: ['#3C537D', '#7295B4', '#E6BB61', '#CD735F', '#EBE4D6'],
+          names: ['Blue hour', 'Open sky', 'Marigold', 'Papaya', 'Oat milk'],
+        },
+      ];
+      let collection = 0;
+      const colors = [...collections[0].colors];
+      const names = [...collections[0].names];
+      const locked = colors.map(() => false);
+      const palette = document.querySelector('#palette');
+      const notice = document.querySelector('#notice');
+
+      function textColor(hex) {
+        const channels = hex
+          .slice(1)
+          .match(/../g)
+          .map((channel) => {
+            const value = parseInt(channel, 16) / 255;
+            return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+          });
+        const luminance =
+          0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        return luminance > 0.179 ? '#172722' : '#FFFFFF';
+      }
+
+      function render() {
+        palette.replaceChildren();
+        colors.forEach((hex, index) => {
+          const card = document.createElement('div');
+          card.className = 'color';
+          const swatch = document.createElement('div');
+          swatch.className = 'swatch';
+          swatch.style.backgroundColor = hex;
+          swatch.style.color = textColor(hex);
+          const number = document.createElement('span');
+          number.className = 'number';
+          number.textContent = `0${index + 1}`;
+          const lock = document.createElement('button');
+          lock.type = 'button';
+          lock.textContent = locked[index] ? 'Locked' : 'Lock color';
+          lock.setAttribute('aria-pressed', String(locked[index]));
+          lock.setAttribute('aria-label', `Lock color ${index + 1}`);
+          lock.addEventListener('click', () => {
+            locked[index] = !locked[index];
+            lock.setAttribute('aria-pressed', String(locked[index]));
+            lock.textContent = locked[index] ? 'Locked' : 'Lock color';
+            notice.textContent = `Color ${index + 1} ${locked[index] ? 'locked' : 'unlocked'}.`;
+          });
+          swatch.append(number, lock);
+          const details = document.createElement('div');
+          details.className = 'details';
+          const name = document.createElement('span');
+          name.className = 'name';
+          name.textContent = names[index];
+          const row = document.createElement('div');
+          row.className = 'hex';
+          const input = document.createElement('input');
+          input.type = 'color';
+          input.value = hex;
+          input.setAttribute('aria-label', `Edit color ${index + 1}`);
+          const code = document.createElement('code');
+          code.textContent = hex;
+          input.addEventListener('input', () => {
+            colors[index] = input.value.toUpperCase();
+            names[index] = 'Your own mix';
+            swatch.style.backgroundColor = colors[index];
+            swatch.style.color = textColor(colors[index]);
+            code.textContent = colors[index];
+            name.textContent = names[index];
+            document.querySelector('#palette-name').textContent = 'Your own mix';
+          });
+          row.append(input, code);
+          details.append(name, row);
+          card.append(swatch, details);
+          palette.append(card);
+        });
+      }
+
+      document.querySelector('#generate').addEventListener('click', () => {
+        if (locked.every(Boolean)) {
+          notice.textContent = 'Unlock a color to explore a new combination.';
+          return;
+        }
+        collection = (collection + 1) % collections.length;
+        colors.forEach((_, index) => {
+          if (!locked[index]) {
+            colors[index] = collections[collection].colors[index];
+            names[index] = collections[collection].names[index];
+          }
+        });
+        document.querySelector('#palette-name').textContent = locked.some(Boolean)
+          ? 'Your own mix'
+          : collections[collection].name;
+        notice.textContent = 'A fresh combination. Your locked colors are kept.';
+        render();
+      });
+      document.querySelector('#export').addEventListener('click', () => {
+        const css = `:root {\n${colors.map((hex, index) => `  --color-${index + 1}: ${hex};`).join('\n')}\n}\n`;
+        const url = URL.createObjectURL(new Blob([css], { type: 'text/css' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'color-palette.css';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        notice.textContent = 'Your CSS palette is ready to download.';
+      });
+      render();
+    </script>
+  </body>
+</html>

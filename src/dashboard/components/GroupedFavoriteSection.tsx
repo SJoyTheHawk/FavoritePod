@@ -64,22 +64,26 @@ export function GroupedFavoriteSection({
         style={{ gridTemplateRows: collapsed ? '0fr' : '1fr' }}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="min-w-0 space-y-8 pt-0.5">
+          <div className="min-w-0 pt-0.5">
             {directItems.length > 0 && renderItems(directItems)}
-            {visibleChildGroups.map((child) => (
-              <GroupedFavoriteSection
-                collapsedGroups={collapsedGroups}
-                group={child}
-                groups={groups}
-                itemsByGroup={itemsByGroup}
-                key={child.id}
-                nested
-                onDropIntoGroup={onDropIntoGroup}
-                onToggleCollapse={onToggleCollapse}
-                renderItems={renderItems}
-                searching={searching}
-              />
-            ))}
+            {visibleChildGroups.length > 0 && (
+              <div className={`space-y-3 ${directItems.length > 0 ? 'mt-8' : ''}`}>
+                {visibleChildGroups.map((child) => (
+                  <GroupedFavoriteSection
+                    collapsedGroups={collapsedGroups}
+                    group={child}
+                    groups={groups}
+                    itemsByGroup={itemsByGroup}
+                    key={child.id}
+                    nested
+                    onDropIntoGroup={onDropIntoGroup}
+                    onToggleCollapse={onToggleCollapse}
+                    renderItems={renderItems}
+                    searching={searching}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

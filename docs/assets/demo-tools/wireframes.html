@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#2448a6" />
+    <title>Wireframes</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #2448a6;
+        color: #eaf0ff;
+      }
+      body {
+        margin: 0;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid #ffcd75;
+        outline-offset: 4px;
+      }
+      header {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 26px;
+        background: #152b65;
+        border-bottom: 1px solid #4965a4;
+        gap: 20px;
+      }
+      .brand {
+        font-size: 15px;
+        font-weight: 500;
+      }
+      .brand span {
+        margin-right: 11px;
+        color: #99baff;
+      }
+      .project {
+        font-family: ui-monospace, monospace;
+        color: #c1cfee;
+        font-size: 10px;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: 170px minmax(0, 1fr) 190px;
+        min-height: 650px;
+      }
+      .layers {
+        background: #1e3b88;
+        padding: 25px 20px;
+        border-right: 1px solid #5c79bb;
+      }
+      .side-title {
+        color: #afc1ec;
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        letter-spacing: 1.3px;
+        margin: 0 0 22px;
+        font-weight: 400;
+      }
+      .layer {
+        color: #b1c3ec;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        padding: 12px 0;
+      }
+      .layer.selected {
+        color: white;
+      }
+      .nested {
+        padding-left: 14px;
+      }
+      .layer span {
+        color: #7e9bd7;
+        margin-right: 7px;
+      }
+      main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 23px 25px;
+      }
+      h1 {
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: -0.3px;
+        margin: 0 0 6px;
+      }
+      .subtitle {
+        color: #b4c9f7;
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+      }
+      .modes {
+        display: flex;
+        gap: 4px;
+      }
+      .modes button {
+        border: 1px solid #6688ce;
+        background: transparent;
+        color: #c7d8fa;
+        padding: 7px 11px;
+        font-size: 10px;
+        border-radius: 2px;
+      }
+      .modes button[aria-pressed='true'] {
+        color: #263e74;
+        background: #edf2fc;
+        border-color: #edf2fc;
+      }
+      .canvas {
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        min-height: 480px;
+        flex: 1;
+        padding: 38px 26px;
+        background-image:
+          linear-gradient(#ffffff0b 1px, transparent 1px),
+          linear-gradient(90deg, #ffffff0b 1px, transparent 1px);
+        background-size: 24px 24px;
+        overflow: auto;
+        position: relative;
+        border-top: 1px solid #5477c4;
+      }
+      .canvas::before {
+        content: 'HOME / FIRST EXPLORATION';
+        position: absolute;
+        top: 17px;
+        left: 26px;
+        font-size: 8px;
+        letter-spacing: 1.5px;
+        color: #b1c9ff;
+        font-family: ui-monospace, monospace;
+      }
+      .browser {
+        width: 100%;
+        max-width: 780px;
+        background: #fff;
+        border: 1px solid #a3beff;
+        outline: 6px solid #ffffff10;
+        color: #626d80;
+        box-shadow: 10px 12px 0 #112e6c55;
+      }
+      .browser-bar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #e3e8ef;
+        background: #f5f7fa;
+      }
+      .browser-bar span {
+        width: 5px;
+        height: 5px;
+        background: #c1cad9;
+        border-radius: 50%;
+      }
+      .browser-bar small {
+        font-family: ui-monospace, monospace;
+        font-size: 8px;
+        margin-left: 10px;
+        color: #929fb2;
+      }
+      .page {
+        padding: 22px;
+      }
+      .site-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #e1e7f0;
+        padding-bottom: 17px;
+      }
+      .logo {
+        background: #6f82a4;
+        height: 12px;
+        width: 65px;
+      }
+      .site-links {
+        display: flex;
+        gap: 15px;
+        font-size: 8px;
+        color: #9ba8ba;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 24px;
+        align-items: center;
+        padding: 24px 0;
+      }
+      .caption {
+        font-family: ui-monospace, monospace;
+        color: #8c9bb2;
+        font-size: 7px;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .headline {
+        height: 14px;
+        background: #8c9db8;
+        width: 95%;
+        margin-bottom: 6px;
+      }
+      .headline.short {
+        width: 65%;
+      }
+      .lines {
+        display: grid;
+        gap: 5px;
+        margin-top: 15px;
+      }
+      .lines span {
+        height: 4px;
+        background: #e0e6ef;
+      }
+      .lines span:last-child {
+        width: 70%;
+      }
+      .action-placeholder {
+        display: grid;
+        place-items: center;
+        width: 85px;
+        height: 25px;
+        margin-top: 17px;
+        background: #6d81a5;
+        color: #fff;
+        font-size: 8px;
+      }
+      .visual {
+        position: relative;
+        display: grid;
+        place-items: center;
+        height: 154px;
+        border: 1px solid #becce0;
+        background: #eff3f8;
+      }
+      .visual svg {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        inset: 0;
+      }
+      .visual span {
+        position: relative;
+        background: #eff3f8;
+        padding: 7px;
+        color: #99a8bf;
+        font-size: 8px;
+        text-align: center;
+      }
+      .features {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        padding-top: 20px;
+        border-top: 1px solid #e1e7f0;
+      }
+      .feature {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .feature-box {
+        height: 26px;
+        width: 26px;
+        background: #dce4ef;
+        flex-shrink: 0;
+      }
+      .feature-text {
+        font-size: 7px;
+        color: #8a9ab2;
+      }
+      .feature-text small {
+        font-size: 7px;
+        display: block;
+        color: #aab5c7;
+        margin-top: 4px;
+      }
+      .canvas[data-mode='mobile'] .browser {
+        max-width: 250px;
+      }
+      .canvas[data-mode='mobile'] .hero {
+        grid-template-columns: 1fr;
+        gap: 17px;
+        padding: 18px 0 0;
+      }
+      .canvas[data-mode='mobile'] .visual {
+        height: 90px;
+      }
+      .canvas[data-mode='mobile'] .features,
+      .canvas[data-mode='mobile'] .site-links {
+        display: none;
+      }
+      .canvas[data-mode='mobile'] .page {
+        padding: 18px;
+      }
+      .inspector {
+        border-left: 1px solid #5c79bb;
+        padding: 26px 20px;
+        background: #1e3b88;
+      }
+      .inspector h2 {
+        font-size: 11px;
+        color: #e3ebff;
+        margin: 0 0 8px;
+        font-weight: 400;
+      }
+      .inspector p {
+        font-size: 10px;
+        line-height: 1.8;
+        color: #b0c2ee;
+        margin: 0 0 24px;
+      }
+      .note-number {
+        font-family: ui-monospace, monospace;
+        font-size: 23px;
+        font-weight: 300;
+        color: #a4c1ff;
+        margin-bottom: 12px;
+      }
+      .document-id {
+        padding-top: 20px;
+        border-top: 1px solid #506eaf;
+        color: #97b2e9;
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        line-height: 1.8;
+      }
+      footer {
+        background: #152b65;
+        color: #afc1e9;
+        padding: 13px 26px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+      }
+      @media (max-width: 1000px) {
+        .workspace {
+          grid-template-columns: 145px minmax(0, 1fr);
+        }
+        .inspector {
+          display: none;
+        }
+      }
+      @media (max-width: 650px) {
+        .workspace {
+          grid-template-columns: 1fr;
+          min-height: 650px;
+        }
+        .layers {
+          display: none;
+        }
+        header {
+          padding-inline: 20px;
+        }
+        .project {
+          font-size: 8px;
+        }
+        .toolbar {
+          padding: 22px;
+          flex-wrap: wrap;
+          gap: 15px;
+        }
+        .canvas {
+          padding: 40px 22px;
+        }
+        .page {
+          padding: 18px;
+        }
+        .hero {
+          gap: 15px;
+        }
+        .site-links {
+          gap: 9px;
+        }
+        .feature-text small {
+          display: none;
+        }
+        .features {
+          gap: 8px;
+        }
+        .feature {
+          flex-direction: column;
+          align-items: start;
+        }
+        .site-links {
+          display: none;
+        }
+        footer span:last-child {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span aria-hidden="true">⌘</span> Wireframes</div>
+      <span class="project">FIELD / NOTES &nbsp; · &nbsp; WEBSITE REFRESH</span>
+    </header>
+    <div class="workspace">
+      <aside class="layers" aria-label="Wireframe structure">
+        <h2 class="side-title">LAYERS</h2>
+        <div class="layer selected">⌄ &nbsp; Homepage</div>
+        <div class="layer nested"><span>▱</span> Navigation</div>
+        <div class="layer nested"><span>▱</span> Introduction</div>
+        <div class="layer nested"><span>▱</span> Featured work</div>
+        <div class="layer nested"><span>▱</span> Studio & contact</div>
+      </aside>
+      <main>
+        <div class="toolbar">
+          <div>
+            <h1>Homepage exploration</h1>
+            <div class="subtitle">Structure before styling.</div>
+          </div>
+          <div class="modes" aria-label="Wireframe layout">
+            <button type="button" data-mode="desktop" aria-pressed="true">Desktop</button
+            ><button type="button" data-mode="mobile" aria-pressed="false">Mobile</button>
+          </div>
+        </div>
+        <section
+          class="canvas"
+          id="canvas"
+          data-mode="desktop"
+          aria-label="Desktop homepage wireframe"
+        >
+          <div class="browser">
+            <div class="browser-bar" aria-hidden="true">
+              <span></span><span></span><span></span
+              ><small>Homepage / First exploration</small>
+            </div>
+            <div class="page">
+              <div class="site-header">
+                <div class="logo" role="img" aria-label="Studio logo placeholder"></div>
+                <div class="site-links">
+                  <span>Work</span><span>About</span><span>Contact</span>
+                </div>
+              </div>
+              <div class="hero">
+                <div>
+                  <div class="caption">A clear first impression</div>
+                  <div class="headline" aria-hidden="true"></div>
+                  <div class="headline short" aria-hidden="true"></div>
+                  <div class="lines" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <div class="action-placeholder">Explore the work</div>
+                </div>
+                <div class="visual">
+                  <svg
+                    viewBox="0 0 200 100"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M0 0 200 100 M0 100 200 0"
+                      fill="none"
+                      stroke="#d7dde4"
+                      stroke-width=".6"
+                    /></svg
+                  ><span>Featured project image</span>
+                </div>
+              </div>
+              <div class="features">
+                <div class="feature">
+                  <div class="feature-box" aria-hidden="true"></div>
+                  <div class="feature-text">
+                    Selected work<small>Show the thinking</small>
+                  </div>
+                </div>
+                <div class="feature">
+                  <div class="feature-box" aria-hidden="true"></div>
+                  <div class="feature-text">
+                    About the studio<small>Make it personal</small>
+                  </div>
+                </div>
+                <div class="feature">
+                  <div class="feature-box" aria-hidden="true"></div>
+                  <div class="feature-text">
+                    Start a conversation<small>A simple next step</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <aside class="inspector" aria-label="Layout notes">
+        <h2 class="side-title">DESIGN NOTES</h2>
+        <div class="note-number">01</div>
+        <h2>Clear navigation</h2>
+        <p>Three direct paths to the things visitors came to find.</p>
+        <div class="note-number">02</div>
+        <h2>A strong introduction</h2>
+        <p>One message, one project image, one useful next step.</p>
+        <div class="note-number">03</div>
+        <h2>Room to adapt</h2>
+        <p>A structure that stacks naturally on a smaller screen.</p>
+        <div class="document-id">PROJECT DOCUMENT 02<br />Layout exploration</div>
+      </aside>
+    </div>
+    <footer>
+      <span>Website refresh / Sample wireframe</span
+      ><span>FIELD / NOTES &nbsp; — &nbsp; 02</span>
+    </footer>
+
+    <script>
+      const canvas = document.querySelector('#canvas');
+      const modes = [...document.querySelectorAll('button[data-mode]')];
+      modes.forEach((button) =>
+        button.addEventListener('click', () => {
+          canvas.dataset.mode = button.dataset.mode;
+          canvas.setAttribute('aria-label', `${button.textContent} homepage wireframe`);
+          modes.forEach((mode) =>
+            mode.setAttribute('aria-pressed', String(mode === button)),
+          );
+        }),
+      );
+    </script>
+  </body>
+</html>

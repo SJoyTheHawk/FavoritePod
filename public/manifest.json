@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FavoritePod",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A visual launcher for favorite web pages and local tools.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2YY8O7xI3tzkEvnq9CkcKmPswQr0hJMXxYuRzQmXZVb2+tlxztTN2Hz6wzIgq8UNK0bM9yLAWBEeN7PMTYlxd+5yTLMmnKigUYWuRCM2HYiB5L/LClhv7Pmno3uSnqxrlrSXlSMO+iJQU/dGDDBbCLZUvz4O3Y1gUx2we2DCNl7oTFkDkpwms0+jzIUJFPWCN2k1ZmCXBvpAafHAOuwhyhgt2I3k5QRSZq5tOTkTJjd4/FdTm0sMUxRHnXy/h0BJpindIeu6HfEwGOdnproIAVetMVhlkgsMM68JFpU91JD+CFMgGoZGuIrGJYbKenUUXs9yWJkqUSPWgGfs61CKMwIDAQAB",
   "icons": {
@@ -27,7 +27,7 @@
   "permissions": ["activeTab", "favicon", "unlimitedStorage", "identity", "alarms"],
   "host_permissions": ["file:///*", "https://www.googleapis.com/*"],
   "oauth2": {
-    "client_id": "301335487475-rpips565ff5gqc6s8dhp3buhpkroqb7h.apps.googleusercontent.com",
+    "client_id": "301335487475-c4bepddqrtuuaqpgnhf0n2mjqmt7u8ob.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/drive.appdata"]
   },
   "optional_permissions": ["topSites", "contextMenus"]

@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#18231f" />
+    <title>Focus Timer</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #e6e8d9;
+        background: #18231f;
+      }
+      body {
+        margin: 0;
+        padding: 0 5vw;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid #dfec9b;
+        outline-offset: 5px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 92px;
+        border-bottom: 1px solid #3b4940;
+      }
+      .brand {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.3px;
+      }
+      .brand span {
+        color: #deec97;
+        margin-right: 12px;
+      }
+      .edition,
+      .label {
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #a4b0a2;
+      }
+      main {
+        max-width: 1120px;
+        margin-inline: auto;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: 230px 1fr;
+        min-height: 550px;
+      }
+      .intention {
+        padding-top: 70px;
+      }
+      .intention h1 {
+        font-size: 29px;
+        font-weight: 400;
+        line-height: 1.35;
+        letter-spacing: -0.8px;
+        margin: 24px 0;
+        max-width: 210px;
+      }
+      .intention p {
+        color: #a4b0a2;
+        font-size: 12px;
+        line-height: 1.8;
+        max-width: 180px;
+      }
+      .project {
+        margin-top: 50px;
+        border-left: 2px solid #7d936f;
+        padding-left: 14px;
+      }
+      .project strong {
+        display: block;
+        font-size: 12px;
+        font-weight: 400;
+        margin-bottom: 6px;
+      }
+      .project small {
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        color: #a4b0a2;
+      }
+      .timer {
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        padding: 28px 0;
+      }
+      .modes {
+        display: flex;
+        gap: 26px;
+      }
+      .modes button {
+        padding: 9px 0;
+        border: 0;
+        border-bottom: 1px solid transparent;
+        background: transparent;
+        color: #a8b2a5;
+        font-size: 12px;
+      }
+      .modes button[aria-pressed='true'] {
+        border-bottom-color: #dce995;
+        color: #e1ed9c;
+      }
+      .clock {
+        position: relative;
+        width: min(410px, 100%);
+        aspect-ratio: 1;
+        display: grid;
+        place-items: center;
+        margin: 12px 0;
+      }
+      .clock svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+      circle {
+        fill: none;
+        stroke-width: 1;
+      }
+      .track {
+        stroke: #3e4e42;
+      }
+      #ring {
+        stroke: #dce995;
+        stroke-linecap: round;
+      }
+      .clock-face {
+        text-align: center;
+      }
+      #time {
+        display: block;
+        font-size: clamp(64px, 9vw, 116px);
+        font-weight: 250;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -7px;
+        color: #e1ed9c;
+      }
+      #status {
+        display: block;
+        margin-top: 20px;
+        color: #b5beb0;
+        font-size: 12px;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+      .actions button {
+        padding: 12px 24px;
+        border: 0;
+        background: transparent;
+        color: #b5beb0;
+        font-size: 12px;
+      }
+      #toggle {
+        background: #dce995;
+        color: #253227;
+        border-radius: 28px;
+        min-width: 146px;
+        font-weight: 600;
+      }
+      .rhythm {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 24px 0;
+        border-top: 1px solid #3b4940;
+      }
+      .rhythm h2 {
+        font-size: 11px;
+        font-weight: 400;
+        margin: 0;
+        color: #a4b0a2;
+      }
+      .dots {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .dots span {
+        width: 35px;
+        height: 3px;
+        background: #405044;
+      }
+      .dots span.complete {
+        background: #dce995;
+      }
+      #session-count {
+        font-family: ui-monospace, monospace;
+        color: #a4b0a2;
+        font-size: 11px;
+      }
+      footer {
+        padding: 14px 0 24px;
+        font-size: 10px;
+        color: #8e9e8b;
+        text-align: right;
+      }
+      @media (max-width: 700px) {
+        header {
+          height: 72px;
+        }
+        .edition {
+          font-size: 8px;
+          letter-spacing: 1px;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        .intention {
+          padding-top: 24px;
+        }
+        .intention h1 {
+          max-width: none;
+          margin: 12px 0;
+          font-size: 24px;
+        }
+        .intention p,
+        .project {
+          display: none;
+        }
+        .timer {
+          padding-top: 12px;
+        }
+        .clock {
+          max-width: 340px;
+        }
+        #time {
+          letter-spacing: -4px;
+          font-size: 85px;
+        }
+        .rhythm {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span aria-hidden="true">◷</span> Focus Timer</div>
+      <span class="edition">Less noise. More focus.</span>
+    </header>
+    <main>
+      <div class="workspace">
+        <section class="intention">
+          <span class="label">Current intention</span>
+          <h1>One thing.<br />Your full attention.</h1>
+          <p>Put the next small step at the center. Everything else can wait.</p>
+          <div class="project">
+            <strong>Website refresh</strong><small>Design exploration</small>
+          </div>
+        </section>
+        <section class="timer" aria-label="Focus timer">
+          <div class="modes" aria-label="Timer duration">
+            <button
+              type="button"
+              data-minutes="25"
+              data-label="Time to focus"
+              aria-pressed="true"
+            >
+              Focus</button
+            ><button
+              type="button"
+              data-minutes="5"
+              data-label="Take a little breather"
+              aria-pressed="false"
+            >
+              Short break</button
+            ><button
+              type="button"
+              data-minutes="15"
+              data-label="Rest and recharge"
+              aria-pressed="false"
+            >
+              Long break
+            </button>
+          </div>
+          <div class="clock">
+            <svg viewBox="0 0 240 240" aria-hidden="true">
+              <circle class="track" cx="120" cy="120" r="111" />
+              <circle
+                id="ring"
+                cx="120"
+                cy="120"
+                r="111"
+                pathLength="100"
+                stroke-dasharray="100"
+                stroke-dashoffset="0"
+              />
+            </svg>
+            <div class="clock-face">
+              <span id="time" role="timer" aria-label="Time remaining">25:00</span
+              ><span id="status" role="status">Time to focus</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" id="toggle">Start focus</button
+            ><button type="button" id="reset">Reset</button>
+          </div>
+        </section>
+      </div>
+      <section class="rhythm" aria-label="Daily focus sessions">
+        <div>
+          <h2>DAILY RHYTHM</h2>
+          <div class="dots" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <p id="session-count" role="status">0 of 4 focus sessions complete</p>
+      </section>
+    </main>
+    <footer>Take your time. Make it count.</footer>
+
+    <script>
+      const time = document.querySelector('#time');
+      const status = document.querySelector('#status');
+      const toggle = document.querySelector('#toggle');
+      const modes = [...document.querySelectorAll('[data-minutes]')];
+      let duration = 25 * 60;
+      let remaining = duration;
+      let deadline = 0;
+      let interval = null;
+      let activeMode = modes[0];
+      let sessions = 0;
+
+      function renderTime() {
+        const minutes = Math.floor(remaining / 60)
+          .toString()
+          .padStart(2, '0');
+        const seconds = (remaining % 60).toString().padStart(2, '0');
+        time.textContent = `${minutes}:${seconds}`;
+        document.querySelector('#ring').style.strokeDashoffset =
+          100 * (1 - remaining / duration);
+      }
+
+      function stop() {
+        clearInterval(interval);
+        interval = null;
+        toggle.textContent =
+          remaining === duration
+            ? activeMode === modes[0]
+              ? 'Start focus'
+              : 'Start break'
+            : 'Resume';
+      }
+
+      function reset() {
+        remaining = duration;
+        stop();
+        status.textContent = activeMode.dataset.label;
+        renderTime();
+      }
+
+      function tick() {
+        remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        renderTime();
+        if (remaining > 0) return;
+        stop();
+        status.textContent =
+          activeMode === modes[0]
+            ? 'Well done. Take a break.'
+            : 'Ready for a fresh start.';
+        toggle.textContent = 'Start again';
+        if (activeMode === modes[0]) {
+          sessions += 1;
+          document.querySelector('#session-count').textContent =
+            `${sessions} of 4 focus sessions complete${sessions >= 4 ? ' — daily goal reached!' : ''}`;
+          document
+            .querySelectorAll('.dots span')
+            .forEach((dot, index) => dot.classList.toggle('complete', index < sessions));
+        }
+      }
+
+      toggle.addEventListener('click', () => {
+        if (interval !== null) {
+          tick();
+          if (interval !== null) {
+            stop();
+            status.textContent = 'Paused. Pick up when you are ready.';
+          }
+          return;
+        }
+        if (remaining === 0) reset();
+        deadline = Date.now() + remaining * 1000;
+        status.textContent = activeMode.dataset.label;
+        toggle.textContent = 'Pause';
+        interval = setInterval(tick, 250);
+      });
+      document.querySelector('#reset').addEventListener('click', reset);
+      modes.forEach((mode) =>
+        mode.addEventListener('click', () => {
+          activeMode = mode;
+          duration = Number(mode.dataset.minutes) * 60;
+          modes.forEach((button) =>
+            button.setAttribute('aria-pressed', String(button === mode)),
+          );
+          reset();
+        }),
+      );
+    </script>
+  </body>
+</html>

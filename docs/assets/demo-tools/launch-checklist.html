@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8f8f6" />
+    <title>Launch Checklist</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #303631;
+        background: #f8f8f6;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid #bd4d20;
+        outline-offset: 4px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding: 19px 34px;
+        border-bottom: 1px solid #cdd1cb;
+      }
+      .brand {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .brand span {
+        color: #bd4d20;
+        margin-right: 9px;
+      }
+      .project-id {
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        color: #848c82;
+      }
+      .banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 22px 34px;
+        gap: 20px;
+        background: #edd8a9;
+        border-bottom: 1px solid #c4af81;
+      }
+      .eyebrow {
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 1.4px;
+        color: #7d6537;
+      }
+      h1 {
+        font-size: 31px;
+        text-transform: uppercase;
+        letter-spacing: -1px;
+        font-weight: 750;
+        margin: 7px 0 0;
+      }
+      .banner-number {
+        font-family: ui-monospace, monospace;
+        font-size: 50px;
+        line-height: 1;
+        color: #ae8d4b;
+        letter-spacing: -3px;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: 265px minmax(0, 1fr);
+        min-height: 510px;
+      }
+      .summary {
+        background: #293732;
+        color: #e5e9de;
+        padding: 30px;
+      }
+      .summary h2 {
+        font-family: ui-monospace, monospace;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 9px;
+        font-weight: 400;
+        color: #a7b5a9;
+        margin: 0;
+      }
+      #percent {
+        display: block;
+        font-size: 79px;
+        font-weight: 300;
+        letter-spacing: -4px;
+        line-height: 1;
+        margin: 23px 0 13px;
+        color: #efe1b0;
+      }
+      #count {
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        color: #b2c0b3;
+      }
+      progress {
+        display: block;
+        width: 100%;
+        height: 6px;
+        border: 0;
+        margin: 19px 0;
+        background: #4b5b50;
+        accent-color: #d4bb7c;
+      }
+      progress::-webkit-progress-bar {
+        background: #4b5b50;
+      }
+      progress::-webkit-progress-value {
+        background: #d4bb7c;
+      }
+      #status {
+        color: #a7b8a7;
+        font-size: 11px;
+        line-height: 1.8;
+        min-height: 40px;
+        margin: 0;
+      }
+      .summary-note {
+        margin-top: 50px;
+        padding-top: 20px;
+        border-top: 1px solid #4b5b50;
+      }
+      .summary-note strong {
+        display: block;
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        font-weight: 400;
+        letter-spacing: 1px;
+        color: #ccd6c7;
+        margin-bottom: 10px;
+      }
+      .summary-note p {
+        color: #9daf9e;
+        font-size: 10px;
+        line-height: 1.9;
+        margin: 0;
+      }
+      #reset {
+        margin-top: 25px;
+        border: 1px solid #7d8d7c;
+        background: transparent;
+        color: #c5d1bd;
+        padding: 9px 12px;
+        font-size: 10px;
+      }
+      main {
+        padding: 25px 30px;
+        min-width: 0;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #404b40;
+      }
+      .toolbar h2 {
+        font-size: 12px;
+        font-weight: 500;
+        margin: 0;
+      }
+      #filter {
+        border: 1px solid #c6cec2;
+        background: white;
+        color: #6f7e6c;
+        font-size: 10px;
+        padding: 7px 10px;
+        border-radius: 2px;
+      }
+      #filter[aria-pressed='true'] {
+        border-color: #b15e36;
+        color: #a5522c;
+        background: #f7ecdf;
+      }
+      .columns {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .card {
+        padding: 20px 20px 12px 0;
+      }
+      .card + .card {
+        border-left: 1px solid #dfe2da;
+        padding-left: 20px;
+      }
+      .card:last-child {
+        padding-right: 0;
+      }
+      .card h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 18px;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .step {
+        color: #ad5b34;
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        font-weight: 400;
+      }
+      .item {
+        display: flex;
+        align-items: start;
+        gap: 9px;
+        min-height: 80px;
+        padding: 14px 0;
+        border-top: 1px solid #dfe2da;
+        cursor: pointer;
+      }
+      .item[hidden] {
+        display: none;
+      }
+      .item input {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        margin: 2px 0 0;
+        accent-color: #697d62;
+      }
+      .item strong {
+        font-size: 11px;
+        line-height: 1.5;
+        font-weight: 400;
+        display: block;
+      }
+      .item small {
+        color: #8f998b;
+        font-size: 9px;
+        line-height: 1.7;
+        display: block;
+        margin-top: 5px;
+      }
+      .item:has(input:checked) strong {
+        color: #949f8e;
+        text-decoration: line-through;
+      }
+      .empty {
+        font-size: 11px;
+        line-height: 1.8;
+        color: #7f9274;
+      }
+      footer {
+        padding: 14px 34px;
+        border-top: 1px solid #cdd1cb;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-family: ui-monospace, monospace;
+        font-size: 8px;
+        color: #939b8c;
+      }
+      @media (max-width: 1050px) {
+        .workspace {
+          grid-template-columns: 220px minmax(0, 1fr);
+        }
+        .columns {
+          grid-template-columns: 1fr;
+        }
+        .card {
+          padding: 20px 0;
+        }
+        .card + .card {
+          border-left: 0;
+          padding-left: 0;
+        }
+        .item {
+          min-height: 0;
+        }
+        .summary {
+          padding: 25px;
+        }
+      }
+      @media (max-width: 600px) {
+        header {
+          padding: 20px;
+        }
+        .brand {
+          font-size: 10px;
+        }
+        .project-id {
+          font-size: 8px;
+        }
+        .banner {
+          padding: 23px 20px;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        .banner-number {
+          font-size: 40px;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        .summary {
+          padding: 25px;
+        }
+        #percent {
+          font-size: 65px;
+          margin-top: 15px;
+        }
+        .summary-note {
+          display: none;
+        }
+        #reset {
+          margin-top: 17px;
+        }
+        main {
+          padding: 25px;
+        }
+        footer span:last-child {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span aria-hidden="true">↗</span> LAUNCH CHECKLIST</div>
+      <span class="project-id">FIELD / NOTES &nbsp; · &nbsp; PROJECT DOCUMENT 03</span>
+    </header>
+    <div class="banner">
+      <div>
+        <div class="eyebrow">Website refresh / Release preparation</div>
+        <h1>Pre-flight review</h1>
+      </div>
+      <div class="banner-number" aria-hidden="true">03</div>
+    </div>
+    <div class="workspace">
+      <aside class="summary" aria-label="Launch review progress">
+        <h2>Review progress</h2>
+        <span id="percent" aria-hidden="true">33%</span
+        ><span id="count">4 of 12 checked</span
+        ><progress
+          id="progress"
+          value="4"
+          max="12"
+          aria-label="Completed launch checks"
+        ></progress>
+        <p id="status" role="status">8 small steps before the big hello.</p>
+        <div class="summary-note">
+          <strong>BEFORE YOU SHARE</strong>
+          <p>
+            Check the details.<br />Try it on another screen.<br />Give it one more look.
+          </p>
+        </div>
+        <button type="button" id="reset">Reset checklist</button>
+      </aside>
+      <main>
+        <div class="toolbar">
+          <h2>Website refresh / Final checks</h2>
+          <button type="button" id="filter" aria-pressed="false">Show remaining</button>
+        </div>
+        <div class="columns">
+          <section class="card">
+            <h3><span class="step" aria-hidden="true">01</span> Content & clarity</h3>
+            <label class="item"
+              ><input type="checkbox" checked /><span
+                ><strong>Review the homepage copy</strong
+                ><small>One clear message, in a natural voice.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" checked /><span
+                ><strong>Add the final imagery</strong
+                ><small>Use the right crops and file sizes.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Proofread every page title</strong
+                ><small>A little care goes a long way.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Check navigation links</strong
+                ><small>Every path should lead somewhere.</small></span
+              ></label
+            >
+            <p class="empty" hidden>All checks in this section are complete.</p>
+          </section>
+          <section class="card">
+            <h3><span class="step" aria-hidden="true">02</span> Experience & access</h3>
+            <label class="item"
+              ><input type="checkbox" checked /><span
+                ><strong>Try the mobile layouts</strong
+                ><small>Small screens deserve the same care.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Navigate with the keyboard</strong
+                ><small>Check focus and a sensible tab order.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Review text contrast</strong
+                ><small>Keep the important things readable.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Check image descriptions</strong
+                ><small>Add useful alternative text.</small></span
+              ></label
+            >
+            <p class="empty" hidden>All checks in this section are complete.</p>
+          </section>
+          <section class="card">
+            <h3><span class="step" aria-hidden="true">03</span> Ready to share</h3>
+            <label class="item"
+              ><input type="checkbox" checked /><span
+                ><strong>Make a project backup</strong
+                ><small>Keep a copy of the finished work.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Test the contact form</strong
+                ><small>Check success and error messages.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Review page metadata</strong
+                ><small>Titles, descriptions, and share images.</small></span
+              ></label
+            ><label class="item"
+              ><input type="checkbox" /><span
+                ><strong>Prepare the announcement</strong
+                ><small>A few good words to mark the moment.</small></span
+              ></label
+            >
+            <p class="empty" hidden>All checks in this section are complete.</p>
+          </section>
+        </div>
+      </main>
+    </div>
+    <footer>
+      <span>Sample project / Website refresh / Launch review</span
+      ><span>FIELD / NOTES &nbsp; — &nbsp; 03</span>
+    </footer>
+
+    <script>
+      const checks = [...document.querySelectorAll('.item input')];
+      const filter = document.querySelector('#filter');
+      let remainingOnly = false;
+      function update() {
+        const done = checks.filter((input) => input.checked).length;
+        document.querySelector('#percent').textContent =
+          `${Math.round((done / checks.length) * 100)}%`;
+        document.querySelector('#count').textContent =
+          `${done} of ${checks.length} checked`;
+        document.querySelector('#progress').value = done;
+        document.querySelector('#status').textContent =
+          done === checks.length
+            ? 'All checked. Ready for one final review.'
+            : `${checks.length - done} small steps before the big hello.`;
+        checks.forEach((input) => {
+          input.closest('.item').hidden = remainingOnly && input.checked;
+        });
+        document.querySelectorAll('.card').forEach((card) => {
+          card.querySelector('.empty').hidden =
+            !remainingOnly ||
+            [...card.querySelectorAll('input')].some((input) => !input.checked);
+        });
+        filter.setAttribute('aria-pressed', String(remainingOnly));
+        filter.textContent = remainingOnly ? 'Show all checks' : 'Show remaining';
+      }
+      checks.forEach((input) => input.addEventListener('change', update));
+      filter.addEventListener('click', () => {
+        remainingOnly = !remainingOnly;
+        update();
+      });
+      document.querySelector('#reset').addEventListener('click', () => {
+        checks.forEach((input) => {
+          input.checked = input.defaultChecked;
+        });
+        remainingOnly = false;
+        update();
+      });
+      update();
+    </script>
+  </body>
+</html>

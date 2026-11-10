@@ -2,12 +2,16 @@
 
 **Your favorite websites and local tools, together in one visual home.**
 
+**Publishing version 1.0? [Start here: step-by-step checklist](docs/publishing/README.md).**
+
+[Documentation index](docs/README.md) — development, planning, testing, and assets.
+
 FavoritePod is a Chrome extension that helps you save pages, recognize them by their
 previews, and find them again without digging through tabs. Organize your library
 into folders, keep useful local files close by, and optionally sync your favorites
 across devices with Google Drive.
 
-![FavoritePod dashboard with preview cards organized into folders](docs/screenshots/dashboard-grid.png)
+![FavoritePod dashboard with preview cards organized into folders](docs/assets/screenshots/dashboard-grid.png)
 
 _Screenshots show the current interface with sample content._
 
@@ -31,7 +35,7 @@ _Screenshots show the current interface with sample content._
 Choose **Open launcher** from the popup to see your full library. You can also add
 an address directly from the launcher using **Add favorite**.
 
-<img src="docs/screenshots/popup.png" alt="FavoritePod's Add bookmark dialog with a page preview, name, folder, and Save button" width="360" />
+<img src="docs/assets/screenshots/popup.png" alt="FavoritePod's Add bookmark dialog with a page preview, name, folder, and Save button" width="360" />
 
 Previews are saved images of a page when you capture it. They help you recognize
 favorites without loading every website in the background.
@@ -57,7 +61,7 @@ Use the sidebar to create and browse folders. Drag favorites to reorder them or
 move them between folders, and use search to narrow down a larger collection.
 Switch between the grid and list views to suit how you browse.
 
-![FavoritePod list view with folders, search, and saved favorites](docs/screenshots/dashboard-list.png)
+![FavoritePod list view with folders, search, and saved favorites](docs/assets/screenshots/dashboard-list.png)
 
 Hover over a favorite to see a larger preview and quick actions. You can edit its
 name or address, copy its link, or open it. Undo and redo help you recover from
@@ -127,7 +131,7 @@ You can use FavoritePod without signing in. To sync your library:
 2. Choose **Sign in with Google** in the dialog. In Settings, start with **Connect Google Drive**. Follow the prompts to confirm your account.
 3. Connect the other Chrome profiles or devices you want to use to the same Google account.
 
-<img src="docs/screenshots/google-drive-sign-in.png" alt="FavoritePod's Google Drive sign-in dialog explaining optional sync across devices" width="560" />
+<img src="docs/assets/screenshots/google-drive-sign-in.png" alt="FavoritePod's Google Drive sign-in dialog explaining optional sync across devices" width="560" />
 
 If both the local library and Drive already contain favorites, FavoritePod asks
 how to combine them. **Merge local and Drive data** keeps favorites from both
@@ -204,6 +208,14 @@ choose to connect.
 
 ## Your data and permissions
 
+Read the [FavoritePod privacy policy](docs/publishing/site/favoritepod/privacy/index.html)
+for data handling and deletion details. For help, see
+[FavoritePod support](docs/publishing/site/favoritepod/support/index.html)
+or email [rockyroadstudio@outlook.com](mailto:rockyroadstudio@outlook.com).
+These links open local previews of the prepared website content. The
+[publishing checklist](docs/publishing/README.md) explains how to place
+these pages in WordPress and prepare the store release.
+
 Your favorites, folders, and previews are stored locally in your Chrome profile.
 When you connect Google Drive, FavoritePod also stores its sync data in Drive’s
 private app folder. The requested Drive scope is limited to that app folder.
@@ -241,6 +253,11 @@ up space in Google Drive, then try syncing again.
 
 ## For contributors
 
+Version **1.0.0** is being prepared for publication. Follow the
+[publishing checklist](docs/publishing/README.md) from website setup
+through the private store release.
+See the [changelog](CHANGELOG.md) for the release summary.
+
 The app uses TypeScript, React, Vite, Tailwind CSS, and Dexie. For local development,
 run `npm run dev` and keep that process running while using the unpacked extension.
 Stop the development server before running `npm run build`; both write to `dist/`.
@@ -255,10 +272,23 @@ npm run format:check
 npm run build
 ```
 
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md) — feature progress and acceptance criteria.
-- [Code guide](docs/CODE_GUIDE.md) — architecture and development patterns.
-- [Design guide](docs/DESIGN_GUIDE.md) — interface and accessibility conventions.
-- [Development handoff](NEXT_STEPS.md) — local workflow and remaining work.
-- [AI agent guide](docs/AI_AGENT_GUIDE.md) — guidance for automated contributions.
+- [Documentation index](docs/README.md) — developer guides, manual tests, and supporting files.
+- [Implementation plan](docs/planning/implementation-plan.md) — feature progress and acceptance criteria.
+- [AI agent guide](docs/development/ai-agent-guide.md) — guidance for automated contributions.
 
 A project license has not yet been selected.
+
+## Use of AI
+
+FavoritePod is developed with assistance from generative AI, including help with
+planning, implementation, code review, testing, documentation, and release
+materials. AI-assisted output can contain mistakes; the maintainer remains
+responsible for the project's design decisions, review, and releases.
+
+This describes the development process. FavoritePod does not include an AI
+service that processes your bookmarks or page previews, and your library is not
+sent to an AI provider by the extension.
+
+## Sponsor Me (With Thanks)
+
+[![Sponsor SJoyTheHawk](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github)](https://github.com/sponsors/SJoyTheHawk)

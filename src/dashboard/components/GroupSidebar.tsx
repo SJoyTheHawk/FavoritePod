@@ -54,6 +54,7 @@ export function GroupSidebar({
   const [viewportWidth, setViewportWidth] = useState(
     () => document.documentElement.clientWidth,
   );
+  const scrimRef = useRef<HTMLButtonElement>(null);
   const drag = useRef<SidebarDrag>();
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const maxWidth = Math.max(
@@ -107,6 +108,10 @@ export function GroupSidebar({
     };
   }, [mobileOpen, onMobileClose]);
 
+  useEffect(() => {
+    if (scrimRef.current) scrimRef.current.inert = !mobileOpen;
+  }, [mobileOpen]);
+
   const saveWidth = (nextWidth: number) => {
     setWidth(nextWidth);
     saveQueue.current = saveQueue.current
@@ -132,10 +137,10 @@ export function GroupSidebar({
   return (
     <>
       <button
-        aria-hidden={!mobileOpen}
         aria-label="Close favorite groups"
         className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ease-out motion-reduce:transition-none md:hidden ${mobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         onClick={onMobileClose}
+        ref={scrimRef}
         tabIndex={mobileOpen ? 0 : -1}
         type="button"
       />

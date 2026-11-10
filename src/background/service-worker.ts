@@ -7,15 +7,11 @@ import {
 import { DRIVE_LIBRARY_CHANGED_MESSAGE } from '../core/drive-sync-triggers';
 import { CONTEXT_MENUS_REFRESH_MESSAGE } from '../core/optional-features';
 import { getContextMenuEnabled } from '../core/storage';
-import type * as ContextMenuModuleType from './context-menus';
-
-type ContextMenuModule = typeof ContextMenuModuleType;
-let contextMenuModule: Promise<ContextMenuModule> | undefined;
-
-function loadContextMenuModule(): Promise<ContextMenuModule> {
-  contextMenuModule ??= import('./context-menus');
-  return contextMenuModule;
-}
+import {
+  handleContextMenuClick as onContextMenuClick,
+  installContextMenus,
+  refreshContextMenus,
+} from './context-menus';
 
 async function installContextMenusIfEnabled(): Promise<void> {
   if (
@@ -25,18 +21,16 @@ async function installContextMenusIfEnabled(): Promise<void> {
   ) {
     return;
   }
-  (await loadContextMenuModule()).installContextMenus();
+  installContextMenus();
 }
 
 function handleContextMenuClick(
   info: chrome.contextMenus.OnClickData,
   tab?: chrome.tabs.Tab,
 ): void {
-  void loadContextMenuModule()
-    .then((module) => module.handleContextMenuClick(info, tab))
-    .catch((cause: unknown) =>
-      console.error('FavoritePod context-menu action failed.', cause),
-    );
+  void onContextMenuClick(info, tab).catch((cause: unknown) =>
+    console.error('FavoritePod context-menu action failed.', cause),
+  );
 }
 
 function registerContextMenuClickListener(): void {
@@ -97,16 +91,11 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
     message.type === CONTEXT_MENUS_REFRESH_MESSAGE &&
     sender.id === chrome.runtime.id
   ) {
-    void loadContextMenuModule()
-      .then((module) => {
-        module.installContextMenus();
-        return module.refreshContextMenus();
-      })
-      .then(
-        () => sendResponse({ ok: true }),
-        () =>
-          sendResponse({ error: 'Could not update the right-click menu. Try again.' }),
-      );
+    installContextMenus();
+    void refreshContextMenus().then(
+      () => sendResponse({ ok: true }),
+      () => sendResponse({ error: 'Could not update the right-click menu. Try again.' }),
+    );
     return true;
   } else if (
     message.type === 'favoritepod.sync.completed' ||

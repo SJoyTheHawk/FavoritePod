@@ -2,6 +2,22 @@
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+
+# Local release packages and browser/test artifacts
+/release/
+/releases/
+/favoritepod-*.zip
+/playwright-report/
+/test-results/
+
+# Package-manager diagnostics
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Local signing material and machine-specific settings
 .local/
@@ -13,6 +29,10 @@ coverage/
 
 # Editor and OS files
 .DS_Store
+._*
+Thumbs.db
+*.swp
+*.swo
 .idea/
 .vscode/*
 !.vscode/extensions.json

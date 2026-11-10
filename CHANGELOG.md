@@ -1,9 +1,9 @@
 # Changelog
 
-## 1.0.0 — Unreleased
+## 1.0.0 — 2026-11-10
 
-Prepared November 10, 2026. This is the first public-release candidate; Chrome Web
-Store publication and production OAuth validation remain pending.
+First GitHub release. Chrome Web Store publication and production OAuth validation
+remain separate release tasks.
 
 ### Features
 
@@ -25,15 +25,19 @@ Store publication and production OAuth validation remain pending.
 - Prepare Elementor content fragments that inherit the studio's Astra styling,
   with a WordPress publishing guide and reproducible local previews.
 - Document AI assistance and add the requested GitHub Sponsors link in the README.
+- Package the store ZIP with `npm run package:store`, omitting the development
+  manifest key while preserving it in local builds.
+- Consolidate publishing into one checklist, remove superseded guides, and update
+  the README with a product introduction and five screenshots.
 
 ### Validation
 
-- Lint and the production build pass.
+- Lint, formatting, and the production build pass.
 - All 335 tests across 36 suites pass; the merge module retains 100% configured
   coverage.
 - Browser-specific release acceptance, production OAuth, and store review are
   separate pending checks in the implementation plan.
 - Public-page previews pass Chrome checks at 1440px, 390px, and 320px widths:
   images load, internal links and FAQ controls work, and content does not overflow.
-  CSS selectors are scoped to FavoritePod; the actual WordPress pages still need
-  a front-end preview after the content is placed in the site.
+  CSS selectors are scoped to FavoritePod. The live product privacy URL currently
+  redirects to the studio policy; correct that route before store submission.

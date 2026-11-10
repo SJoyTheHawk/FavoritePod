@@ -20,6 +20,7 @@ delete manifest.key;
 const files = {};
 async function collect(directory, prefix = '') {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.name === '.DS_Store' || entry.name.startsWith('._')) continue;
     const name = prefix + entry.name;
     if (entry.isDirectory()) {
       await collect(join(directory, entry.name), name + '/');

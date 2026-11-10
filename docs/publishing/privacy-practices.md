@@ -22,7 +22,7 @@ Paste each explanation into its corresponding dashboard field. For the separate
 | `identity`                     | Obtain Google OAuth authorization only when the user chooses optional Google Drive sync, and obtain/refresh access tokens to perform that sync while connected. Local bookmark features work without Google sign-in.                                 |
 | `alarms`                       | Schedule background synchronization and retry work for the user's connected Google Drive library.                                                                                                                                                    |
 | `file:///*`                    | Open saved local-file links and check whether their remapped targets are available. Local-page capture also requires Chrome's separate Allow access to file URLs switch. FavoritePod does not scan arbitrary folders or upload original local files. |
-| `https://www.googleapis.com/*` | Call Google's Drive API for account identification and Drive storage information, and read/write FavoritePod's library state and preview assets in the user's appDataFolder. These requests use the drive.appdata OAuth scope.                       |
+| `https://www.googleapis.com/*` | Call Google's Drive API for account identification, and read/write FavoritePod's library state and preview assets in the user's appDataFolder. These requests use the drive.appdata OAuth scope.                                                     |
 | Optional `topSites`            | When the user grants Frequently visited access, obtain Chrome's top-site titles and URLs to show launcher shortcuts in Chrome's order. Hidden shortcuts and visibility preferences stay local; only explicitly saved favorites join the library.     |
 | Optional `contextMenus`        | When the user enables Right-click save menu, add Save to FavoritePod to page/link context menus and open the bookmark form for the selected destination.                                                                                             |
 
@@ -33,7 +33,7 @@ Paste this entire answer into **Host permission justification**:
 ```text
 file:///*: FavoritePod checks whether saved local-file links are available, including targets adjusted by the user's path remapping. Local-page previews require Chrome's separate Allow access to file URLs setting. File locations are chosen by the user and can be anywhere on their device, so access cannot be limited to one folder. The extension does not scan arbitrary folders or upload original local files.
 
-https://www.googleapis.com/*: When the user connects Google Drive, FavoritePod calls the Drive API to identify the connected account, check storage usage, and synchronize library data and preview images in its own hidden appDataFolder. This host covers both /drive/v3/ and /upload/drive/v3/ endpoints. File access uses the drive.appdata OAuth scope; local bookmark features work without Google sign-in.
+https://www.googleapis.com/*: When the user connects Google Drive, FavoritePod calls the Drive API to identify the connected account and synchronize library data and preview images in its own hidden appDataFolder. This host covers both /drive/v3/ and /upload/drive/v3/ endpoints. File access uses the drive.appdata OAuth scope; local bookmark features work without Google sign-in.
 ```
 
 ### Google OAuth scope
@@ -87,8 +87,10 @@ After hosting the prepared page, use:
 
 `https://rockyroad.studio/favoritepod/privacy/`
 
-This is a proposed URL until deployed and checked. Also use the policy in the
-Google OAuth branding configuration and make it accessible in the extension UI.
+The November 10, 2026 link check found that this URL redirects to the studio-wide
+privacy page. Fix it to serve the FavoritePod policy before entering it in the
+dashboard. Also use the verified policy in Google OAuth branding and make it
+accessible in the extension UI.
 
 ## Implementation evidence
 

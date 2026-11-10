@@ -1,14 +1,14 @@
 # Screenshot notes
 
-The main README images were refreshed on November 6, 2026, using the FavoritePod
+These supporting screenshots were captured on November 6, 2026, using the FavoritePod
 components at commit `4fa6de5`:
 
-| Image | What it shows |
-| --- | --- |
-| `dashboard-grid.png` | Eight sample favorites in the Favorites and Projects folders. |
-| `dashboard-list.png` | The same library in the compact list view. |
-| `popup.png` | The Add bookmark dialog, including the preview, name, folder, and Done button. |
-| `google-drive-sign-in.png` | The optional Google Drive connection dialog. |
+| Image                      | What it shows                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| `dashboard-grid.png`       | Eight sample favorites in the Favorites and Projects folders.                  |
+| `dashboard-list.png`       | The same library in the compact list view.                                     |
+| `popup.png`                | The Add bookmark dialog, including the preview, name, folder, and Done button. |
+| `google-drive-sign-in.png` | The optional Google Drive connection dialog.                                   |
 
 These are browser captures of the actual React components and existing app styles,
 rendered in headless Chrome with an isolated temporary profile. Sample data and
@@ -21,8 +21,8 @@ The dashboard captures use a 1200-pixel viewport; the popup uses its 320-pixel w
 Images are captured at double resolution for clear text. The Drive screenshot is
 cropped around the dialog.
 
-The older `dashboard-empty-desktop.png` and `dashboard-empty-mobile.png` remain as
-historical captures used by the project overview.
+These earlier captures remain available for support and development documentation.
+The root README now uses the five [store screenshots](../../publishing/screenshots/).
 
 When refreshing these images, use sample content, keep personal emails and browser
 tabs out of frame, and update the captions when the UI changes.

@@ -9,12 +9,13 @@
 | [planning/](planning/)       | Current implementation plan and deferred work                                     |
 | [testing/](testing/)         | Manual Chrome checklists and acceptance records                                   |
 | [assets/](assets/)           | README screenshots and sample local tools                                         |
-| [archive/](archive/)         | Earlier proposals, phase summaries, and historical handoffs                       |
 
 For development, use the [implementation plan](planning/implementation-plan.md),
 [code guide](development/code-guide.md), and [design guide](development/design-guide.md).
 The [schema guide](development/schema-versions.md) covers import/export formats;
 the [AI agent guide](development/ai-agent-guide.md) covers automated contributions.
+Manual checklists preserve dated acceptance results; they are not evidence of a
+fresh test run for the current build.
 
 Keep release work in the single publishing checklist. Put new documents in the
-matching folder above; archived proposals are background, not the current task list.
+matching folder above. Superseded proposals and handoffs remain in Git history.

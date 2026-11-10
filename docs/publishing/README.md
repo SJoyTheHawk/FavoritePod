@@ -1,8 +1,9 @@
 # Publish FavoritePod 1.0 — start here
 
-Follow this checklist for the first **private test release**. Files are prepared
-locally; website publication and store submission are still to do. Open the
-linked files only when a step needs them.
+Follow this checklist for the first **private test release**. Open the linked
+files only when a step needs them. The homepage and support page are reachable;
+the privacy-page redirect below still needs fixing. Store publication is not
+confirmed by these checks.
 
 ## 1. Upload the website images
 
@@ -38,6 +39,11 @@ URLs signed out:
 - https://rockyroad.studio/favoritepod/privacy/
 - https://rockyroad.studio/favoritepod/support/
 
+**Link check (November 10, 2026):** The privacy URL redirects to the studio-wide
+`/privacy-policy/` page. Check its WordPress parent/slug and any redirect rule
+so it serves the prepared FavoritePod policy. Verify the product-specific policy
+before using this URL in the store or OAuth settings.
+
 Keep the existing studio privacy page. Use the fragments above, not the local
 preview documents. Your theme supplies the studio header and footer.
 
@@ -71,8 +77,11 @@ In Google Cloud's **Google Auth Platform**:
   its **Item ID / Application ID** with the store's extension ID. If they match
   and its type is **Chrome Extension**, reuse it. If they differ, create a new
   **Chrome Extension** client in the same Google Cloud project using the store
-  extension ID; keep the old client for development. Put the new client ID in
-  oauth2.client_id, then rebuild and re-upload with **npm run package:store**.
+  extension ID. Put the matching client ID in oauth2.client_id, then rebuild
+  and re-upload with **npm run package:store**. Both builds currently share this
+  client ID. To use it locally, align the unpacked extension ID with the store's
+  public key using the ID/OAuth instructions below. Export a backup before
+  changing IDs; Chrome stores each extension ID's library separately.
 - **Branding:** enter the live homepage and privacy URLs from step 3; complete
   Google's domain/branding requirements.
 - **Audience:** prepare production access and verify Drive sync with an account

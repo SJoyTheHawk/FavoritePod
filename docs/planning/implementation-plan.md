@@ -2,9 +2,13 @@
 
 ## Overview
 
+For publication, follow the [publishing checklist](../publishing/README.md).
+Earlier phase entries below are dated implementation records; their test counts
+and timing estimates are not current measurements.
+
 FavoritePod is a Chrome extension that provides a visual bookmark launcher with Google Drive synchronization, nested groups, drag-and-drop organization, and rich preview thumbnails.
 
-**Current status**: Phases 2-8.5 are implemented and covered by automated checks.
+**Recorded implementation status**: Phases 2-8.5 are implemented and covered by automated checks.
 Phase 9.1, including its Chrome-top-sites-only revision, closed on 2026-11-07
 after user-reported manual checklist acceptance. Phase 9.2 was revised on
 2026-11-07 to a single right-click action opening the toolbar save popup;
@@ -14,7 +18,7 @@ Phases 4 and 5 closed on 2026-11-03; Phase 7 closed on 2026-11-04 after
 automated and user-reported manual Chrome validation. Manual Chrome validation
 for extension loading, HMR, screenshots, nested drag-and-drop, keyboard
 navigation, thumbnail previews, and `file://` access remains open; see
-`docs/archive/development-handoff.md` and the phase 4-6 manual test checklists. Phase 8.4 was closed
+the [manual Chrome checklists](../testing/). Phase 8.4 was closed
 on 2026-11-05 after user validation. Phase 8.5 closed on 2026-11-06 after all
 manual Chrome checks passed; see [`phase-8.5-manual-test.md`](../testing/phase-8.5-manual-test.md).
 
@@ -55,21 +59,24 @@ further group-tree and bundle optimization is deferred. See
 ## Technology Stack
 
 ### Core Technologies
+
 - **TypeScript 5.x**: Type safety, better IDE support
 - **React 18**: UI framework with hooks
 - **Vite 6.x**: Build tool with HMR
 - **Manifest V3**: Latest Chrome extension standard
 
 ### Key Libraries
+
 - **Dexie 4.x**: IndexedDB wrapper with TypeScript support
-- **@dnd-kit/core**: Accessible drag-and-drop
+- **Native drag events and custom geometry**: Drag-and-drop organization
 - **fractional-indexing**: Conflict-free ordering
 - **fflate**: ZIP compression (works in service worker)
 - **zod**: Runtime validation for imports
 - **Tailwind CSS**: Utility-first styling
-- **Framer Motion**: Smooth animations
+- **CSS transitions and shared motion helpers**: Dialog and reorder animations
 
 ### Development Tools
+
 - **Vitest**: Unit testing
 - **Playwright**: E2E testing with extension support
 - **ESLint + Prettier**: Code quality
@@ -78,9 +85,11 @@ further group-tree and bundle optimization is deferred. See
 ## Phase 1: Foundation (Week 1-2)
 
 ### 1.1 Repository Setup
+
 **Goal**: Establish development environment and extension identity
 
 **Tasks**:
+
 - [x] Initialize repository with `.gitignore`, `README.md`
 - [x] Set up Vite with TypeScript and React
 - [x] Configure Tailwind CSS and design tokens
@@ -90,6 +99,7 @@ further group-tree and bundle optimization is deferred. See
 - [x] Set up ESLint, Prettier, and pre-commit hooks
 
 **Deliverables**:
+
 ```
 favoritepod/
 ├── src/
@@ -108,14 +118,17 @@ favoritepod/
 ```
 
 **Acceptance**:
+
 - [ ] Extension loads in Chrome as unpacked
 - [ ] HMR works during development
 - [x] TypeScript compiles without errors
 
 ### 1.2 Platform Spike (De-risking)
+
 **Goal**: Validate risky assumptions before UI work
 
 **Tasks**:
+
 - [ ] Test `chrome.identity.getAuthToken()` with Drive API
 - [ ] Upload/download file to `appDataFolder`
 - [ ] Test `chrome.tabs.captureVisibleTab()` from popup
@@ -123,10 +136,12 @@ favoritepod/
 - [ ] Document spike findings and limitations
 
 **Deliverables**:
-- `docs/spike-findings.md` with test results
+
+- API spike findings recorded with the applicable manual checklist
 - Throwaway spike code (can be deleted after)
 
 **Acceptance**:
+
 - Drive authentication works
 - Screenshot capture works
 - File:// links open correctly
@@ -135,9 +150,11 @@ favoritepod/
 ## Phase 2: Core Data Layer (Week 2-3) - Implementation Complete
 
 ### 2.1 Data Model & HLC
+
 **Goal**: Build conflict-free data structures
 
 **Tasks**:
+
 - [x] Implement Hybrid Logical Clock (HLC) module
 - [x] Define `Group` and `Item` interfaces with per-field clocks
 - [x] Create fractional ordering utility
@@ -145,6 +162,7 @@ favoritepod/
 - [x] Write comprehensive unit tests for merge scenarios
 
 **Key Files**:
+
 ```
 src/core/
 ├── types.ts          # Group, Item, HLC interfaces
@@ -158,6 +176,7 @@ src/core/
 ```
 
 **Test Cases**:
+
 - Concurrent field edits resolve correctly
 - Deletion tombstones win over stale edits
 - Group cycle detection and repair
@@ -165,14 +184,17 @@ src/core/
 - Ordering conflict resolution
 
 **Acceptance**:
+
 - All merge unit tests pass
 - 100% test coverage on merge logic
 - Documented merge rules
 
 ### 2.2 IndexedDB Layer
+
 **Goal**: Local storage with sync-ready schema
 
 **Tasks**:
+
 - [x] Define versioned Dexie schema and indexes
 - [x] Establish the initial database version; add upgrade migrations with future schema versions
 - [x] Create CRUD operations for groups/items (group deletion requires an empty group)
@@ -181,6 +203,7 @@ src/core/
 - [x] Implement snapshot mechanism (last 3 snapshots)
 
 **Schema**:
+
 ```typescript
 const db = new Dexie('FavoritePod');
 
@@ -190,11 +213,12 @@ db.version(1).stores({
   thumbnails: 'hash, size, createdAt',
   syncMeta: 'key',
   snapshots: '++id, createdAt',
-  deviceFiles: 'deviceId, lastSync'
+  deviceFiles: 'deviceId, lastSync',
 });
 ```
 
 **Acceptance**:
+
 - CRUD operations work
 - Queries are efficient (use indexes)
 - Transactions are atomic
@@ -207,9 +231,11 @@ merge module is held to 100% branch, function, line, and statement coverage by
 ## Phase 3: Basic UI (Week 3-4) - Implementation Complete
 
 ### 3.1 Toolbar Popup
+
 **Goal**: Quick access to recent favorites with a bookmark-style add dialog
 
 **Tasks**:
+
 - [x] Create popup UI (320x480px)
 - [x] Add an "Add bookmark" action for the active page
 - [x] Keep a preview of the five most recent pages in the popup
@@ -225,6 +251,7 @@ merge module is held to 100% branch, function, line, and statement coverage by
 - [x] Add "Open launcher" button
 
 **Design Requirements**:
+
 - Fast load time (<100ms)
 - Recent pages preview (last 5)
 - Maximum of five non-dismissed pages, with an x action to remove a page from this list
@@ -233,6 +260,7 @@ merge module is held to 100% branch, function, line, and statement coverage by
 - Group selection dropdown in the review dialog
 
 **Acceptance**:
+
 - The add action opens the review dialog and saves the page by default
 - Done persists name and folder edits; Remove deletes the favorite
 - Recent pages remain available from the popup home screen
@@ -240,9 +268,11 @@ merge module is held to 100% branch, function, line, and statement coverage by
 - Works on activeTab without broad permissions
 
 ### 3.2 Launcher Dashboard Shell
+
 **Goal**: Full-screen extension tab with navigation
 
 **Tasks**:
+
 - [x] Create dashboard layout
 - [x] Build responsive grid/list views
 - [x] Add top bar (search, view options, settings)
@@ -251,6 +281,7 @@ merge module is held to 100% branch, function, line, and statement coverage by
 - [x] Build settings panel structure with a saved default-view preference
 
 **Layout**:
+
 ```
 ┌────────────────────────────────────────────────────┐
 │ [Logo] [Search] [View] [Account] [Settings]        │
@@ -265,6 +296,7 @@ merge module is held to 100% branch, function, line, and statement coverage by
 ```
 
 **Acceptance**:
+
 - Dashboard opens in new tab
 - Responsive layout works
 - Navigation is intuitive
@@ -286,9 +318,11 @@ Phase 6 and Phase 7 implementations are complete, with manual Chrome acceptance
 tracked separately. Google Drive Sync is the next planned phase.
 
 ### 4.1 Nested Groups & Items
+
 **Goal**: Hierarchical organization with drag-and-drop
 
 **Tasks**:
+
 - [x] Render nested group tree
 - [x] Display items in grid/list views
 - [x] Implement group expand/collapse
@@ -297,12 +331,14 @@ tracked separately. Google Drive Sync is the next planned phase.
 - [x] Show favicons as fallback
 
 **Group Tree Component**:
+
 - Collapsible with smooth animation
 - Visual depth indicator (indent + line)
 - Badge showing item count
 - Drag rows directly; edge line and circle show sibling placement, center drops nest
 
 **Item Card Component**:
+
 - Thumbnail (640x400 local, lazy-loaded)
 - Title overlay on hover
 - Favicon + domain if no thumbnail
@@ -310,15 +346,18 @@ tracked separately. Google Drive Sync is the next planned phase.
 - Selection checkbox
 
 **Acceptance**:
+
 - [x] Groups nest at arbitrary depth
 - [x] Items display correctly
 - [x] Context menus work
 - [x] Keyboard navigation works
 
 ### 4.2 Drag-and-Drop Ordering
+
 **Goal**: Intuitive reordering and grouping
 
 **Tasks**:
+
 - [x] Implement drag-and-drop with keyboard-accessible move controls
 - [x] Implement group-to-group drag
 - [x] Implement item drag between groups
@@ -328,6 +367,7 @@ tracked separately. Google Drive Sync is the next planned phase.
 - [x] Handle nested group drag (prevent cycles)
 
 **Drag Scenarios**:
+
 1. Item to same group (reorder)
 2. Item to different group (move)
 3. Item to nested group (move + nest)
@@ -335,15 +375,18 @@ tracked separately. Google Drive Sync is the next planned phase.
 5. Group into group (nest, with cycle prevention)
 
 **Acceptance**:
+
 - [x] Drag is smooth and drop zones are clear
 - [x] Ordering persists correctly
 - [x] Cycle prevention works
 - [x] Undo/redo works
 
 ### 4.3 Edit & Delete
+
 **Goal**: Full CRUD operations with confirmation
 
 **Tasks**:
+
 - [x] Build edit modal for items
 - [x] Build edit modal for groups
 - [x] Add URL validation
@@ -353,6 +396,7 @@ tracked separately. Google Drive Sync is the next planned phase.
 - [x] Build undo system (local action stack)
 
 **Edit Item Modal**:
+
 - URL input with validation
 - Title input
 - Group selector
@@ -360,6 +404,7 @@ tracked separately. Google Drive Sync is the next planned phase.
 - Delete button
 
 **Acceptance**:
+
 - [x] Edits save correctly
 - [x] Invalid URLs rejected
 - [x] Deletes are reversible (undo)
@@ -377,9 +422,11 @@ opening still need the manual checks in `../testing/phase-4-manual-test.md`.
 ## Phase 5: Thumbnail System (Week 6-7) - Closed on 2026-11-03
 
 ### 5.1 Capture & Storage
+
 **Goal**: High-quality previews with efficient storage
 
 **Tasks**:
+
 - [x] Implement `captureVisibleTab()` wrapper
 - [x] Build OffscreenCanvas resizing
 - [x] Generate two sizes: 640x400, 320x200
@@ -389,8 +436,9 @@ opening still need the manual checks in `../testing/phase-4-manual-test.md`.
 - [x] Add favicon fetching via `chrome-extension://_favicon/`
 
 **Thumbnail Pipeline**:
+
 ```
-Capture (activeTab) 
+Capture (activeTab)
   → Resize (OffscreenCanvas)
   → Compress (JPEG quality 75%)
   → Hash (SHA-256)
@@ -399,21 +447,25 @@ Capture (activeTab)
 ```
 
 **Fallback Card**:
+
 - Gradient background based on URL hash
 - Large favicon (64px)
 - Title (truncated)
 - Domain badge
 
 **Acceptance**:
+
 - Thumbnails are crisp and fast
 - Deduplication works (same hash = one blob)
 - Fallback looks good
 - Capture respects rate limits
 
 ### 5.2 Hover Previews
+
 **Goal**: Rich previews on hover
 
 **Tasks**:
+
 - [x] Build popover component
 - [x] Show thumbnail on 400ms hover
 - [x] Display full URL
@@ -422,6 +474,7 @@ Capture (activeTab)
 - [x] Open pages through the Open action; remove unreliable live iframe previews
 
 **Popover Design**:
+
 ```
 ┌─────────────────────────────┐
 │                             │
@@ -435,6 +488,7 @@ Capture (activeTab)
 ```
 
 **Acceptance**:
+
 - Hover is smooth and responsive
 - Popover doesn't block interaction
 - Saved previews work for sites that block embedding
@@ -453,9 +507,11 @@ production build pass. Browser behavior remains open for the checklist in
 ## Phase 6: File:// Link Support (Week 7)
 
 ### 6.1 Local File Handling
+
 **Goal**: Support local HTML tools with path handling
 
 **Tasks**:
+
 - [x] Detect file:// URLs during save
 - [x] Check `chrome.extension.isAllowedFileSchemeAccess()`
 - [x] Show permission hint if denied
@@ -469,6 +525,7 @@ navigation behavior remain for the manual acceptance steps in
 `../testing/phase-6-manual-test.md`.
 
 **Permission Hint**:
+
 ```
 ┌────────────────────────────────────────────┐
 │ ⚠️ File Access Not Enabled                 │
@@ -483,11 +540,13 @@ navigation behavior remain for the manual acceptance steps in
 ```
 
 **Path Override Settings**:
+
 - Store per-device mappings
 - UI to add/edit overrides
 - Apply on open, not on save
 
 **Acceptance**:
+
 - File:// links open correctly
 - Permission hint shows when needed
 - Path overrides work across devices
@@ -500,9 +559,11 @@ user-reported manual acceptance in Chrome. Closure does not claim acceptance in
 other browsers or close browser acceptance for other phases.
 
 ### 7.1 ZIP Export
+
 **Goal**: Share libraries with colleagues
 
 **Tasks**:
+
 - [x] Build export dialog (select groups)
 - [x] Serialize groups/items to JSON
 - [x] Copy thumbnails to `previews/` by hash
@@ -511,6 +572,7 @@ other browsers or close browser acceptance for other phases.
 - [x] Add export metadata (version, timestamp)
 
 **Export Format**:
+
 ```typescript
 interface LauncherExport {
   format: 'visual-launcher';
@@ -523,14 +585,17 @@ interface LauncherExport {
 ```
 
 **Acceptance**:
+
 - Export completes in <5s for 100 items
 - ZIP structure is correct
 - Re-import works perfectly
 
 ### 7.2 ZIP Import
+
 **Goal**: Safe, validated import with merge options
 
 **Tasks**:
+
 - [x] Build import dialog (drag/drop + file picker)
 - [x] Validate ZIP structure with zod
 - [x] Validate URLs and reject unsafe schemes (including `javascript:`)
@@ -548,13 +613,15 @@ archives. Deleted records remain in the local database for the later cleanup
 phase.
 
 **Validation Rules**:
+
 - Max archive size: 100 MB
 - Max items: 10,000
 - Max image size: 5 MB each
-- Allowed schemes: http, https, file
+- Allowed schemes are defined by [validation.ts](../../src/core/validation.ts); ZIP imports use the same validation.
 - All referenced previews must exist
 
 **Acceptance**:
+
 - Invalid imports are rejected safely
 - Merge modes work as expected
 - Large imports show progress
@@ -563,9 +630,11 @@ phase.
 ## Phase 8: Google Drive Sync (Week 9-12)
 
 ### 8.1 Drive Authentication
+
 **Goal**: Secure OAuth flow via Chrome Identity API
 
 **Tasks**:
+
 - [x] Set up Google Cloud Project
 - [x] Enable Drive API
 - [x] Configure OAuth consent screen
@@ -577,6 +646,7 @@ phase.
 - [x] Detect account switches via permissionId
 
 **Settings UI**:
+
 ```
 ┌────────────────────────────────────────────┐
 │ Google Drive Sync                          │
@@ -591,6 +661,7 @@ phase.
 ```
 
 **Connected State**:
+
 ```
 ┌────────────────────────────────────────────┐
 │ Google Drive Sync                          │
@@ -605,6 +676,7 @@ phase.
 ```
 
 **Acceptance**:
+
 - OAuth flow completes
 - Tokens refresh automatically
 - Disconnect works offline and affects only this Chrome profile; other devices remain authorized
@@ -616,9 +688,11 @@ phase.
 Browser verification steps: [`phase-8.1-manual-test.md`](../testing/phase-8.1-manual-test.md).
 
 ### 8.2 Device File Management
+
 **Goal**: Per-device sync files with conflict-free updates
 
 **Tasks**:
+
 - [x] Generate and persist stable `deviceId` on first run
 - [x] Create device file: `launcher-state-device-<id>.json`
 - [x] List paginated appDataFolder files
@@ -627,6 +701,7 @@ Browser verification steps: [`phase-8.1-manual-test.md`](../testing/phase-8.1-ma
 - [x] Merge stale device records before removing files older than 90 days
 
 **Device File Structure**:
+
 ```typescript
 interface DriveDeviceState {
   schemaVersion: 1;
@@ -643,6 +718,7 @@ interface DriveDeviceState {
 ```
 
 **Acceptance**:
+
 - Each device has its own file in the private `appDataFolder`
 - Updates target only that device's file and refuse to overwrite an unseen remote change
 - Compaction merges device records into the current file before deleting files stale for 90 days
@@ -653,9 +729,11 @@ Chrome end-to-end verification now uses the manual multi-profile flow in
 [Phase 8.4 manual verification](../testing/phase-8.4-manual-test.md).
 
 ### 8.3 Asset Sync
+
 **Goal**: Deduplicated thumbnail sync
 
 **Tasks**:
+
 - [x] Upload thumbnails as `asset-<sha256>.jpg` into the private `appDataFolder`
 - [x] Skip already-uploaded hashes and report local or remote missing assets
 - [x] Download missing thumbnails and verify their content hash and image dimensions
@@ -664,6 +742,7 @@ Chrome end-to-end verification now uses the manual multi-profile flow in
 - [x] Translate Drive quota failures into a clear storage-full message
 
 **Upload Strategy**:
+
 1. Collect preview hashes from merged state
 2. List existing asset files in pages and cache their `fileId` by hash
 3. Upload missing local JPEGs only, verifying each blob matches its SHA-256 name
@@ -676,6 +755,7 @@ it as the remote asset would require a second synchronized hash before it could
 be safely downloaded and verified. Uploads use the existing 5 MB image limit.
 
 **Acceptance**:
+
 - Missing thumbnails can be uploaded and downloaded by content hash
 - Existing assets are reused instead of uploaded again
 - Old unreferenced assets are removed while recent or referenced assets remain
@@ -686,6 +766,7 @@ Chrome end-to-end verification now uses the manual multi-profile flow in
 [Phase 8.4 manual verification](../testing/phase-8.4-manual-test.md).
 
 ### 8.4 Sync Engine & Merge
+
 **Goal**: Conflict-free multi-device sync
 
 **Status**: Closed at the user's direction on 2026-11-05 as an implementation
@@ -693,6 +774,7 @@ milestone. The detailed Chrome acceptance sequence remains in
 [`phase-8.4-manual-test.md`](../testing/phase-8.4-manual-test.md).
 
 **Tasks**:
+
 - [x] Implement sync lock (navigator.locks)
 - [x] Build sync orchestrator (download → merge → upload)
 - [x] Implement per-field merge with HLC
@@ -703,12 +785,14 @@ milestone. The detailed Chrome acceptance sequence remains in
 - [x] Build sync retry with exponential backoff
 
 **Sync Triggers**:
+
 - On dashboard open
 - 10s after local change (debounced)
 - Every 15 minutes (chrome.alarms)
 - Manual "Sync Now" button
 
 **First Connect Dialog**:
+
 ```
 ┌────────────────────────────────────────────┐
 │ Sync with Google Drive                     │
@@ -726,6 +810,7 @@ milestone. The detailed Chrome acceptance sequence remains in
 ```
 
 **Acceptance**:
+
 - Two devices converge
 - Concurrent edits both survive
 - Deletions propagate
@@ -733,6 +818,7 @@ milestone. The detailed Chrome acceptance sequence remains in
 - Offline changes sync when online
 
 **Implementation notes**:
+
 - The existing field-clock merge and group-tree repair are reused by the sync
   orchestrator. Downloaded device-file metadata is cached only after its records
   have been applied locally.
@@ -747,17 +833,20 @@ milestone. The detailed Chrome acceptance sequence remains in
 Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-sync.test.ts src/core/__tests__/drive-files.test.ts`, followed by `npm run type-check`, `npm run lint`, and `npm run build`.
 
 ### 8.5 Error Handling & UI - Closed (2026-11-06)
+
 **Goal**: Clear sync status and error messages
 
 **Tasks**:
+
 - [x] Build sync status indicator (icon + accessible tooltip)
 - [x] Show sync progress across dashboard and service worker syncs
 - [x] Display sync errors with contextual retry or storage actions
 - [x] Implement offline mode; preserve local changes and sync on reconnect
 - [x] Add a bounded, profile-local sync history log
-- [x] Show cached Google Drive storage usage in Settings
+- Account-wide storage display was removed; the [app-folder usage proposal](deferred-sync-storage-usage.md) remains deferred.
 
 **Sync States**:
+
 - ✓ Synced (green dot)
 - ↻ Syncing... (spinning)
 - ⚠ Conflict resolved (yellow, temporary)
@@ -765,32 +854,34 @@ Automated verification: `npx vitest run --config vitest.config.ts src/core/__tes
 - ⊗ Offline (gray)
 
 **Error Messages**:
+
 - Quota exceeded: "Google Drive storage is full. Free up space in Google Drive to continue syncing."
 - Auth expired: Show "Connection needs attention" with **Connect Google Drive**.
 - Network error: Explain that local changes are saved and will sync when online; offer **Try again**.
 - Conflict repaired: "Concurrent changes merged automatically."
 
 **Acceptance**:
+
 - User always knows sync status from the dashboard header and Settings
 - Errors are actionable and distinguish authorization, network, offline, and quota states
 - Offline changes remain local and sync when the browser comes online
 - The latest 20 sync outcomes remain available for debugging
 
 **Implementation notes**:
-- Sync history and cached quota metadata use the existing `syncMeta` table; no
-  Dexie migration is needed. Disconnect/account changes clear these Drive-scoped
-  records with the rest of that profile's Drive bookkeeping.
-- Storage usage comes from Drive `about.get` and describes the Google account's
-  Drive usage, including files outside FavoritePod; it is not an appDataFolder
-  size estimate. The value is cached for 30 minutes.
-- See [`phase-8.5-manual-test.md`](../testing/phase-8.5-manual-test.md) for status,
-  offline, error, history, and quota checks.
+
+- Sync history uses the existing syncMeta table and retains the latest 20 entries.
+  Disconnect/account changes clear profile-local Drive bookkeeping.
+- Account-wide quota display and its cache were removed. Database migration 4
+  removes the old cache; storage-limit error handling and Manage storage remain.
+- See [Phase 8.5 manual verification](../testing/phase-8.5-manual-test.md) for
+  status, offline, error, and history checks.
 
 Automated verification: `npx vitest run --config vitest.config.ts src/core/__tests__/drive-auth.test.ts src/core/__tests__/drive-sync.test.ts src/core/__tests__/drive-sync-history.test.ts src/core/__tests__/drive-files.test.ts src/background/__tests__/drive-background.test.ts`, followed by `npm test`, `npm run type-check`, `npm run lint`, and `npm run build`.
 
 ## Phase 9: Optional Features (Week 13-14)
 
 ### 9.1 Frequently Visited Shortcuts — Complete (2026-11-07)
+
 **Goal**: Open frequently visited sites quickly from All favorites.
 
 This shortcut design supersedes the original separate save-suggestions view.
@@ -798,6 +889,7 @@ Manual acceptance passed on 2026-11-07 according to the user, including the
 Chrome-top-sites-only revision, permission flow, and layout/accessibility checks.
 
 **Tasks**:
+
 - [x] Request optional Top sites access in Settings (History permission removed)
 - [x] Use only Chrome top sites, preserving Chrome selection and ordering
 - [x] Show up to ten shortcuts within All favorites, including already-saved sites
@@ -808,6 +900,7 @@ Chrome-top-sites-only revision, permission flow, and layout/accessibility checks
 - [x] Persist hidden shortcuts locally
 
 **Acceptance**:
+
 - Permission requests are explicit; denied/revoked access is handled
 - The section appears in All favorites and optionally the home group, outside search
 - Saving keeps the shortcut and current view; undo/redo works
@@ -816,6 +909,7 @@ Chrome-top-sites-only revision, permission flow, and layout/accessibility checks
 - Keyboard, touch, desktop/narrow layouts, and light/dark themes work
 
 Implementation notes:
+
 - Visibility defaults on. Browser access remains opt-in through **Settings → Behavior →
   Permission control → Frequently visited access**. Hiding stops reads and clears
   results when both visibility options are off; turning access off removes Top
@@ -833,16 +927,18 @@ Implementation notes:
 
 Chrome's top-sites response is now the sole shortcut source. History backfill,
 custom visit-count/recency ranking, and History permission are removed. See
-[Chrome Top Sites Shortcuts](../archive/chrome-top-sites.md)
+[Phase 9 manual checklist](../testing/phase-9-manual-test.md)
 for implementation verification and user-reported acceptance on 2026-11-07.
 
 ### 9.2 Context Menu Integration (Optional) — Revised Implementation (2026-11-07)
+
 **Goal**: Right-click to save page/link
 
 **Next work**: Complete native Chrome manual acceptance of the single-action
 popup flow. Phase 9.2 is not included in the 2026-11-07 Phase 9.1 sign-off.
 
 **Tasks**:
+
 - [x] Add `contextMenus` permission (optional, requested from Settings)
 - [x] Create "Save to FavoritePod" menu item
 - [x] Handle page context (save current page)
@@ -853,12 +949,14 @@ popup flow. Phase 9.2 is not included in the 2026-11-07 Phase 9.1 sign-off.
 - [x] Add a persistent Settings switch to enable/disable the right-click save menu
 
 **Acceptance**:
+
 - Right-click works on pages
 - Right-click works on links
 - Name and destination folder are editable inside the popup
 - No page/group submenus or dashboard tab are opened
 
 Implementation notes:
+
 - Off by default. Enable **Settings → Behavior → Permission control → Right-click save menu**
   to request the optional permission. Disabling removes menu entries immediately;
   its permission can be reused on re-enable.
@@ -891,7 +989,8 @@ separately in [`phase-9-manual-test.md`](../testing/phase-9-manual-test.md).
 
 **Status Review (2026-11-08)**: After 9 phases, FavoritePod is functionally complete, with passing tests and stable builds. Phases 10.1 and 10.2 are closed after user manual acceptance. The remaining large-group memory cost is accepted for this stage; Phases 10.3–10.4 remain separate.
 
-**Current System Health**:
+**Recorded system health (2026-11-08)**:
+
 - ✅ All tests passing, TypeScript compiles cleanly
 - ✅ Robust HLC-based sync, offline support, comprehensive Drive integration
 - ✅ Optional features (Frequently Visited, Context Menus) implemented
@@ -901,6 +1000,7 @@ separately in [`phase-9-manual-test.md`](../testing/phase-9-manual-test.md).
 - ⚠️ Accessibility incomplete (keyboard shortcuts, ARIA labels need work)
 
 ### 10.1 Design System Finalization
+
 **Goal**: Consistent, polished UI (see design-guide.md)
 
 **Status (2026-11-07)**: Closed at the user's request after all manual acceptance
@@ -910,6 +1010,7 @@ Escape or native dragend, while allowing pending drops to finish saving. Isolate
 Chrome checks verify cancellation and subsequent persisted native drag/drop.
 
 **Current Status**:
+
 - ✅ CSS variables and color system defined in global.css
 - ✅ Component styling consistent across dashboard
 - ✅ Tailwind configuration complete
@@ -919,6 +1020,7 @@ Chrome checks verify cancellation and subsequent persisted native drag/drop.
 - ✅ Search shortcut, Escape handling, and responsive favorite arrow navigation
 
 **Revised Priority Tasks**:
+
 - [x] **HIGH**: Implement dark/light theme toggle (system preference detection + manual override)
 - [x] **MEDIUM**: Add smooth transitions (card hover, dialog open/close, drag feedback)
 - [x] **MEDIUM**: Polish loading states (Drive sync progress, thumbnail loading)
@@ -958,6 +1060,7 @@ The cancellation follow-up is documented as resolved; deferred polish and
 phases 10.2–10.4 remain separate work.
 
 ### 10.2 Performance Optimization
+
 **Goal**: Fast and smooth experience
 
 **Status (2026-11-08)**: Closed. All 11 manual checks are marked complete by the
@@ -1009,6 +1112,7 @@ unread response bodies. This reduces measured memory; the remaining cost is
 explicitly accepted at closure rather than treated as fully eliminated.
 
 **Revised Priority Tasks**:
+
 - [x] **HIGH**: Profile a 5,760-item dashboard and identify the all-cards mount cost
 - [x] **HIGH**: Load nearby thumbnails with Intersection Observer and share duplicate resources
 - [x] **MEDIUM**: Debounce search by 300ms
@@ -1016,10 +1120,12 @@ explicitly accepted at closure rather than treated as fully eliminated.
 - [x] **HIGH**: Virtualize favorite rows after profiling proved it necessary
 
 **Deferred Beyond Closure**:
+
 - Further group-tree virtualization/index consolidation to reduce the remaining large-group baseline
 - Additional bundle compression beyond the current production build and optional chunks
 
 **Reference Performance Targets (not all benchmarked; not closure blockers)**:
+
 - Popup opens: <100ms (current: untested)
 - Dashboard loads: <500ms with 100 items (current: untested)
 - Dashboard loads: <2s with 1000 items (5,760-item isolated profile settles in ~1.1s)
@@ -1028,17 +1134,20 @@ explicitly accepted at closure rather than treated as fully eliminated.
 - Sync cycle: <5s for 100 items (current: appears fast but not measured)
 
 ### 10.3 Comprehensive Testing
+
 **Goal**: High confidence before release
 
 **Current Status**:
+
 - ✅ 263 unit tests passing across 32 test files
 - ✅ Core modules well-tested (HLC, merge, storage, Drive sync)
-- ✅ Manual testing completed for Phases 1-9
+- Manual acceptance is recorded per phase in [testing/](../testing/); outstanding items remain open.
 - ⚠️ No automated E2E tests (all manual so far)
 - ✅ Phase 10.2 large-library checks accepted on the user's normal profile; broader target-device benchmarking remains separate
 - ⚠️ Accessibility not audited
 
 **Revised Priority Tasks**:
+
 - [ ] **HIGH**: Two-device Drive sync test (concurrent editing, conflict resolution)
 - [ ] **MEDIUM**: Accessibility audit (keyboard-only navigation, screen reader, ARIA labels)
 - [ ] **MEDIUM**: Test Drive quota limits and error handling
@@ -1047,274 +1156,45 @@ explicitly accepted at closure rather than treated as fully eliminated.
 - [ ] **LOW**: Cross-browser check (Chrome only for v1, Edge/Brave for v2)
 
 **Critical Manual Tests** (prioritized):
+
 1. ✅ Save page → appears in dashboard (Phase 3)
 2. ✅ Import ZIP → merge works (Phase 7)
 3. ✅ Export ZIP → re-import succeeds (Phase 7)
 4. ✅ Disconnect Drive → local still works (Phase 8.5)
 5. ✅ Account switch → confirmation works (Phase 8.1)
-6. ✅ Large data sets tested (5,760 items, 2GB memory usage identified - see memory-inspection.md)
+6. ✅ Large data sets tested (5,760 items, remaining memory cost accepted; see [Phase 10.2 checks](../testing/phase-10.2-manual-test.md))
 7. ⚠️ **PENDING**: Two devices → concurrent edits → verify merge
 8. ⚠️ **PENDING**: Delete group with nested items → verify sync
 9. ⚠️ **PENDING**: Fill Drive quota → verify error handling
 
 ### 10.4 Documentation
-**Goal**: Easy onboarding for users and developers
 
-**Current Status**:
-- ✅ Comprehensive developer docs (ai-agent-guide.md, code-guide.md, design-guide.md)
-- ✅ Implementation plan with phase details
-- ✅ Manual test plans for each phase
-- ✅ Inline JSDoc comments in core modules
-- ⚠️ No user-facing README
-- ⚠️ No troubleshooting guide
-- ⚠️ No keyboard shortcuts documented (because few exist)
+**Goal**: Easy onboarding for users and developers.
 
-**Revised Priority Tasks**:
-- [ ] **HIGH**: Write user README with screenshots for Chrome Web Store
-- [ ] **HIGH**: Create troubleshooting guide (file:// access, Drive auth, common errors)
-- [ ] **MEDIUM**: Document Drive quota limits and storage expectations
-- [ ] **MEDIUM**: Create CHANGELOG.md with release notes format
-- [ ] **LOW**: Document keyboard shortcuts (after implementing them in 10.1)
-- [ ] **LOW**: Developer setup guide (current docs are good, make it more beginner-friendly)
-- [ ] **DEFER**: Architecture decisions (well-documented in code and design guides)
+- [x] User [README](../../README.md) with installation, basic use, privacy, and a screenshot.
+- [x] [Support page](../publishing/wordpress/pages/support.html) for local files, Drive, and backups.
+- [x] [Developer guides](../development/) for code, design, data formats, and contribution workflow.
+- [x] [Changelog](../../CHANGELOG.md) and one [publishing checklist](../publishing/README.md).
+- [x] [Keyboard behavior](../development/design-guide.md#keyboard-behavior) documented.
+- [ ] Publish the prepared website content and verify live links.
 
 ---
-
-## Phase 10 Code Quality & Enhancement Analysis (2026-11-07)
-
-### System Architecture Review
-
-**Overall Assessment**: The codebase demonstrates solid architectural patterns with clear separation of concerns, robust data layer, and comprehensive sync implementation. After 9 phases, the foundation is production-ready, but several areas need polish for optimal user experience.
-
-### Strengths
-
-1. **Data Layer Excellence**
-   - HLC-based conflict-free sync working correctly across devices
-   - Well-tested merge logic with 100% coverage on critical paths
-   - Fractional indexing for stable ordering
-   - Proper use of Dexie transactions for atomicity
-   - Comprehensive Drive sync with offline support
-
-2. **Code Organization**
-   - Clear module boundaries (`core/`, `dashboard/`, `popup/`, `background/`)
-   - Shared types with consistent TypeScript usage
-   - Good separation between business logic and UI
-   - Reusable components (FavoriteCard, GroupTree, dialogs)
-
-3. **Testing & Quality**
-   - 204 tests passing across 23 test files
-   - Critical paths well-covered (storage, merge, Drive sync, ordering)
-   - Clean TypeScript compilation with strict mode
-   - Consistent code style with ESLint + Prettier
-
-4. **Chrome Extension Best Practices**
-   - Correct MV3 implementation
-   - Proper permission handling (optional features)
-   - Background service worker correctly scoped
-   - No DOM access in service worker
-
-### Areas Needing Enhancement
-
-#### 1. **Performance & Memory (CRITICAL for v1)**
-
-**Original findings (addressed in Phase 10.2; remaining group overhead accepted)**:
-- All matching favorites mounted simultaneously in "All favorites" view
-- Each card creates both small and full-size thumbnail URLs
-- No resource sharing for duplicate images
-- Group tree fully mounted even when collapsed
-
-**Closure disposition** (see `docs/archive/memory-inspection.md`):
-- [x] Virtualize favorite grid/list with the agreed 50% viewport buffer above/below
-- [x] Deduplicate thumbnail resources; retain ten recent hover images with no unused small-image cache
-- [x] Generate missing 320×200 card previews on demand from imported images
-- [x] Suspend offscreen collection work and mount group menu panels on demand
-- Deferred: group-tree virtualization and further consolidation of hierarchy indexes
-
-**Disposition**: Phase 10.2 closed by user acceptance on 2026-11-08. Remaining
-group-memory cost is a documented future improvement, not an open phase blocker.
-
-#### 2. **Bundle Size Optimization**
-
-**Current Sizes**:
-- dashboard.js: 231KB (67.5KB gzipped)
-- global.js: 200KB (66KB gzipped)
-- drive-sync-triggers.js: 127KB (40.7KB gzipped)
-- optional-features.js: 130KB (36.8KB gzipped)
-
-**Issues**:
-- Zod library included in multiple bundles (4.6.7, large schema validation library)
-- Optional features not lazy-loaded (Discovery and Context Menus always loaded)
-- Heroicons imported individually but not tree-shaken optimally
-
-**Recommendations**:
-- [ ] **MEDIUM**: Code-split optional features (load Discovery/Context Menu modules only when enabled)
-- [ ] **LOW**: Analyze Zod bundle impact (consider lighter validation for some paths)
-- [ ] **LOW**: Review Heroicons imports (use only needed icons or switch to inline SVG)
-- [ ] **DEFER**: Consider moving Dexie operations to shared worker for memory
-
-**Priority**: MEDIUM - Current sizes acceptable for extension, but optimization would improve load time.
-
-#### 3. **UI/UX Polish**
-
-**Theme Toggle — Implemented in 10.1 (2026-11-07)**:
-- CSS variables defined in global.css with light/dark modes
-- `prefers-color-scheme` media query exists
-- Settings offers System/Light/Dark using existing semantic tokens
-- Theme preference is saved locally and observed across open extension pages
-
-**Recommendations**:
-- [x] **HIGH**: Add theme selector to Settings (System / Light / Dark)
-- [x] **HIGH**: Save preference to IndexedDB settings table
-- [x] **HIGH**: Apply data-theme attribute to root element
-- [ ] **MEDIUM**: Add smooth transition when switching themes
-
-**Animation & Transitions**:
-- Basic transitions exist (hover states, button presses)
-- Shared dialog enter/exit transitions respect reduced motion
-- Existing drag-stack ghosts and placement/reorder feedback retained
-- Thumbnail decode and sync progress feedback polished
-
-**Recommendations**:
-- [x] **MEDIUM**: Add dialog fade-in animation (200ms)
-- [x] **MEDIUM**: Improve drag visual feedback (existing ghost images and drop zone highlights retained)
-- [ ] **LOW**: Add smooth scroll when navigating to groups
-- [x] **LOW**: Polish Drive sync progress indicator (counts when known; otherwise indeterminate)
-
-#### 4. **Accessibility Gaps**
-
-**Current State**:
-- Basic keyboard navigation works (Tab, Enter, Esc)
-- Focus styles defined globally
-- Headless UI components provide good ARIA support
-- Missing comprehensive keyboard shortcuts
-
-**Issues Identified**:
-- Cmd/Ctrl+K and favorite arrow/Home/End navigation implemented in 10.1
-- Some interactive elements missing ARIA labels
-- Skip-to-favorites link added in 10.1
-- Screen reader testing not performed
-
-**Recommendations**:
-- [x] **HIGH**: Implement Cmd/Ctrl+K for search focus
-- [x] **HIGH**: Add arrow key navigation in grid/list views
-- [ ] **MEDIUM**: Audit all interactive elements for ARIA labels
-- [x] **MEDIUM**: Add skip-to-main-content link
-- [ ] **LOW**: Test with VoiceOver/NVDA screen readers
-- [ ] **LOW**: Document keyboard shortcuts in UI (? key for help)
-
-#### 5. **Error Handling & Edge Cases**
-
-**Current State**:
-- Drive sync errors well-handled (offline, auth, quota)
-- File access errors properly surfaced
-- Import validation comprehensive
-
-**Potential Improvements**:
-- [ ] **MEDIUM**: Add retry logic for thumbnail capture failures
-- [ ] **MEDIUM**: Better error messages for corrupted IndexedDB (recovery guide)
-- [ ] **LOW**: Add telemetry for error tracking (optional, privacy-respecting)
-- [ ] **LOW**: Implement automatic crash recovery (detect incomplete operations)
-
-#### 6. **Code Organization Suggestions**
-
-**DashboardApp.tsx Complexity**:
-- 67 React hooks in one component
-- 1000+ lines (estimated from context)
-- Handles: state, Drive sync, optional features, drag-drop, selection, undo/redo
-
-**Recommendations**:
-- [ ] **LOW**: Extract Drive sync state to custom hook (`useDriveSync`)
-- [ ] **LOW**: Extract selection/bulk actions to custom hook (`useSelection`)
-- [ ] **LOW**: Extract undo/redo stack to custom hook (`useUndoRedo`)
-- [ ] **DEFER**: Consider splitting DashboardApp into smaller components (works fine as-is)
-
-**Storage.ts Module Size**:
-- Single module handles all CRUD operations
-- 150+ lines already read (likely 500+ total)
-- Mixes settings getters/setters with library operations
-
-**Recommendations**:
-- [ ] **DEFER**: Consider splitting into `storage/library.ts`, `storage/settings.ts`, `storage/snapshots.ts`
-- [ ] **DEFER**: Only split if module becomes hard to navigate (currently manageable)
-
-### Recommendations by Priority
-
-**Must Do Before v1 Launch (HIGH Priority)**:
-1. Implement virtual scrolling and thumbnail resource management (memory fix)
-2. Two-device Drive sync testing (validate conflict resolution)
-3. Dark/light theme toggle (user expectation for modern apps)
-4. Basic keyboard shortcuts (Cmd+K search, Esc close)
-5. Accessibility ARIA label audit
-
-**Should Do Before v1 Launch (MEDIUM Priority)**:
-6. Code-split optional features (reduce initial bundle)
-7. Add smooth animations (dialogs, drag-drop feedback)
-8. Polish Drive sync UI (progress bar, better error messages)
-9. Search debouncing (prevent lag on large collections)
-10. Accessibility testing with screen readers
-
-**Nice to Have for v1 (LOW Priority)**:
-11. Skeleton loading screens
-12. Detailed keyboard shortcuts (arrow navigation, shortcuts help)
-13. Bundle size optimization (Zod, Heroicons)
-14. Refactor DashboardApp hooks
-15. Comprehensive tooltips
-
-**Defer to v2**:
-- Automated E2E tests (manual testing working well)
-- Code architecture refactoring (current structure is maintainable)
-- Advanced animations (confetti, celebrations)
-- Cross-browser support (Chrome-first for v1)
-- Module reorganization (only if navigation becomes difficult)
-
-### Logic Issues Identified
-
-After reviewing the codebase, **no significant logic errors were found**. The implementation is solid:
-
-✅ HLC merge logic correct and well-tested  
-✅ Fractional ordering handles all edge cases  
-✅ Drive sync properly handles offline, errors, conflicts  
-✅ File URL validation prevents security issues  
-✅ Group cycle prevention working correctly  
-✅ Undo/redo stack properly maintained  
-✅ Optional permissions requested correctly  
-
-**Minor Suggestions**:
-- Consider adding bounds checking for very deep group nesting (100+ levels)
-- Add rate limiting for rapid favorite creation (prevent accidental duplication)
-- Consider adding data validation on IndexedDB read (detect corruption early)
-
-### Conclusion
-
-FavoritePod is **functionally complete and architecturally sound**. The core features work correctly, sync is robust, and code quality is high. Before public launch, focus on:
-
-1. **Performance**: Virtual scrolling for large collections (blocking issue)
-2. **Polish**: Theme toggle, smooth animations, keyboard shortcuts
-3. **Testing**: Two-device sync, accessibility audit
-4. **Documentation**: User README, troubleshooting guide
-
-The codebase is ready for these enhancements without major refactoring. Current architecture will scale well with the recommended optimizations.
-
----
-
 
 ## Phase 11: Release Preparation (Week 16-17)
 
 ### 11.1 Chrome Web Store Submission
+
 **Goal**: Published extension
 
 **Tasks**:
-- [ ] Create store listing assets:
-  - Screenshots (1280x800, 3-5 images)
-  - Promo tile (440x280)
-  - Small tile (128x128)
-  - Logo assets (16, 48, 128)
+
+- [x] Prepare five 1280 × 800 screenshots, 440 × 280 promotional artwork, and the 128 × 128 store icon
+- [ ] Confirm final screenshot acceptance against the release build
 - [x] Write store description
 - [x] Prepare public homepage, privacy policy, support page, privacy declarations, and reviewer instructions
 - [x] Set the release version to 1.0.0 in the package, lockfile, and extension manifest
 - [ ] Host the public pages and verify their URLs while signed out
 - [ ] Add the live privacy-policy URL to the store, OAuth branding, and extension UI
-- [ ] Set up analytics (if desired)
 - [ ] Upload to Chrome Web Store
 - [ ] Move OAuth consent to "In production"
 - [ ] Submit for review
@@ -1326,8 +1206,8 @@ instructions, and WordPress-ready product/privacy/support fragments with scoped
 Astra styling and generated local previews. The [publishing checklist](../publishing/README.md)
 describes the Elementor widgets, media uploads, and shared CSS placement. Publisher contact and
 website details were supplied by the user. Optional Buy Me a Coffee support is
-included in the listing and website copy. The pages are prepared locally and have
-not been deployed. All five screenshot files in `../publishing/screenshots/`
+included in the listing and website copy. The homepage and support URLs were reachable during the documentation link check;
+the product privacy URL redirects to the studio policy and needs correction. All five screenshot files in `../publishing/screenshots/`
 are 1280 × 800; final visual/manual acceptance and upload remain separate. Version
 1.0.0 passes lint, the production build, and 335 tests in 36 suites, with 100%
 configured merge-module coverage. Production OAuth configuration, native Chrome
@@ -1335,9 +1215,11 @@ acceptance, and store submission are not marked complete by this preparation.
 See [CHANGELOG.md](../../CHANGELOG.md) for the unreleased version summary.
 
 ### 11.2 Public Launch
+
 **Goal**: Get first users
 
 **Tasks**:
+
 - [ ] Soft launch to test users
 - [ ] Monitor error logs and feedback
 - [ ] Fix critical bugs
@@ -1348,6 +1230,7 @@ See [CHANGELOG.md](../../CHANGELOG.md) for the unreleased version summary.
 ## Ongoing Maintenance
 
 ### Regular Tasks
+
 - Monitor Drive API quota usage
 - Respond to user feedback
 - Fix bugs
@@ -1355,6 +1238,7 @@ See [CHANGELOG.md](../../CHANGELOG.md) for the unreleased version summary.
 - Chrome API compatibility checks
 
 ### Future Enhancements (v2+)
+
 - New-tab replacement variant
 - Custom themes
 - Tag system
@@ -1368,6 +1252,7 @@ See [CHANGELOG.md](../../CHANGELOG.md) for the unreleased version summary.
 ## Risk Mitigation
 
 ### High-Risk Areas
+
 1. **Drive sync conflicts**: Mitigated by spike, unit tests, and two-device testing
 2. **IndexedDB quota**: Mitigated by `unlimitedStorage` permission and monitoring
 3. **Thumbnail capture rate limits**: Mitigated by queue and rate limiting
@@ -1375,14 +1260,16 @@ See [CHANGELOG.md](../../CHANGELOG.md) for the unreleased version summary.
 5. **Browser compatibility**: Mitigated by Chrome-first approach, documented limitations
 
 ### Rollback Plan
+
 - Keep last 3 snapshots locally
 - Export to ZIP before major changes
 - Gradual rollout to test users first
-- Monitor error rates with analytics
+- Review local error reports and user feedback
 
 ## Success Metrics
 
 ### Launch Goals (v1)
+
 - 100 active users
 - <5% error rate
 - Average sync time <5s
@@ -1390,93 +1277,8 @@ See [CHANGELOG.md](../../CHANGELOG.md) for the unreleased version summary.
 - Zero data-loss incidents
 
 ### User Experience Targets
+
 - Popup opens in <100ms
 - Dashboard loads in <500ms
 - Drag-and-drop at 60fps
 - Sync converges in <10s
-
-## V1 Simplified Scope (AI-Assisted Development)
-
-Given requirements:
-- **First-time Chrome extension development**
-- **AI agents as primary workforce**
-- **Manual testing only (token-efficient)**
-- **Priority: file:// link support**
-- **Timeline: flexible, optimize for quality over speed**
-
-### V1 Must-Haves
-1. ✅ **File:// link support** (local HTML tools - PRIMARY GOAL)
-2. ✅ Basic launcher with thumbnails
-3. ✅ Hierarchical groups with nested organization
-4. ✅ Manual drag-and-drop reordering
-5. ✅ IndexedDB storage (sync-ready schema, but no Drive yet)
-6. ✅ ZIP export/import (for sharing)
-7. ✅ Popup "Save page" action
-
-### V1 Deferred to V2
-- ❌ Google Drive sync (most complex, defer until core works)
-- ❌ Visited-site discovery (optional permission complexity)
-- ❌ Advanced animations (polish later)
-- ❌ Automated testing (manual first, automate if patterns emerge)
-
-### Revised Timeline (AI-Driven)
-
-| Phase | Duration | Key Deliverable |
-|-------|----------|-----------------|
-| 1. Foundation | 3 days | Dev environment + extension basics |
-| 2. Platform Spike | 2 days | Validate file:// + capture APIs |
-| 3. Data Layer | 3 days | IndexedDB with simple schema |
-| 4. Popup UI | 2 days | Save current page |
-| 5. Dashboard Shell | 3 days | Basic launcher view |
-| 6. Items & Groups | 4 days | Display + CRUD |
-| 7. Thumbnails | 3 days | Capture + display |
-| 8. **File:// Support** | 4 days | **Local file handling (PRIORITY)** |
-| 9. Drag-and-Drop | 3 days | Reordering |
-| 10. ZIP Export/Import | 4 days | Sharing mechanism |
-| 11. Polish | 3 days | Theme + UX cleanup |
-| 12. Manual Testing | 3 days | Bug fixing |
-| **Total** | **~5 weeks** | **V1 ready** |
-
-### V2 Additions (After V1 Stabilizes)
-- Google Drive sync (4 weeks)
-- Advanced features (history discovery)
-- Automated E2E tests (2 weeks)
-
-## AI Development Strategy
-
-### Working with AI Agents
-
-**Optimal Task Breakdown**:
-- Each task should be completable in one AI session (<200K tokens)
-- Provide complete context (this plan + code guide + design guide)
-- Focus on one module at a time
-- Clear acceptance criteria for each task
-
-**AI-Friendly Architecture**:
-- Pure functions over classes (easier to test and reason about)
-- Clear interfaces between modules
-- Extensive TypeScript types (AI can validate contracts)
-- JSDoc comments for complex logic
-
-**Iteration Approach**:
-1. AI implements feature
-2. Manual testing by human
-3. Report bugs/feedback
-4. AI fixes
-5. Repeat until stable
-6. Move to next feature
-
-**Token Optimization**:
-- Use manual testing (cheaper than writing test suites)
-- Reuse patterns (once drag-and-drop works, copy pattern)
-- Focus AI on business logic, not boilerplate
-- Generate simple test data manually
-
-## Notes
-
-- Prioritize getting file:// support working perfectly before other features
-- Keep UI simple initially (polish is easier than fixing architecture)
-- Manual testing is fine for v1 (100-200 items, 2-3 devices)
-- Drive sync is complex - defer until core is proven
-- AI agents work best with clear, modular tasks
-
